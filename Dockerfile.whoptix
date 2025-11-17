@@ -1,0 +1,37 @@
+# Use the official .NET runtime as a parent image
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
+WORKDIR /app
+EXPOSE 80
+
+# Use the SDK image to build the application
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+
+# Copy csproj files and restore dependencies
+COPY backend/SkuVaultSaaS.Core/SkuVaultSaaS.Core.csproj backend/SkuVaultSaaS.Core/
+COPY backend/SkuVaultSaaS.Infrastructure/SkuVaultSaaS.Infrastructure.csproj backend/SkuVaultSaaS.Infrastructure/
+COPY backend/SkuVaultSaaS.Api/SkuVaultSaaS.Api.csproj backend/SkuVaultSaaS.Api/
+
+RUN dotnet restore backend/SkuVaultSaaS.Api/SkuVaultSaaS.Api.csproj
+
+# Copy the source code
+COPY backend/ backend/
+
+# Build the application
+WORKDIR /src/backend/SkuVaultSaaS.Api
+RUN dotnet build -c Release -o /app/build
+
+# Publish the application
+FROM build AS publish
+RUN dotnet publish -c Release -o /app/publish
+
+# Final stage/image
+FROM base AS final
+WORKDIR /app
+COPY --from=publish /app/publish .
+
+# Set environment variables
+ENV ASPNETCORE_URLS=http://+:80
+ENV ASPNETCORE_ENVIRONMENT=Production
+
+ENTRYPOINT ["dotnet", "SkuVaultSaaS.Api.dll"]

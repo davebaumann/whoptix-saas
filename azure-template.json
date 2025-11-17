@@ -1,0 +1,101 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "siteName": {
+      "type": "string",
+      "defaultValue": "whoptix-api",
+      "metadata": {
+        "description": "Name of the App Service for the API"
+      }
+    },
+    "staticWebAppName": {
+      "type": "string", 
+      "defaultValue": "whoptix-frontend",
+      "metadata": {
+        "description": "Name of the Static Web App for the frontend"
+      }
+    },
+
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Location for all resources"
+      }
+    }
+  },
+  "variables": {
+    "appServicePlanName": "whoptix-plan",
+    "connectionString": "Server=davidbaumann.pro;Database=whoptix;Uid=whoptix_user;Pwd=YOUR_DB_PASSWORD;SslMode=Required;Port=3306"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2021-02-01",
+      "name": "[variables('appServicePlanName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "F1",
+        "tier": "Free"
+      },
+      "properties": {
+        "reserved": false
+      }
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2021-02-01",
+      "name": "[parameters('siteName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]"
+      ],
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]",
+        "siteConfig": {
+          "netFrameworkVersion": "8.0",
+          "appSettings": [
+            {
+              "name": "ASPNETCORE_ENVIRONMENT",
+              "value": "Production"
+            },
+            {
+              "name": "ConnectionStrings__DefaultConnection", 
+              "value": "[variables('connectionString')]"
+            },
+            {
+              "name": "VITE_API_BASE_URL",
+              "value": "[concat('https://', parameters('siteName'), '.azurewebsites.net')]"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Web/staticSites",
+      "apiVersion": "2021-02-01",
+      "name": "[parameters('staticWebAppName')]",
+      "location": "East US 2",
+      "properties": {
+        "repositoryUrl": "",
+        "branch": "",
+        "buildProperties": {
+          "appLocation": "/",
+          "apiLocation": "",
+          "outputLocation": "dist"
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "appServiceUrl": {
+      "type": "string",
+      "value": "[concat('https://', parameters('siteName'), '.azurewebsites.net')]"
+    },
+    "staticWebAppUrl": {
+      "type": "string", 
+      "value": "[reference(resourceId('Microsoft.Web/staticSites', parameters('staticWebAppName'))).defaultHostname]"
+    }
+  }
+}

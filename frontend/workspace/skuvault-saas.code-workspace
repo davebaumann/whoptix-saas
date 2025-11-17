@@ -1,0 +1,19 @@
+{
+  "folders": [
+    {
+      "name": "frontend",
+      "path": "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\frontend"
+    },
+    {
+      "name": "backend",
+      "path": "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\SkuVaultSaaS.Api"
+    }
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/bin": true,
+      "**/obj": true,
+      "**/node_modules": true
+    }
+  }
+}

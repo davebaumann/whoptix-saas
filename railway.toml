@@ -1,0 +1,43 @@
+# Railway Deployment Setup for Whoptix
+
+## Step 1: Install Railway CLI (Optional but helpful)
+```powershell
+# Install Railway CLI
+npm install -g @railway/cli
+
+# Login to Railway
+railway login
+```
+
+## Step 2: Create railway.toml Configuration
+```toml
+[build]
+builder = "nixpacks"
+
+[deploy]
+healthcheckPath = "/api/health"
+healthcheckTimeout = 300
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 10
+
+[env]
+ASPNETCORE_ENVIRONMENT = "Production"
+ASPNETCORE_URLS = "http://0.0.0.0:$PORT"
+```
+
+## Step 3: Environment Variables for Railway Dashboard
+```
+ASPNETCORE_ENVIRONMENT=Production
+ASPNETCORE_URLS=http://0.0.0.0:$PORT
+ConnectionStrings__DefaultConnection=Server=davidbaumann.pro;Database=dbayd5xzdn55n8;User=u41gecrgnxvqt;Password=skuvault_db_admin;SslMode=Required;Port=3306
+```
+
+## Alternative: Quick Deploy with CLI
+```powershell
+# If you have Railway CLI installed
+railway login
+railway init
+railway up
+```
+
+This should give you immediate deployment without quota issues!

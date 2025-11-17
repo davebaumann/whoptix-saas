@@ -1,0 +1,8 @@
+{
+  "providers": ["csharp"],
+  "buildCommand": "cd backend/SkuVaultSaaS.Api && dotnet publish -c Release -o out",
+  "startCommand": "cd backend/SkuVaultSaaS.Api/out && dotnet SkuVaultSaaS.Api.dll",
+  "staticAssets": {
+    "/**": "./frontend/dist"
+  }
+}

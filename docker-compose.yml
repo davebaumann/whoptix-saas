@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  skuvault-app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: skuvault-saas
+    ports:
+      - "80:8080"
+      - "443:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+    volumes:
+      - ./logs:/app/logs
+      - ./appsettings.Production.json:/app/appsettings.Production.json:ro
+    restart: unless-stopped
+    depends_on:
+      - mysql
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  mysql:
+    image: mysql:8.0
+    container_name: skuvault-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: your-root-password
+      MYSQL_DATABASE: skuvault_saas
+      MYSQL_USER: skuvault_user
+      MYSQL_PASSWORD: your-mysql-password
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "3306:3306"
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+
+networks:
+  default:
+    driver: bridge

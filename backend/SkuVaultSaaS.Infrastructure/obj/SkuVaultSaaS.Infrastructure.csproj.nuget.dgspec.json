@@ -1,0 +1,160 @@
+{
+  "format": 1,
+  "restore": {
+    "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\SkuVaultSaaS.Infrastructure\\SkuVaultSaaS.Infrastructure.csproj": {}
+  },
+  "projects": {
+    "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\SkuVaultSaaS.Core\\SkuVaultSaaS.Core.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\SkuVaultSaaS.Core\\SkuVaultSaaS.Core.csproj",
+        "projectName": "SkuVaultSaaS.Core",
+        "projectPath": "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\SkuVaultSaaS.Core\\SkuVaultSaaS.Core.csproj",
+        "packagesPath": "C:\\Users\\dcbau\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\SkuVaultSaaS.Core\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\dcbau\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.415/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\SkuVaultSaaS.Infrastructure\\SkuVaultSaaS.Infrastructure.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\SkuVaultSaaS.Infrastructure\\SkuVaultSaaS.Infrastructure.csproj",
+        "projectName": "SkuVaultSaaS.Infrastructure",
+        "projectPath": "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\SkuVaultSaaS.Infrastructure\\SkuVaultSaaS.Infrastructure.csproj",
+        "packagesPath": "C:\\Users\\dcbau\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\SkuVaultSaaS.Infrastructure\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\dcbau\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\SkuVaultSaaS.Core\\SkuVaultSaaS.Core.csproj": {
+                "projectPath": "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\SkuVaultSaaS.Core\\SkuVaultSaaS.Core.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "Microsoft.AspNetCore.Identity.EntityFrameworkCore": {
+              "target": "Package",
+              "version": "[8.0.8, )"
+            },
+            "Microsoft.EntityFrameworkCore": {
+              "target": "Package",
+              "version": "[8.0.8, )"
+            },
+            "Microsoft.EntityFrameworkCore.Design": {
+              "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[8.0.8, )"
+            },
+            "Microsoft.Extensions.Configuration.Abstractions": {
+              "target": "Package",
+              "version": "[8.0.0, )"
+            },
+            "Microsoft.Extensions.Configuration.Binder": {
+              "target": "Package",
+              "version": "[8.0.0, )"
+            },
+            "Microsoft.Extensions.Hosting.Abstractions": {
+              "target": "Package",
+              "version": "[8.0.0, )"
+            },
+            "Pomelo.EntityFrameworkCore.MySql": {
+              "target": "Package",
+              "version": "[8.0.0-beta.2, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.415/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}

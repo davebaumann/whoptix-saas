@@ -1,0 +1,40 @@
+# Heroku Dockerfile for SkuVault SaaS
+# Multi-stage build for production deployment
+
+# Stage 1: Build frontend
+FROM node:18 AS frontend-build
+WORKDIR /app/frontend
+COPY frontend/package*.json ./
+RUN npm ci --only=production
+COPY frontend/ ./
+RUN npm run build
+
+# Stage 2: Build backend
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS backend-build
+WORKDIR /app/backend
+COPY backend/ ./
+RUN dotnet restore
+RUN dotnet publish SkuVaultSaaS.Api/SkuVaultSaaS.Api.csproj -c Release -o /app/publish
+
+# Stage 3: Runtime
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
+WORKDIR /app
+
+# Copy published backend
+COPY --from=backend-build /app/publish .
+
+# Copy built frontend to wwwroot
+COPY --from=frontend-build /app/frontend/dist ./wwwroot
+
+# Heroku sets the PORT environment variable
+ENV ASPNETCORE_URLS=http://+:$PORT
+ENV ASPNETCORE_ENVIRONMENT=Production
+
+# Create non-root user for security
+RUN adduser --disabled-password --gecos '' appuser && chown -R appuser /app
+USER appuser
+
+EXPOSE $PORT
+
+# Start the application
+CMD dotnet SkuVaultSaaS.Api.dll --urls http://0.0.0.0:$PORT

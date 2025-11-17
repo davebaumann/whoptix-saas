@@ -1,0 +1,17 @@
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\bin\Debug\net8.0\SkuVaultSaaS.Infrastructure.deps.json
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\bin\Debug\net8.0\SkuVaultSaaS.Infrastructure.runtimeconfig.json
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\bin\Debug\net8.0\SkuVaultSaaS.Infrastructure.dll
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\bin\Debug\net8.0\SkuVaultSaaS.Infrastructure.pdb
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\bin\Debug\net8.0\SkuVaultSaaS.Core.dll
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\bin\Debug\net8.0\SkuVaultSaaS.Core.pdb
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Debug\net8.0\SkuVaultSaaS.Infrastructure.csproj.AssemblyReference.cache
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Debug\net8.0\SkuVaultSaaS.Infrastructure.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Debug\net8.0\SkuVaultSaaS.Infrastructure.AssemblyInfoInputs.cache
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Debug\net8.0\SkuVaultSaaS.Infrastructure.AssemblyInfo.cs
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Debug\net8.0\SkuVaultSaaS.Infrastructure.csproj.CoreCompileInputs.cache
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Debug\net8.0\SkuVault.6DC8B1F6.Up2Date
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Debug\net8.0\SkuVaultSaaS.Infrastructure.dll
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Debug\net8.0\refint\SkuVaultSaaS.Infrastructure.dll
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Debug\net8.0\SkuVaultSaaS.Infrastructure.pdb
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Debug\net8.0\SkuVaultSaaS.Infrastructure.genruntimeconfig.cache
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Debug\net8.0\ref\SkuVaultSaaS.Infrastructure.dll
