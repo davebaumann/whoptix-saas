@@ -1,0 +1,8 @@
+[phases.install]
+cmd = "cd backend && dotnet restore SkuVaultSaaS.Api/SkuVaultSaaS.Api.csproj --verbosity minimal --no-cache"
+
+[phases.build] 
+cmd = "cd backend && dotnet publish SkuVaultSaaS.Api/SkuVaultSaaS.Api.csproj -c Release -o ../out --no-restore --verbosity minimal -p:RunAnalyzersDuringBuild=false -p:RunCodeAnalysis=false"
+
+[phases.start]
+cmd = "dotnet out/SkuVaultSaaS.Api.dll"
