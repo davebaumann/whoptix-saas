@@ -3,9 +3,11 @@ builder = "nixpacks"
 
 [deploy]
 healthcheckPath = "/api/health"
-healthcheckTimeout = 60
+healthcheckTimeout = 30
+healthcheckInterval = 10
 restartPolicyType = "on_failure"
-restartPolicyMaxRetries = 5
+restartPolicyMaxRetries = 3
+startCommand = "dotnet SkuVaultSaaS.Api.dll"
 
 [deploy.environment]
 ASPNETCORE_ENVIRONMENT = "Production"

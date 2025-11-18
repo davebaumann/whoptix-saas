@@ -187,15 +187,19 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Configure port for Railway/Heroku deployment
-var port = Environment.GetEnvironmentVariable("PORT") ?? "5000";
-
-// Only configure URLs explicitly if PORT is provided (production)
-if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PORT")))
+// Configure port for Railway deployment - more robust binding
+var port = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrEmpty(port))
 {
+    // Railway deployment - bind to all interfaces on Railway port
     app.Urls.Clear();
     app.Urls.Add($"http://0.0.0.0:{port}");
-    Console.WriteLine($"[RAILWAY] Listening on http://0.0.0.0:{port}");
+    app.Urls.Add($"http://+:{port}");
+    Console.WriteLine($"[RAILWAY] Binding to port {port} on all interfaces");
+}
+else
+{
+    Console.WriteLine("[LOCAL] Using default port configuration");
 }
 
 // Configure static file serving for React app
@@ -235,8 +239,18 @@ if (app.Environment.IsDevelopment())
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Enhanced health check endpoint for Railway
-app.MapGet("/api/health", async (ApplicationDbContext dbContext) => 
+// Simple health check endpoint for Railway deployment (no database dependency)
+app.MapGet("/api/health", () => 
+{
+    return Results.Ok(new { 
+        status = "healthy",
+        timestamp = DateTime.UtcNow.ToString("o"),
+        service = "Whoptix API"
+    });
+});
+
+// Detailed health check with database connectivity for monitoring
+app.MapGet("/api/health/detailed", async (ApplicationDbContext dbContext) => 
 {
     try 
     {
@@ -245,7 +259,7 @@ app.MapGet("/api/health", async (ApplicationDbContext dbContext) =>
         
         return Results.Ok(new { 
             status = "healthy", 
-            timestamp = DateTime.UtcNow,
+            timestamp = DateTime.UtcNow.ToString("o"),
             version = "1.0.0",
             service = "Whoptix API",
             environment = app.Environment.EnvironmentName,
@@ -257,7 +271,7 @@ app.MapGet("/api/health", async (ApplicationDbContext dbContext) =>
     {
         return Results.Json(new {
             status = "unhealthy",
-            timestamp = DateTime.UtcNow,
+            timestamp = DateTime.UtcNow.ToString("o"),
             version = "1.0.0", 
             service = "Whoptix API",
             environment = app.Environment.EnvironmentName,
