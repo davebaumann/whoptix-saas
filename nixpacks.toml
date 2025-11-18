@@ -1,14 +1,2 @@
 [variables]
 ASPNETCORE_ENVIRONMENT = "Production"
-
-[phases.setup]
-nixPkgs = ["dotnet-sdk_8"]
-
-[phases.install]
-cmd = "cd backend && dotnet restore"
-
-[phases.build]
-cmd = "cd backend && dotnet publish -c Release -o ../publish"
-
-[phases.start]
-cmd = "dotnet publish/SkuVaultSaaS.Api.dll"
