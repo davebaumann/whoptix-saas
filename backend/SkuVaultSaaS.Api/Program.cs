@@ -187,15 +187,20 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Configure port for Railway deployment - more robust binding
+// Configure port for Railway deployment
 var port = Environment.GetEnvironmentVariable("PORT");
-if (!string.IsNullOrEmpty(port))
+var isRailway = !string.IsNullOrEmpty(port);
+
+Console.WriteLine($"=== Whoptix API Startup ===");
+Console.WriteLine($"Environment: {app.Environment.EnvironmentName}");
+Console.WriteLine($"PORT env var: {port ?? "not set"}");
+Console.WriteLine($"ASPNETCORE_URLS: {Environment.GetEnvironmentVariable("ASPNETCORE_URLS") ?? "not set"}");
+Console.WriteLine($"Railway detected: {isRailway}");
+
+if (isRailway)
 {
-    // Railway deployment - bind to all interfaces on Railway port
-    app.Urls.Clear();
-    app.Urls.Add($"http://0.0.0.0:{port}");
-    app.Urls.Add($"http://+:{port}");
-    Console.WriteLine($"[RAILWAY] Binding to port {port} on all interfaces");
+    Console.WriteLine($"[RAILWAY] Port {port} detected from environment");
+    Console.WriteLine("[RAILWAY] Using ASPNETCORE_URLS for port binding");
 }
 else
 {
@@ -239,6 +244,8 @@ if (app.Environment.IsDevelopment())
 app.UseAuthentication();
 app.UseAuthorization();
 
+app.MapControllers();
+
 // Simple health check endpoint for Railway deployment (no database dependency)
 app.MapGet("/api/health", () => 
 {
@@ -281,8 +288,6 @@ app.MapGet("/api/health/detailed", async (ApplicationDbContext dbContext) =>
         }, statusCode: 503);
     }
 });
-
-app.MapControllers();
 
 // Fallback to index.html for React Router (SPA)
 app.MapFallbackToFile("index.html", new StaticFileOptions
