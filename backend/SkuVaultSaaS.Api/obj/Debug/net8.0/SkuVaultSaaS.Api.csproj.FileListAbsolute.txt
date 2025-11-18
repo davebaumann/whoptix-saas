@@ -129,3 +129,12 @@ C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\bin\Debug\net8.0\Newto
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\bin\Debug\net8.0\Stripe.net.dll
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\bin\Debug\net8.0\System.Configuration.ConfigurationManager.dll
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\bin\Debug\net8.0\System.Security.Cryptography.ProtectedData.dll
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\bin\Debug\net8.0\publish\web.config
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\bin\Debug\net8.0\appsettings.Azure.json
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\bin\Debug\net8.0\publish\appsettings.Azure.json
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\bin\Debug\net8.0\publish\appsettings.Development.json
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\bin\Debug\net8.0\publish\appsettings.json
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\bin\Debug\net8.0\publish\appsettings.Production.json
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\bin\Debug\net8.0\publish\SkuVaultSaaS.Api.deps.json
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\bin\Debug\net8.0\publish\SkuVaultSaaS.Api.runtimeconfig.json
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\obj\Debug\net8.0\SkuVaultSaaS.Api.sourcelink.json

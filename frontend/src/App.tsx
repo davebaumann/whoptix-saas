@@ -14,6 +14,7 @@ import AgingInventoryReport from './pages/AgingInventoryReport'
 import FinancialWarehouseReport from './pages/FinancialWarehouseReport'
 import Locations from './pages/Locations'
 import Performance from './pages/Performance'
+import InventoryTurnoverReport from './pages/InventoryTurnoverReport'
 import LowStockReport from './pages/LowStockReport'
 import LowStockAdmin from './pages/LowStockAdmin'
 import AdminDashboard from './pages/AdminDashboard'
@@ -49,6 +50,7 @@ function App() {
                   <Route path="/financial-warehouse" element={<FinancialWarehouseReport />} />
                   <Route path="/locations" element={<Locations />} />
                   <Route path="/performance" element={<Performance />} />
+                  <Route path="/inventory-turnover" element={<InventoryTurnoverReport />} />
                   <Route path="/low-stock" element={<LowStockReport />} />
                   <Route path="/low-stock-admin" element={<LowStockAdmin />} />
                   <Route path="/admin" element={<AdminDashboard />} />

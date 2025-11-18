@@ -23,6 +23,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/app/financial-warehouse', label: 'Financial Report', icon: '💰', reportName: 'financial-warehouse' },
     { path: '/app/locations', label: 'Locations Report', icon: '📍', reportName: 'locations' },
     { path: '/app/performance', label: 'Performance Metrics', icon: '📈', reportName: 'performance' },
+    { path: '/app/inventory-turnover', label: 'Inventory Turnover', icon: '🔄', reportName: 'inventory-turnover' },
     { path: '/app/membership/upgrade', label: 'Upgrade Membership', icon: '⭐', reportName: 'inventory' }, // Available to all customers
   ]
 

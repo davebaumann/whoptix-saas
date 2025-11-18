@@ -683,6 +683,10 @@ namespace SkuVaultSaaS.Api.Controllers
                 // Get underperformers
                 var underPerformers = GetUnderPerformers(inventoryLevels, currentPeriodMovements);
 
+                var totalUnitsSold = currentPeriodMovements.Where(m => m.TransactionType == "Pick" || m.TransactionType == "Sale").Sum(m => Math.Abs(m.QuantityChange));
+                var previousUnitsSold = previousPeriodMovements.Where(m => m.TransactionType == "Pick" || m.TransactionType == "Sale").Sum(m => Math.Abs(m.QuantityChange));
+                var unitsSoldGrowth = previousUnitsSold > 0 ? ((totalUnitsSold - previousUnitsSold) / (decimal)previousUnitsSold) * 100 : 0;
+
                 var performanceSummary = new PerformanceReportSummary
                 {
                     TotalProducts = inventoryLevels.Select(il => il.ProductId).Distinct().Count(),
@@ -692,15 +696,34 @@ namespace SkuVaultSaaS.Api.Controllers
                     FastMovers = velocityMetrics.Count(v => v.Velocity > 10), // More than 10 units per day
                     SlowMovers = velocityMetrics.Count(v => v.Velocity < 1), // Less than 1 unit per day
                     TotalRevenue = currentPeriodMovements.Where(m => m.TransactionType == "Pick" || m.TransactionType == "Sale").Sum(m => Math.Abs(m.QuantityChange) * (m.Product.Cost ?? 0)),
-                    RevenueGrowth = CalculateRevenueGrowth(currentPeriodMovements, previousPeriodMovements)
+                    RevenueGrowth = CalculateRevenueGrowth(currentPeriodMovements, previousPeriodMovements),
+                    UnitsSold = (int)totalUnitsSold,
+                    UnitsSoldGrowth = (double)unitsSoldGrowth,
+                    AverageStockCoverage = inventoryLevels.Any() ? inventoryLevels.Average(il => il.QuantityOnHand * 30) : 0, // Rough estimate
+                    ActiveSKUs = inventoryLevels.Count(il => il.QuantityOnHand > 0),
+                    ZeroStockSKUs = inventoryLevels.Count(il => il.QuantityOnHand == 0),
+                    TotalTransactions = currentPeriodMovements.Count
                 };
 
                 return Ok(new
                 {
                     summary = performanceSummary,
-                    velocityMetrics = velocityMetrics.OrderByDescending(v => v.Velocity).Take(20),
-                    turnoverMetrics = turnoverMetrics.OrderByDescending(t => t.TurnoverRate).Take(20),
-                    trends = performanceTrends,
+                    velocityMetrics = new {
+                        averageVelocity = velocityMetrics.Any() ? velocityMetrics.Average(v => v.Velocity) : 0,
+                        fastMovingCount = velocityMetrics.Count(v => v.Velocity >= 10),
+                        mediumMovingCount = velocityMetrics.Count(v => v.Velocity >= 5 && v.Velocity < 10),
+                        slowMovingCount = velocityMetrics.Count(v => v.Velocity >= 1 && v.Velocity < 5),
+                        deadStockCount = velocityMetrics.Count(v => v.Velocity < 1)
+                    },
+                    turnoverMetrics = new {
+                        averageTurnover = turnoverMetrics.Any() ? turnoverMetrics.Average(t => t.TurnoverRate) : 0
+                    },
+                    trends = new[] {
+                        new { metric = "Sales Growth", change = (double)performanceTrends.SalesGrowth, direction = performanceTrends.SalesGrowth >= 0 ? "up" : "down" },
+                        new { metric = "Revenue Growth", change = (double)performanceTrends.RevenueGrowth, direction = performanceTrends.RevenueGrowth >= 0 ? "up" : "down" },
+                        new { metric = "Movement Growth", change = (double)performanceTrends.MovementGrowth, direction = performanceTrends.MovementGrowth >= 0 ? "up" : "down" },
+                        new { metric = "Active Products", change = 0.0, direction = "stable" }
+                    },
                     topPerformers = topPerformers,
                     underPerformers = underPerformers,
                     // Debug information
@@ -842,14 +865,21 @@ namespace SkuVaultSaaS.Api.Controllers
             return movements
                 .Where(m => m.TransactionType == "Pick" || m.TransactionType == "Sale")
                 .GroupBy(m => new { m.ProductId, m.Product.Sku, m.Product.Name })
-                .Select(g => new TopPerformer
-                {
-                    ProductSku = g.Key.Sku,
-                    ProductName = g.Key.Name,
-                    Revenue = g.Sum(m => Math.Abs(m.QuantityChange) * (m.Product.Cost ?? 0)),
-                    UnitsSold = g.Sum(m => Math.Abs(m.QuantityChange)),
-                    Transactions = g.Count(),
-                    CurrentStock = inventory.Where(il => il.ProductId == g.Key.ProductId).Sum(il => il.QuantityAvailable)
+                .Select(g => {
+                    var unitsSold = g.Sum(m => Math.Abs(m.QuantityChange));
+                    var days = 30; // Assuming 30-day period
+                    var velocity = days > 0 ? (decimal)unitsSold / days : 0;
+                    return new TopPerformer
+                    {
+                        ProductSku = g.Key.Sku,
+                        ProductName = g.Key.Name,
+                        Sku = g.Key.Sku, // For frontend compatibility
+                        Revenue = g.Sum(m => Math.Abs(m.QuantityChange) * (m.Product.Cost ?? 0)),
+                        UnitsSold = unitsSold,
+                        Transactions = g.Count(),
+                        CurrentStock = inventory.Where(il => il.ProductId == g.Key.ProductId).Sum(il => il.QuantityOnHand),
+                        Velocity = velocity
+                    };
                 })
                 .OrderByDescending(p => p.Revenue)
                 .Take(10)
@@ -861,16 +891,23 @@ namespace SkuVaultSaaS.Api.Controllers
             var productsWithSales = movements.Where(m => m.TransactionType == "Pick" || m.TransactionType == "Sale").Select(m => m.ProductId).Distinct().ToHashSet();
             
             return inventory
-                .Where(il => !productsWithSales.Contains(il.ProductId) && il.QuantityAvailable > 0)
+                .Where(il => !productsWithSales.Contains(il.ProductId) && il.QuantityOnHand > 0)
                 .GroupBy(il => il.Product)
-                .Select(g => new UnderPerformer
-                {
-                    ProductSku = g.Key.Sku,
-                    ProductName = g.Key.Name,
-                    StockQuantity = g.Sum(il => il.QuantityAvailable),
-                    StockValue = g.Sum(il => il.QuantityAvailable) * (g.Key.Cost ?? 0),
-                    DaysInStock = 30, // Since no sales in the period
-                    LastSaleDate = null // No sales in the current period
+                .Select(g => {
+                    var currentStock = g.Sum(il => il.QuantityOnHand);
+                    return new UnderPerformer
+                    {
+                        ProductSku = g.Key.Sku,
+                        ProductName = g.Key.Name,
+                        Sku = g.Key.Sku, // For frontend compatibility
+                        StockQuantity = currentStock,
+                        CurrentStock = currentStock, // For frontend compatibility
+                        StockValue = currentStock * (g.Key.Cost ?? 0),
+                        DaysInStock = 30, // Since no sales in the period
+                        DaysOnHand = 999, // High number for no sales
+                        LastSaleDate = null, // No sales in the current period
+                        Velocity = 0 // No velocity since no sales
+                    };
                 })
                 .OrderByDescending(u => u.StockValue)
                 .Take(10)
@@ -963,20 +1000,26 @@ namespace SkuVaultSaaS.Api.Controllers
     {
         public string ProductSku { get; set; } = string.Empty;
         public string ProductName { get; set; } = string.Empty;
+        public string Sku { get; set; } = string.Empty; // Frontend expects this
         public decimal Revenue { get; set; }
         public int UnitsSold { get; set; }
         public int Transactions { get; set; }
         public int CurrentStock { get; set; }
+        public decimal? Velocity { get; set; }
     }
 
     public class UnderPerformer
     {
         public string ProductSku { get; set; } = string.Empty;
         public string ProductName { get; set; } = string.Empty;
+        public string Sku { get; set; } = string.Empty; // Frontend expects this
         public int StockQuantity { get; set; }
+        public int CurrentStock { get; set; } // Frontend expects this
         public decimal StockValue { get; set; }
         public int DaysInStock { get; set; }
+        public int? DaysOnHand { get; set; } // Frontend expects this
         public DateTime? LastSaleDate { get; set; }
+        public decimal? Velocity { get; set; }
     }
 
     public class PerformanceReportSummary
@@ -989,5 +1032,11 @@ namespace SkuVaultSaaS.Api.Controllers
         public int SlowMovers { get; set; }
         public decimal TotalRevenue { get; set; }
         public decimal RevenueGrowth { get; set; }
+        public int UnitsSold { get; set; }
+        public double UnitsSoldGrowth { get; set; }
+        public double AverageStockCoverage { get; set; }
+        public int ActiveSKUs { get; set; }
+        public int ZeroStockSKUs { get; set; }
+        public int TotalTransactions { get; set; }
     }
 }

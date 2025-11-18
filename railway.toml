@@ -3,6 +3,10 @@ builder = "nixpacks"
 
 [deploy]
 healthcheckPath = "/api/health"
-healthcheckTimeout = 300
+healthcheckTimeout = 60
 restartPolicyType = "on_failure"
-restartPolicyMaxRetries = 10
+restartPolicyMaxRetries = 5
+
+[deploy.environment]
+ASPNETCORE_ENVIRONMENT = "Production"
+ASPNETCORE_URLS = "http://*:$PORT"

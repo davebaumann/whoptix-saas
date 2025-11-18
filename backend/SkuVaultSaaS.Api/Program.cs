@@ -106,8 +106,26 @@ if (!string.IsNullOrWhiteSpace(jwtKey))
                 if (string.IsNullOrEmpty(context.Token))
                 {
                     // If no Authorization header, check for AuthToken cookie
-                    context.Token = context.Request.Cookies["AuthToken"];
+                    var token = context.Request.Cookies["AuthToken"];
+                    if (!string.IsNullOrEmpty(token))
+                    {
+                        context.Token = token;
+                        Console.WriteLine($"[AUTH DEBUG] Found AuthToken cookie: {token.Substring(0, Math.Min(20, token.Length))}...");
+                    }
+                    else
+                    {
+                        Console.WriteLine("[AUTH DEBUG] No AuthToken cookie found");
+                    }
                 }
+                else
+                {
+                    Console.WriteLine($"[AUTH DEBUG] Found Authorization header: {context.Token.Substring(0, Math.Min(20, context.Token.Length))}...");
+                }
+                return Task.CompletedTask;
+            },
+            OnAuthenticationFailed = context =>
+            {
+                Console.WriteLine($"[AUTH DEBUG] Authentication failed: {context.Exception?.Message}");
                 return Task.CompletedTask;
             }
         };
@@ -150,14 +168,16 @@ builder.Services.AddSwaggerGen(c =>
 // the provider schema is missing optional columns). Enabled so we can reseed on startup.
 builder.Services.AddHostedService<SkuVaultSaaS.Infrastructure.Data.SeedHostedService>();
 
-// CORS for local frontend dev
+// CORS for frontend and Railway deployment
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("FrontendDev", policy =>
     {
         policy.WithOrigins(
             "http://localhost:5173", // Vite default
-            "http://127.0.0.1:5173"
+            "http://127.0.0.1:5173",
+            "https://*.up.railway.app", // Railway domain pattern
+            "https://whoptix-saas.up.railway.app" // Specific Railway URL
         )
         .AllowAnyHeader()
         .AllowAnyMethod()
@@ -167,9 +187,16 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Configure port for Heroku deployment
+// Configure port for Railway/Heroku deployment
 var port = Environment.GetEnvironmentVariable("PORT") ?? "5000";
-app.Urls.Add($"http://0.0.0.0:{port}");
+
+// Only configure URLs explicitly if PORT is provided (production)
+if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PORT")))
+{
+    app.Urls.Clear();
+    app.Urls.Add($"http://0.0.0.0:{port}");
+    Console.WriteLine($"[RAILWAY] Listening on http://0.0.0.0:{port}");
+}
 
 // Configure static file serving for React app
 // In production, files are in wwwroot; in development, they're in frontend/dist
@@ -199,17 +226,47 @@ app.UseSwaggerUI(c =>
 
 app.UseCors("FrontendDev");
 
-app.UseHttpsRedirection();
+// Only enable HTTPS redirection in development
+// Railway handles SSL termination
+if (app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Simple health check endpoint
-app.MapGet("/api/health", () => Results.Ok(new { 
-    status = "healthy", 
-    timestamp = DateTime.UtcNow,
-    version = "1.0.0",
-    service = "Whoptix API"
-}));
+// Enhanced health check endpoint for Railway
+app.MapGet("/api/health", async (ApplicationDbContext dbContext) => 
+{
+    try 
+    {
+        // Test database connectivity
+        await dbContext.Database.CanConnectAsync();
+        
+        return Results.Ok(new { 
+            status = "healthy", 
+            timestamp = DateTime.UtcNow,
+            version = "1.0.0",
+            service = "Whoptix API",
+            environment = app.Environment.EnvironmentName,
+            port = Environment.GetEnvironmentVariable("PORT") ?? "5000",
+            database = "connected"
+        });
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new {
+            status = "unhealthy",
+            timestamp = DateTime.UtcNow,
+            version = "1.0.0", 
+            service = "Whoptix API",
+            environment = app.Environment.EnvironmentName,
+            port = Environment.GetEnvironmentVariable("PORT") ?? "5000",
+            database = "disconnected",
+            error = ex.Message
+        }, statusCode: 503);
+    }
+});
 
 app.MapControllers();
 

@@ -9,3 +9,4 @@ C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaas.Core\obj\Debug\net8.0\SkuV
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaas.Core\obj\Debug\net8.0\refint\SkuVaultSaaS.Core.dll
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaas.Core\obj\Debug\net8.0\SkuVaultSaaS.Core.pdb
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaas.Core\obj\Debug\net8.0\ref\SkuVaultSaaS.Core.dll
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Core\obj\Debug\net8.0\SkuVaultSaaS.Core.sourcelink.json

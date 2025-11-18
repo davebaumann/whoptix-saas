@@ -15,3 +15,4 @@ C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Debug\n
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Debug\net8.0\SkuVaultSaaS.Infrastructure.pdb
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Debug\net8.0\SkuVaultSaaS.Infrastructure.genruntimeconfig.cache
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Debug\net8.0\ref\SkuVaultSaaS.Infrastructure.dll
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Debug\net8.0\SkuVaultSaaS.Infrastructure.sourcelink.json
