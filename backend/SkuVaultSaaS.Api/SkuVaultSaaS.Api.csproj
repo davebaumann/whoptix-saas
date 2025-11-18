@@ -22,7 +22,7 @@
 </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\SkuVaultSaaS.Core\SkuVaultSaaS.Core.csproj" />
+    <ProjectReference Include="..\SkuVaultSaas.Core\SkuVaultSaaS.Core.csproj" />
     <ProjectReference Include="..\SkuVaultSaaS.Infrastructure\SkuVaultSaaS.Infrastructure.csproj" />
   </ItemGroup>
 

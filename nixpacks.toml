@@ -1,5 +1,8 @@
+[variables]
+NIXPACKS_DOTNET_VERSION = "8.0"
+
 [phases.build]
-cmd = "cd backend && dotnet publish SkuVaultSaaS.Api/SkuVaultSaaS.Api.csproj -c Release -o ../out"
+cmd = "cd backend && dotnet publish SkuVaultSaaS.Api/SkuVaultSaaS.Api.csproj -c Release -o ../out --verbosity minimal"
 
 [phases.start]
 cmd = "dotnet out/SkuVaultSaaS.Api.dll"
