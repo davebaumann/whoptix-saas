@@ -7,6 +7,7 @@ healthcheckTimeout = 30
 healthcheckInterval = 10
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
+rootDirectory = "/backend/SkuVaultSaaS.Api"
 
 [deploy.environment]
 ASPNETCORE_ENVIRONMENT = "Production"
