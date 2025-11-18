@@ -1,14 +1,2 @@
 [variables]
-NIXPACKS_NO_DEFAULT_CACHE_DIRS = "1"
-
-[phases.setup]
-nixPkgs = ["dotnet-sdk_8"]
-
-[phases.install]
-cmd = "cd backend && dotnet restore SkuVaultSaaS.Api/SkuVaultSaaS.Api.csproj --verbosity minimal --no-cache --disable-parallel"
-
-[phases.build] 
-cmd = "cd backend && dotnet publish SkuVaultSaaS.Api/SkuVaultSaaS.Api.csproj -c Release -o ../out --no-restore --verbosity minimal -p:RunAnalyzersDuringBuild=false -p:RunCodeAnalysis=false -p:TreatWarningsAsErrors=false"
-
-[phases.start]
-cmd = "dotnet out/SkuVaultSaaS.Api.dll"
+ASPNETCORE_ENVIRONMENT = "Production"
