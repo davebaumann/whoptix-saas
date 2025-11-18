@@ -1,2 +1,7 @@
 [variables]
 ASPNETCORE_ENVIRONMENT = "Production"
+DOTNET_VERSION = "8.0.404"
+
+[phases.setup]
+nixPkgs = ["dotnet-sdk_8"]
+aptPkgs = []
