@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\SkuVaultSaaS.Core\\SkuVaultSaaS.Core.csproj": {}
+    "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\SkuVaultSaas.Core\\SkuVaultSaaS.Core.csproj": {}
   },
   "projects": {
-    "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\SkuVaultSaaS.Core\\SkuVaultSaaS.Core.csproj": {
+    "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\SkuVaultSaas.Core\\SkuVaultSaaS.Core.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\SkuVaultSaaS.Core\\SkuVaultSaaS.Core.csproj",
+        "projectUniqueName": "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\SkuVaultSaas.Core\\SkuVaultSaaS.Core.csproj",
         "projectName": "SkuVaultSaaS.Core",
-        "projectPath": "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\SkuVaultSaaS.Core\\SkuVaultSaaS.Core.csproj",
+        "projectPath": "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\SkuVaultSaas.Core\\SkuVaultSaaS.Core.csproj",
         "packagesPath": "C:\\Users\\dcbau\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\SkuVaultSaaS.Core\\obj\\",
+        "outputPath": "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\SkuVaultSaas.Core\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\dcbau\\AppData\\Roaming\\NuGet\\NuGet.Config"
