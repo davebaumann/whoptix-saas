@@ -35,7 +35,7 @@ export default function Login() {
       const data = await apiClient.login(formData.email, formData.password)
       
       // Use auth context to handle login (cookie is already set by server)
-      login(data.email, data.expires)
+      await login(data.email, data.expires)
       
       // Navigate to intended page or dashboard
       navigate(from, { replace: true })

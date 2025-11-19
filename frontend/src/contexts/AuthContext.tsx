@@ -62,13 +62,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
-  const login = (email: string, _expires: string) => {
+  const login = async (email: string, _expires: string) => {
     setUser({
       id: '', // Will be populated by checkAuthStatus
       email,
       roles: []
     })
-    // Cookie is already set by the server, just update state
+    // Cookie is already set by the server, trigger auth check to get full user data
+    await checkAuthStatus()
   }
 
   const logout = async () => {
