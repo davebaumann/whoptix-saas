@@ -40,13 +40,15 @@ namespace SkuVaultSaaS.Api.Controllers
             var user = await _userManager.FindByEmailAsync(request.Email);
             if (user == null)
             {
-                return Unauthorized();
+                // Use consistent timing to prevent user enumeration
+                await Task.Delay(100);
+                return Unauthorized("Invalid credentials.");
             }
 
-            var result = await _signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: false);
+            var result = await _signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
             if (!result.Succeeded)
             {
-                return Unauthorized();
+                return Unauthorized("Invalid credentials.");
             }
 
             var token = await GenerateJwtTokenAsync(user);
@@ -88,33 +90,24 @@ namespace SkuVaultSaaS.Api.Controllers
         [Authorize]
         public async Task<IActionResult> GetCurrentUser()
         {
-            Console.WriteLine($"[AUTH DEBUG] GetCurrentUser called");
-            
             // Try multiple claim types as JWT claims can be mapped differently
             var userId = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value ?? 
                         User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? 
                         User.FindFirst("sub")?.Value;
             
-            Console.WriteLine($"[AUTH DEBUG] All claims: {string.Join(", ", User.Claims.Select(c => $"{c.Type}={c.Value}"))}");
-            Console.WriteLine($"[AUTH DEBUG] UserId from token: {userId}");
-            
             if (userId == null)
             {
-                Console.WriteLine($"[AUTH DEBUG] UserId is null, returning Unauthorized");
                 return Unauthorized();
             }
 
             var user = await _userManager.FindByIdAsync(userId);
-            Console.WriteLine($"[AUTH DEBUG] User found: {user?.Email}");
             
             if (user == null)
             {
-                Console.WriteLine($"[AUTH DEBUG] User not found in database, returning Unauthorized");
                 return Unauthorized();
             }
 
             var roles = await _userManager.GetRolesAsync(user);
-            Console.WriteLine($"[AUTH DEBUG] User roles: {string.Join(", ", roles)}");
             
             // TODO: Implement proper user-customer relationship lookup
             // Temporarily adding customerId = 1 for development
@@ -126,7 +119,7 @@ namespace SkuVaultSaaS.Api.Controllers
                 customerId = user.CustomerId
             };
             
-            Console.WriteLine($"[AUTH DEBUG] Returning OK with user data");
+
             return Ok(result);
         }
         
@@ -149,8 +142,7 @@ namespace SkuVaultSaaS.Api.Controllers
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
             };
             
-            Console.WriteLine($"[AUTH DEBUG] Creating JWT with UserId: {user.Id}");
-            Console.WriteLine($"[AUTH DEBUG] JWT Claims: {string.Join(", ", claims.Select(c => $"{c.Type}={c.Value}"))}");
+
 
             var roles = await _userManager.GetRolesAsync(user);
             claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));

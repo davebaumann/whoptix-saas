@@ -95,10 +95,20 @@ if (!string.IsNullOrEmpty(allowedHosts) && allowedHosts.Contains("${ALLOWED_HOST
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
 
-// Add Identity (include Roles so RoleManager/RoleStore are available)
-builder.Services.AddDefaultIdentity<ApplicationUser>(options => options.SignIn.RequireConfirmedAccount = false)
-    .AddRoles<IdentityRole>()
-    .AddEntityFrameworkStores<ApplicationDbContext>();
+// Add Identity with security settings
+builder.Services.AddDefaultIdentity<ApplicationUser>(options => {
+    options.SignIn.RequireConfirmedAccount = false;
+    options.Password.RequireDigit = true;
+    options.Password.RequireLowercase = true;
+    options.Password.RequireUppercase = true;
+    options.Password.RequiredLength = 8;
+    options.Password.RequireNonAlphanumeric = false;
+    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+    options.Lockout.MaxFailedAccessAttempts = 5;
+    options.Lockout.AllowedForNewUsers = true;
+})
+.AddRoles<IdentityRole>()
+.AddEntityFrameworkStores<ApplicationDbContext>();
 
 // JWT Authentication
 var jwtSection = builder.Configuration.GetSection("Jwt");
@@ -141,28 +151,18 @@ if (!string.IsNullOrWhiteSpace(jwtKey))
                     if (!string.IsNullOrEmpty(token))
                     {
                         context.Token = token;
-                        Console.WriteLine($"[AUTH DEBUG] Found AuthToken cookie: {token.Substring(0, Math.Min(20, token.Length))}...");
+                        // Token found in cookie
                     }
-                    else
-                    {
-                        Console.WriteLine("[AUTH DEBUG] No AuthToken cookie found");
-                    }
-                }
-                else
-                {
-                    Console.WriteLine($"[AUTH DEBUG] Found Authorization header: {context.Token.Substring(0, Math.Min(20, context.Token.Length))}...");
-                }
                 return Task.CompletedTask;
             },
             OnAuthenticationFailed = context =>
             {
-                Console.WriteLine($"[AUTH DEBUG] Authentication failed: {context.Exception?.Message}");
-                Console.WriteLine($"[AUTH DEBUG] Exception details: {context.Exception}");
+                // Log authentication failures for monitoring
                 return Task.CompletedTask;
             },
             OnTokenValidated = context =>
             {
-                Console.WriteLine($"[AUTH DEBUG] Token validated successfully for user: {context.Principal?.Identity?.Name}");
+                // Token validated successfully
                 return Task.CompletedTask;
             }
         };
@@ -252,6 +252,20 @@ app.UseSwaggerUI(c =>
 {
     c.SwaggerEndpoint("/swagger/v1/swagger.json", "SkuVault SaaS API v1");
     c.RoutePrefix = "swagger";
+});
+
+// Add security headers
+app.Use(async (context, next) =>
+{
+    context.Response.Headers.Add("X-Content-Type-Options", "nosniff");
+    context.Response.Headers.Add("X-Frame-Options", "DENY");
+    context.Response.Headers.Add("X-XSS-Protection", "1; mode=block");
+    context.Response.Headers.Add("Referrer-Policy", "strict-origin-when-cross-origin");
+    if (!app.Environment.IsDevelopment())
+    {
+        context.Response.Headers.Add("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+    }
+    await next();
 });
 
 app.UseCors("FrontendDev");

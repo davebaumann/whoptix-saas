@@ -58,7 +58,7 @@ namespace SkuVaultSaaS.Infrastructure.Data
                     // Retrieve the newly inserted tenant id using a raw SQL scalar query to avoid EF mapping
                     // attempting to read missing columns.
                     var connection = context.Database.GetDbConnection();
-                    logger?.LogInformation("Connection Failed: " + connection.ConnectionString);
+                    // Connection logging removed for security
                     try
                     {
                         if (connection.State != System.Data.ConnectionState.Open)

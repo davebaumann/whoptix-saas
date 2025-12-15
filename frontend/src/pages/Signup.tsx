@@ -42,6 +42,27 @@ export default function Signup() {
     setIsLoading(true)
     setError('')
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(formData.email)) {
+      setError('Please enter a valid email address')
+      setIsLoading(false)
+      return
+    }
+
+    // Validate password strength
+    if (formData.password.length < 8) {
+      setError('Password must be at least 8 characters long')
+      setIsLoading(false)
+      return
+    }
+
+    if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
+      setError('Password must contain at least one uppercase letter, one lowercase letter, and one number')
+      setIsLoading(false)
+      return
+    }
+
     // Validate passwords match
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match')
@@ -52,6 +73,19 @@ export default function Signup() {
     // Validate required fields
     if (!formData.email || !formData.password || !formData.companyName || !formData.firstName) {
       setError('Please fill in all required fields')
+      setIsLoading(false)
+      return
+    }
+
+    // Validate input lengths
+    if (formData.firstName.length > 50 || formData.lastName.length > 50) {
+      setError('Names must be 50 characters or less')
+      setIsLoading(false)
+      return
+    }
+
+    if (formData.companyName.length > 100) {
+      setError('Company name must be 100 characters or less')
       setIsLoading(false)
       return
     }
@@ -202,7 +236,7 @@ export default function Signup() {
                 placeholder="Password"
               />
               <p className="mt-1 text-xs text-gray-500">
-                Must be at least 6 characters long
+                Must be at least 8 characters with uppercase, lowercase, and number
               </p>
             </div>
 
