@@ -49,13 +49,20 @@ namespace SkuVaultSaaS.Api.Controllers
             // Debug logging
             Console.WriteLine($"Searching for packer: '{packerName}', customerId: {customerId}, from: {fromDate}, to: {toDate}");
 
-            var transactions = await _context.Transactions
+            // First check what users exist
+            var allUsers = await _context.InventoryMovements
+                .Where(t => t.CustomerId == customerId)
+                .Select(t => t.PerformedBy)
+                .Distinct()
+                .ToListAsync();
+            Console.WriteLine($"Available users: {string.Join(", ", allUsers)}");
+
+            var transactions = await _context.InventoryMovements
                 .Where(t => t.CustomerId == customerId && 
                            t.PerformedBy == packerName &&
-                           t.TransactionDate >= fromDate && 
-                           t.TransactionDate <= toDate &&
-                           (t.TransactionType == "Pick" || t.TransactionType == "Pack"))
-                .Select(t => new { t.TransactionDate, t.Quantity, t.TransactionType })
+                           t.OccurredAtUtc >= fromDate && 
+                           t.OccurredAtUtc <= toDate)
+                .Select(t => new { TransactionDate = t.OccurredAtUtc, Quantity = t.QuantityChange, t.TransactionType })
                 .AsNoTracking()
                 .ToListAsync();
 
@@ -80,7 +87,7 @@ namespace SkuVaultSaaS.Api.Controllers
                     totalTransactions = transactions.Count,
                     totalQuantity = transactions.Sum(t => Math.Abs(t.Quantity)),
                     pickCount = transactions.Count(t => t.TransactionType == "Pick"),
-                    packCount = transactions.Count(t => t.TransactionType == "Pack"),
+                    shipCount = transactions.Count(t => t.TransactionType == "Ship"),
                     averagePerDay = transactions.Count / Math.Max(1, (toDate - fromDate).Days)
                 }
             });
@@ -90,15 +97,16 @@ namespace SkuVaultSaaS.Api.Controllers
         {
             var grouped = transactions
                 .GroupBy(t => t.TransactionDate.Date)
+                .Where(g => g.Count() > 0) // Only include days with transactions
                 .Select(g => new
                 {
                     date = g.Key.ToString("yyyy-MM-dd"),
                     totalTransactions = g.Count(),
                     totalQuantity = g.Sum(t => Math.Abs(t.Quantity)),
                     pickCount = g.Count(t => t.TransactionType == "Pick"),
-                    packCount = g.Count(t => t.TransactionType == "Pack"),
+                    shipCount = g.Count(t => t.TransactionType == "Ship"),
                     receiveCount = g.Count(t => t.TransactionType == "Receive"),
-                    otherCount = g.Count(t => t.TransactionType != "Pick" && t.TransactionType != "Pack" && t.TransactionType != "Receive")
+                    otherCount = g.Count(t => t.TransactionType != "Pick" && t.TransactionType != "Ship" && t.TransactionType != "Receive")
                 })
                 .OrderBy(x => x.date)
                 .ToList();
@@ -117,9 +125,9 @@ namespace SkuVaultSaaS.Api.Controllers
                     totalTransactions = g.Count(),
                     totalQuantity = g.Sum(t => Math.Abs(t.Quantity)),
                     pickCount = g.Count(t => t.TransactionType == "Pick"),
-                    packCount = g.Count(t => t.TransactionType == "Pack"),
+                    shipCount = g.Count(t => t.TransactionType == "Ship"),
                     receiveCount = g.Count(t => t.TransactionType == "Receive"),
-                    otherCount = g.Count(t => t.TransactionType != "Pick" && t.TransactionType != "Pack" && t.TransactionType != "Receive")
+                    otherCount = g.Count(t => t.TransactionType != "Pick" && t.TransactionType != "Ship" && t.TransactionType != "Receive")
                 })
                 .OrderBy(x => x.weekStart)
                 .ToList();
@@ -137,9 +145,9 @@ namespace SkuVaultSaaS.Api.Controllers
                     totalTransactions = g.Count(),
                     totalQuantity = g.Sum(t => Math.Abs(t.Quantity)),
                     pickCount = g.Count(t => t.TransactionType == "Pick"),
-                    packCount = g.Count(t => t.TransactionType == "Pack"),
+                    shipCount = g.Count(t => t.TransactionType == "Ship"),
                     receiveCount = g.Count(t => t.TransactionType == "Receive"),
-                    otherCount = g.Count(t => t.TransactionType != "Pick" && t.TransactionType != "Pack" && t.TransactionType != "Receive")
+                    otherCount = g.Count(t => t.TransactionType != "Pick" && t.TransactionType != "Ship" && t.TransactionType != "Receive")
                 })
                 .OrderBy(x => x.month)
                 .ToList();

@@ -22,6 +22,7 @@ import CustomerManagement from './pages/CustomerManagement'
 import TierConfigPage from './pages/TierConfigPage'
 import MembershipUpgrade from './pages/MembershipUpgrade'
 import AccountSettings from './pages/AccountSettings'
+import UserManagement from './pages/UserManagement'
 import LandingPage from './pages/LandingPage'
 import TermsOfService from './pages/TermsOfService'
 import PrivacyPolicy from './pages/PrivacyPolicy'
@@ -59,6 +60,7 @@ function App() {
                   <Route path="/admin/tiers" element={<TierConfigPage />} />
                   <Route path="/membership/upgrade" element={<MembershipUpgrade />} />
                   <Route path="/account-settings" element={<AccountSettings />} />
+                  <Route path="/user-management" element={<UserManagement />} />
                 </Routes>
               </Layout>
             </ProtectedRoute>

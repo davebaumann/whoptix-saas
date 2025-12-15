@@ -5,6 +5,7 @@ interface User {
   email: string
   customerId: number
   roles?: string[]
+  isAdmin?: boolean
 }
 
 interface AuthContextType {
@@ -48,11 +49,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
       
       if (response.ok) {
         const userData = await response.json()
-        // Set user data - use fallback customerId for now until proper association is implemented
+        // Set user data
+        const isAdmin = userData.roles?.includes('Admin') || false
         setUser({
           id: userData.id,
           email: userData.email,
-          customerId: typeof userData.customerId === 'number' ? userData.customerId : 1 // Temporary fallback
+          customerId: userData.customerId, // Will be null for admin users
+          roles: userData.roles,
+          isAdmin
         })
         
         if (typeof userData.customerId !== 'number') {

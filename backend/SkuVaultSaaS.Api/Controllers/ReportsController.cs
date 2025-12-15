@@ -546,6 +546,12 @@ namespace SkuVaultSaaS.Api.Controllers
                     .AsNoTracking()
                     .ToListAsync();
 
+                // Get low stock thresholds once
+                var lowStockThresholds = await _context.LowStockThresholds
+                    .Where(lst => lst.CustomerId == customerId && lst.IsActive)
+                    .AsNoTracking()
+                    .ToListAsync();
+
                 // Group by location and calculate metrics
                 var locationAnalytics = inventoryLevels
                     .GroupBy(il => new { 
@@ -554,34 +560,34 @@ namespace SkuVaultSaaS.Api.Controllers
                         LocationName = il.Location.Name ?? il.Location.Code,
                         Warehouse = il.Location.Warehouse ?? "Unknown"
                     })
-                    .Select(g => new LocationAnalytic
-                    {
-                        LocationId = g.Key.LocationId,
-                        LocationCode = g.Key.LocationCode,
-                        LocationName = g.Key.LocationName,
-                        Warehouse = g.Key.Warehouse,
-                        TotalSkus = g.Count(),
-                        TotalQuantity = g.Sum(x => x.QuantityAvailable),
-                        TotalCostValue = g.Sum(x => (x.Product.Cost ?? 0) * x.QuantityAvailable),
-                        TotalRetailValue = g.Sum(x => (x.Product.Price ?? 0) * x.QuantityAvailable),
-                        AverageQuantityPerSku = g.Count() > 0 ? (decimal)g.Sum(x => x.QuantityAvailable) / g.Count() : 0,
-                        LowStockItems = g.Count(x => {
-                            // Check for low stock thresholds
-                            var specificThreshold = _context.LowStockThresholds
-                                .FirstOrDefault(t => t.CustomerId == customerId && 
-                                               t.ProductId == x.ProductId && 
-                                               t.LocationId == x.LocationId && 
-                                               t.IsActive);
-                            var generalThreshold = _context.LowStockThresholds
-                                .FirstOrDefault(t => t.CustomerId == customerId && 
-                                               t.ProductId == x.ProductId && 
-                                               t.LocationId == null && 
-                                               t.IsActive);
+                    .Select(g => {
+                        var lowStockCount = 0;
+                        foreach (var item in g)
+                        {
+                            var specificThreshold = lowStockThresholds
+                                .FirstOrDefault(t => t.ProductId == item.ProductId && t.LocationId == item.LocationId);
+                            var generalThreshold = lowStockThresholds
+                                .FirstOrDefault(t => t.ProductId == item.ProductId && t.LocationId == null);
                             var threshold = specificThreshold ?? generalThreshold;
                             var thresholdQty = threshold?.ThresholdQuantity ?? 10;
-                            return x.QuantityAvailable <= thresholdQty;
-                        }),
-                        UtilizationScore = CalculateUtilizationScore(g.ToList())
+                            if (item.QuantityAvailable <= thresholdQty)
+                                lowStockCount++;
+                        }
+                        
+                        return new LocationAnalytic
+                        {
+                            LocationId = g.Key.LocationId,
+                            LocationCode = g.Key.LocationCode,
+                            LocationName = g.Key.LocationName,
+                            Warehouse = g.Key.Warehouse,
+                            TotalSkus = g.Count(),
+                            TotalQuantity = g.Sum(x => x.QuantityAvailable),
+                            TotalCostValue = g.Sum(x => (x.Product.Cost ?? 0) * x.QuantityAvailable),
+                            TotalRetailValue = g.Sum(x => (x.Product.Price ?? 0) * x.QuantityAvailable),
+                            AverageQuantityPerSku = g.Count() > 0 ? (decimal)g.Sum(x => x.QuantityAvailable) / g.Count() : 0,
+                            LowStockItems = lowStockCount,
+                            UtilizationScore = CalculateUtilizationScore(g.ToList())
+                        };
                     })
                     .OrderByDescending(l => l.TotalCostValue)
                     .ToList();

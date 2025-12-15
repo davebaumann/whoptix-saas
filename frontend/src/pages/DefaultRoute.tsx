@@ -8,14 +8,14 @@ const DefaultRoute: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // If user has a role property and is admin, redirect
-    if (user && (user as any).role === 'Admin') {
+    // If user is admin, redirect to admin dashboard
+    if (user?.isAdmin) {
       navigate('/app/admin', { replace: true });
     }
   }, [user, navigate]);
 
   // For non-admin users, show the regular dashboard
-  if (!user || (user as any).role !== 'Admin') {
+  if (!user?.isAdmin) {
     return <Dashboard />;
   }
 

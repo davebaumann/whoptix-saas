@@ -104,7 +104,7 @@ namespace SkuVaultSaaS.Api.Controllers
                 existing.ThresholdQuantity = dto.ThresholdQuantity;
                 existing.IsActive = true;
                 existing.UpdatedAtUtc = DateTime.UtcNow;
-                existing.UpdatedBy = User.Identity?.Name ?? "System";
+                existing.UpdatedBy = User.Identity?.Name;
                 
                 await _context.SaveChangesAsync();
                 
@@ -121,8 +121,8 @@ namespace SkuVaultSaaS.Api.Controllers
                 IsActive = true,
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow,
-                CreatedBy = User.Identity?.Name ?? "System",
-                UpdatedBy = User.Identity?.Name ?? "System"
+                CreatedBy = User.Identity?.Name,
+                UpdatedBy = User.Identity?.Name
             };
 
             _context.LowStockThresholds.Add(threshold);
@@ -144,7 +144,7 @@ namespace SkuVaultSaaS.Api.Controllers
 
             threshold.ThresholdQuantity = dto.ThresholdQuantity;
             threshold.UpdatedAtUtc = DateTime.UtcNow;
-            threshold.UpdatedBy = User.Identity?.Name ?? "System";
+            threshold.UpdatedBy = User.Identity?.Name;
 
             await _context.SaveChangesAsync();
 
@@ -164,7 +164,7 @@ namespace SkuVaultSaaS.Api.Controllers
             // Soft delete by setting IsActive to false
             threshold.IsActive = false;
             threshold.UpdatedAtUtc = DateTime.UtcNow;
-            threshold.UpdatedBy = User.Identity?.Name ?? "System";
+            threshold.UpdatedBy = User.Identity?.Name;
 
             await _context.SaveChangesAsync();
 

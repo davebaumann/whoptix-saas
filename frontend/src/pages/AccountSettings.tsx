@@ -173,6 +173,17 @@ const AccountSettings: React.FC = () => {
               </Link>
             </div>
             
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-gray-500">Next Renewal</p>
+                <p className="font-medium text-gray-900">January 15, 2025</p>
+              </div>
+              <div>
+                <p className="text-gray-500">Monthly Cost</p>
+                <p className="font-medium text-gray-900">$49.99</p>
+              </div>
+            </div>
+            
             <div className="text-sm text-gray-600">
               <p className="mb-2">Available Reports:</p>
               <ul className="space-y-1">
@@ -184,6 +195,19 @@ const AccountSettings: React.FC = () => {
                 ))}
               </ul>
             </div>
+            
+            <button className="w-full text-left p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <span className="text-xl mr-3">🧾</span>
+                  <div>
+                    <p className="font-medium text-gray-900">View Receipts</p>
+                    <p className="text-sm text-gray-500">Download billing history</p>
+                  </div>
+                </div>
+                <span className="text-gray-400">→</span>
+              </div>
+            </button>
           </div>
         </div>
 
@@ -210,6 +234,17 @@ const AccountSettings: React.FC = () => {
               <div>
                 <p className="font-medium text-gray-900">Billing & Payments</p>
                 <p className="text-sm text-gray-500">Manage subscription and payment methods</p>
+              </div>
+            </Link>
+            
+            <Link
+              to="/app/user-management"
+              className="flex items-center p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <span className="text-xl mr-3">👥</span>
+              <div>
+                <p className="font-medium text-gray-900">User Management</p>
+                <p className="text-sm text-gray-500">Invite and manage team members</p>
               </div>
             </Link>
           </div>

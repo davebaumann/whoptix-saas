@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
 import { apiClient } from '../api/client'
 import { format, startOfToday, endOfToday, subDays } from 'date-fns'
+import PickerPerformanceDetail from '../components/PickerPerformanceDetail'
 
 export default function Dashboard() {
   const { user } = useAuth()
@@ -18,6 +19,7 @@ export default function Dashboard() {
   const [dateRange, setDateRange] = useState<'today' | 'yesterday' | 'last7' | 'custom'>('today')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [selectedPicker, setSelectedPicker] = useState<string | null>(null)
 
   const getDateParams = () => {
     const now = new Date()
@@ -39,6 +41,9 @@ export default function Dashboard() {
           to: format(now, 'yyyy-MM-dd')
         }
       case 'custom':
+        if (fromDate && !toDate) {
+          return { from: fromDate, to: format(now, 'yyyy-MM-dd') }
+        }
         return fromDate && toDate ? { from: fromDate, to: toDate } : undefined
       default:
         return undefined
@@ -229,7 +234,12 @@ export default function Dashboard() {
                 summary?.summary.map((item, idx) => (
                   <tr key={idx}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {item.user || 'Unknown'}
+                      <button
+                        onClick={() => setSelectedPicker(item.user || 'Unknown')}
+                        className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                      >
+                        {item.user || 'Unknown'}
+                      </button>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded">
@@ -324,6 +334,16 @@ export default function Dashboard() {
           </table>
         </div>
       </div>
+
+      {/* Picker Performance Modal */}
+      {selectedPicker && (
+        <PickerPerformanceDetail
+          customerId={customerId}
+          pickerName={selectedPicker}
+          onClose={() => setSelectedPicker(null)}
+          dateRange={dateParams}
+        />
+      )}
     </div>
   )
 }

@@ -19,6 +19,7 @@ namespace SkuVaultSaaS.Infrastructure.Data
         public DbSet<LowStockThreshold> LowStockThresholds => Set<LowStockThreshold>();
         public DbSet<Sale> Sales => Set<Sale>();
         public DbSet<Shipment> Shipments => Set<Shipment>();
+        public DbSet<UserInvitation> UserInvitations => Set<UserInvitation>();
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -153,6 +154,21 @@ namespace SkuVaultSaaS.Infrastructure.Data
                 .WithMany()
                 .HasForeignKey(u => u.CustomerId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // UserInvitation configuration
+            builder.Entity<UserInvitation>()
+                .HasIndex(ui => ui.InvitationToken)
+                .IsUnique();
+            builder.Entity<UserInvitation>()
+                .HasOne(ui => ui.Customer)
+                .WithMany()
+                .HasForeignKey(ui => ui.CustomerId)
+                .OnDelete(DeleteBehavior.Cascade);
+            builder.Entity<UserInvitation>()
+                .HasOne(ui => ui.InvitedBy)
+                .WithMany()
+                .HasForeignKey(ui => ui.InvitedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

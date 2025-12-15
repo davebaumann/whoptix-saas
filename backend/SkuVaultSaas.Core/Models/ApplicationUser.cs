@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity;
+using SkuVaultSaaS.Core.Enums;
 
 namespace SkuVaultSaaS.Core.Models
 {
@@ -6,5 +7,6 @@ namespace SkuVaultSaaS.Core.Models
     {
         public int? CustomerId { get; set; }
         public Customer? Customer { get; set; }
+        public CustomerRole CustomerRole { get; set; } = CustomerRole.Viewer;
     }
 }

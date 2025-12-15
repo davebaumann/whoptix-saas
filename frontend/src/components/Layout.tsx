@@ -11,6 +11,13 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation()
   const { user, logout } = useAuth()
   const { membershipInfo, canAccessReport } = useMembership()
+  
+  // Admin navigation items
+  const adminNavItems = [
+    { path: '/app/admin', label: 'Admin Dashboard', icon: '⚙️' },
+    { path: '/app/admin/customers', label: 'Customers', icon: '🏢' },
+    { path: '/app/admin/tiers', label: 'Tier Configuration', icon: '👑' },
+  ]
 
   const allNavItems = [
     { path: '/app/', label: 'Picker Dashboard', icon: '📦', reportName: null },
@@ -20,11 +27,14 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/app/financial-warehouse', label: 'Financial Report', icon: '💰', reportName: 'financial-warehouse' },
     { path: '/app/locations', label: 'Locations Report', icon: '📍', reportName: 'locations' },
     { path: '/app/performance', label: 'Performance Metrics', icon: '📈', reportName: 'performance' },
+
   ]
 
-  const navItems = allNavItems.filter(item => 
-    !item.reportName || canAccessReport(item.reportName)
-  )
+  // Use admin navigation for admin users, customer navigation for regular users
+  const navItems = user?.isAdmin ? adminNavItems : allNavItems.filter(item => {
+    if (item.reportName && !canAccessReport(item.reportName)) return false
+    return true
+  })
 
   const handleLogout = () => {
     logout()
@@ -45,7 +55,11 @@ export default function Layout({ children }: LayoutProps) {
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-700">
                 {user?.email}
-                {membershipInfo?.currentLevelName && (
+                {user?.isAdmin ? (
+                  <span className="ml-2 px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-semibold">
+                    Administrator
+                  </span>
+                ) : membershipInfo?.currentLevelName && (
                   <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-semibold">
                     {membershipInfo.currentLevelName} Plan
                   </span>

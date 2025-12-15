@@ -38,7 +38,7 @@ namespace SkuVaultSaaS.Infrastructure.Services
                 await SyncInventoryMovementsAsync(customerId);
                 await SyncTransactionsAsync(customerId);
                 await SyncSalesAsync(customerId);
-                await SyncShipmentsAsync(customerId);
+                // await SyncShipmentsAsync(customerId); // Disabled - endpoint returns 404
 
                 // Update customer's last synced timestamp
                 var customer = await _context.Customers.FindAsync(customerId);
@@ -378,11 +378,21 @@ namespace SkuVaultSaaS.Infrastructure.Services
                         chunkEnd);
                     allApiMovements.AddRange(chunkMovements);
                 }
+                catch (HttpRequestException ex) when (ex.Message.Contains("429"))
+                {
+                    _logger.LogWarning("Rate limited while fetching inventory movements chunk {ChunkStart} to {ChunkEnd}, skipping this chunk", chunkStart, chunkEnd);
+                }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, $"Failed to fetch inventory movements for chunk {chunkStart:u} to {chunkEnd:u}");
+                    _logger.LogError(ex, "Failed to fetch inventory movements for chunk {ChunkStart} to {ChunkEnd}", chunkStart, chunkEnd);
                 }
                 chunkStart = chunkEnd;
+                
+                // Add delay between chunks to avoid overwhelming the API
+                if (chunkStart < toDate)
+                {
+                    await Task.Delay(1000); // 1 second between chunks
+                }
             }
 
             var apiMovements = allApiMovements;
@@ -520,11 +530,21 @@ namespace SkuVaultSaaS.Infrastructure.Services
                         chunkEnd);
                     allApiTransactions.AddRange(chunkTransactions);
                 }
+                catch (HttpRequestException ex) when (ex.Message.Contains("429"))
+                {
+                    _logger.LogWarning("Rate limited while fetching chunk {ChunkStart} to {ChunkEnd}, skipping this chunk", chunkStart, chunkEnd);
+                }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, $"Failed to fetch transactions for chunk {chunkStart:u} to {chunkEnd:u}");
+                    _logger.LogError(ex, "Failed to fetch transactions for chunk {ChunkStart} to {ChunkEnd}", chunkStart, chunkEnd);
                 }
                 chunkStart = chunkEnd;
+                
+                // Add delay between chunks to avoid overwhelming the API
+                if (chunkStart < toDate)
+                {
+                    await Task.Delay(1000); // 1 second between chunks
+                }
             }
 
             var apiTransactions = allApiTransactions;

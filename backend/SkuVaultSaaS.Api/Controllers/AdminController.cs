@@ -16,13 +16,13 @@ namespace SkuVaultSaaS.Api.Controllers
     public class AdminController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
-        private readonly UserManager<IdentityUser> _userManager;
+        private readonly UserManager<ApplicationUser> _userManager;
         private readonly IEmailService _emailService;
         private readonly ILogger<AdminController> _logger;
 
         public AdminController(
             ApplicationDbContext context,
-            UserManager<IdentityUser> userManager,
+            UserManager<ApplicationUser> userManager,
             IEmailService emailService,
             ILogger<AdminController> logger)
         {
@@ -167,7 +167,7 @@ namespace SkuVaultSaaS.Api.Controllers
 
                 // Create Identity user
                 var tempPassword = GenerateTemporaryPassword();
-                var user = new IdentityUser
+                var user = new ApplicationUser
                 {
                     UserName = request.Email,
                     Email = request.Email,

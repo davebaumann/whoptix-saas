@@ -109,14 +109,12 @@ namespace SkuVaultSaaS.Api.Controllers
 
             var roles = await _userManager.GetRolesAsync(user);
             
-            // TODO: Implement proper user-customer relationship lookup
-            // Temporarily adding customerId = 1 for development
             var result = new
             {
                 id = user.Id,
                 email = user.Email,
                 roles = roles,
-                customerId = user.CustomerId
+                customerId = user.CustomerId // Will be null for admin users
             };
             
 

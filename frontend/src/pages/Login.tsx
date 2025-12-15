@@ -31,9 +31,25 @@ export default function Login() {
     try {
       await apiClient.login(formData.email, formData.password)
       
-      // Cookie is set by server, navigate to dashboard with page reload
-      // This ensures AuthContext properly initializes on the new page
-      window.location.href = from === '/' ? '/app/dashboard' : from
+      // Check if user is admin and redirect accordingly
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/auth/me`, {
+        method: 'GET',
+        credentials: 'include',
+      })
+      
+      if (response.ok) {
+        const userData = await response.json()
+        const isAdmin = userData.roles?.includes('Admin') || false
+        
+        // Redirect based on user type
+        if (isAdmin) {
+          window.location.href = '/app/admin'
+        } else {
+          window.location.href = from === '/' ? '/app/dashboard' : from
+        }
+      } else {
+        window.location.href = from === '/' ? '/app/dashboard' : from
+      }
     } catch (err) {
       if (err instanceof Error && err.message.includes('401')) {
         setError('Invalid email or password')

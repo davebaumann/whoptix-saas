@@ -46,7 +46,7 @@ namespace SkuVaultSaaS.Infrastructure.SkuVaultSaaSApi
                 ToDate = to.ToString("yyyy-MM-ddTHH:mm:ss")
             };
             return await PostAndParseListWithRetry<SkuVaultSaleDto>(
-                "sales/getSales",
+                "sales/getSalesByDate",
                 token => body,
                 "Sales",
                 userToken);
@@ -224,19 +224,38 @@ namespace SkuVaultSaaS.Infrastructure.SkuVaultSaaSApi
                 ToDate = to.ToString("yyyy-MM-ddTHH:mm:ss")
             };
 
-            _logger?.LogInformation("SkuVault API call to inventory/getTransactions with body: {Body}", System.Text.Json.JsonSerializer.Serialize(body));
-            var response = await _httpClient.PostAsJsonAsync("inventory/getTransactions", body);
-            var raw = await response.Content.ReadAsStringAsync();
-
-            _logger?.LogInformation("SkuVault API call to inventory/getTransactions returned {Status} with {Length} bytes", (int)response.StatusCode, raw?.Length ?? 0);
-
-            if (!response.IsSuccessStatusCode)
+            int maxRetries = 5;
+            int baseDelayMs = 5000; // Start with 5 seconds
+            
+            for (int attempt = 0; attempt < maxRetries; attempt++)
             {
+                var response = await _httpClient.PostAsJsonAsync("inventory/getTransactions", body);
+                var raw = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    return ParseTransactionsArray(raw ?? string.Empty);
+                }
+                
+                if ((int)response.StatusCode == 429)
+                {
+                    if (attempt == maxRetries - 1)
+                    {
+                        _logger?.LogError("Rate limit exceeded after {Attempts} attempts", maxRetries);
+                        throw CreateHttpException(response, raw ?? string.Empty);
+                    }
+                    
+                    var delay = baseDelayMs * (int)Math.Pow(2, attempt); // Exponential backoff
+                    _logger?.LogWarning("Rate limited (429), waiting {Delay}ms before retry {Attempt}/{MaxRetries}", delay, attempt + 1, maxRetries);
+                    await Task.Delay(delay);
+                    continue;
+                }
+                
                 _logger?.LogWarning("SkuVault transactions call failed: {Status}. Raw (first 300): {Preview}", (int)response.StatusCode, Truncate(raw ?? string.Empty, 300));
                 throw CreateHttpException(response, raw ?? string.Empty);
             }
 
-            return ParseTransactionsArray(raw ?? string.Empty);
+            throw new Exception("Failed to get inventory movements after retries");
         }
 
     private void EnsureUserToken(string userToken)

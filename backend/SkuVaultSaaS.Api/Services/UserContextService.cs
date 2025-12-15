@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using SkuVaultSaaS.Infrastructure.Data;
 using SkuVaultSaaS.Core.Models;
+using SkuVaultSaaS.Core.Enums;
 using System.Security.Claims;
 
 namespace SkuVaultSaaS.Api.Services
@@ -14,6 +15,9 @@ namespace SkuVaultSaaS.Api.Services
         bool IsAdmin();
         string? GetCurrentUserId();
         string? GetCurrentUserEmail();
+        Task<CustomerRole?> GetCurrentUserRoleAsync();
+        Task<bool> CanManageUsersAsync();
+        Task<bool> CanInviteUsersAsync();
     }
 
     public class UserContextService : IUserContextService
@@ -96,6 +100,31 @@ namespace SkuVaultSaaS.Api.Services
             return currentCustomerId.HasValue 
                 ? new List<int> { currentCustomerId.Value }
                 : new List<int>();
+        }
+
+        public async Task<CustomerRole?> GetCurrentUserRoleAsync()
+        {
+            var userId = GetCurrentUserId();
+            if (string.IsNullOrEmpty(userId)) return null;
+
+            var user = await _userManager.FindByIdAsync(userId);
+            return user?.CustomerRole;
+        }
+
+        public async Task<bool> CanManageUsersAsync()
+        {
+            if (IsAdmin()) return true;
+            
+            var role = await GetCurrentUserRoleAsync();
+            return role == CustomerRole.Owner;
+        }
+
+        public async Task<bool> CanInviteUsersAsync()
+        {
+            if (IsAdmin()) return true;
+            
+            var role = await GetCurrentUserRoleAsync();
+            return role == CustomerRole.Owner || role == CustomerRole.Admin;
         }
     }
 }
