@@ -8,7 +8,7 @@ namespace SkuVaultSaaS.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    // Temporarily removed [Authorize] for testing - TODO: Fix auth issue
+    [Authorize]
     public class LowStockController : ControllerBase
     {
         private readonly ApplicationDbContext _context;

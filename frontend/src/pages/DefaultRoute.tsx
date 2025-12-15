@@ -4,17 +4,18 @@ import { useAuth } from '../contexts/AuthContext';
 import Dashboard from '../pages/Dashboard';
 
 const DefaultRoute: React.FC = () => {
-  const { hasRole } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (hasRole('Admin')) {
-      navigate('/admin', { replace: true });
+    // If user has a role property and is admin, redirect
+    if (user && (user as any).role === 'Admin') {
+      navigate('/app/admin', { replace: true });
     }
-  }, [hasRole, navigate]);
+  }, [user, navigate]);
 
   // For non-admin users, show the regular dashboard
-  if (!hasRole('Admin')) {
+  if (!user || (user as any).role !== 'Admin') {
     return <Dashboard />;
   }
 

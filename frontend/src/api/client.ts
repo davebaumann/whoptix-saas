@@ -222,11 +222,14 @@ class ApiClient {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = API_BASE_URL;
+    // Remove trailing slash from baseUrl if present
+    this.baseUrl = API_BASE_URL.replace(/\/+$/, '');
   }
 
   private async fetch<T>(endpoint: string, options?: RequestInit): Promise<T> {
-    const url = `${this.baseUrl}${endpoint}`;
+    // Ensure endpoint starts with a single slash
+    const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    const url = `${this.baseUrl}${normalizedEndpoint}`;
     const response = await fetch(url, {
       ...options,
       credentials: 'include', // Include cookies in all requests

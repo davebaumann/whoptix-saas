@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, useLocation, Link } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
+import { useLocation } from 'react-router-dom'
 import { apiClient } from '../api/client'
 
 interface LoginForm {
@@ -12,11 +11,9 @@ export default function Login() {
   const [formData, setFormData] = useState<LoginForm>({ email: '', password: '' })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
-  const navigate = useNavigate()
   const location = useLocation()
-  const { login } = useAuth()
 
-  const from = location.state?.from?.pathname || '/app'
+  const from = location.state?.from?.pathname || '/'
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -32,13 +29,11 @@ export default function Login() {
     setError('')
 
     try {
-      const data = await apiClient.login(formData.email, formData.password)
+      await apiClient.login(formData.email, formData.password)
       
-      // Use auth context to handle login (cookie is already set by server)
-      await login(data.email, data.expires)
-      
-      // Navigate to intended page or dashboard
-      navigate(from, { replace: true })
+      // Cookie is set by server, navigate to dashboard with page reload
+      // This ensures AuthContext properly initializes on the new page
+      window.location.href = from === '/' ? '/app/dashboard' : from
     } catch (err) {
       if (err instanceof Error && err.message.includes('401')) {
         setError('Invalid email or password')
@@ -54,12 +49,12 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
-          <h1 className="text-center text-3xl font-bold text-gray-900">Whoptix</h1>
+          <h1 className="text-center text-3xl font-bold text-gray-900">SkuVault SaaS</h1>
           <h2 className="mt-6 text-center text-xl font-semibold text-gray-700">
             Sign in to your account
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Access your warehouse optimization dashboard
+            Access your warehouse management dashboard
           </p>
         </div>
         
@@ -98,17 +93,6 @@ export default function Login() {
             />
           </div>
 
-          <div className="flex items-center justify-end">
-            <div className="text-sm">
-              <Link
-                to="/forgot-password"
-                className="font-medium text-blue-600 hover:text-blue-500"
-              >
-                Forgot your password?
-              </Link>
-            </div>
-          </div>
-
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative">
               {error}
@@ -135,30 +119,10 @@ export default function Login() {
 
           <div className="text-center">
             <p className="text-sm text-gray-600">
-              Don't have an account?{' '}
-              <Link
-                to="/signup"
-                className="font-medium text-blue-600 hover:text-blue-500"
-              >
-                Sign up for free
-              </Link>
-            </p>
-          </div>
-
-          <div className="text-center">
-            <p className="text-sm text-gray-600">
               Test credentials: <br />
               <span className="font-mono bg-gray-100 px-2 py-1 rounded text-xs">
                 Kim.baumann@skuvault.com / P@ssw0rd!
               </span>
-            </p>
-          </div>
-
-          <div className="text-center mt-4">
-            <p className="text-xs text-gray-500">
-              <Link to="/terms" className="text-blue-600 hover:text-blue-500">Terms of Service</Link>
-              {' • '}
-              <Link to="/privacy" className="text-blue-600 hover:text-blue-500">Privacy Policy</Link>
             </p>
           </div>
         </form>

@@ -2,7 +2,6 @@ import { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useMembership } from '../contexts/MembershipContext'
-import { Crown } from 'lucide-react'
 
 interface LayoutProps {
   children: ReactNode
@@ -10,46 +9,27 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation()
-  const { user, logout, hasRole } = useAuth()
-  const { canAccessReport, membershipInfo } = useMembership()
-  
-  // All possible navigation items with their membership requirements (for customers only)
-  const customerNavItems = [
-    { path: '/app/', label: 'Picker/Packer Dashboard', icon: '📦', reportName: 'inventory' },
+  const { user, logout } = useAuth()
+  const { membershipInfo, canAccessReport } = useMembership()
+
+  const allNavItems = [
+    { path: '/app/', label: 'Picker Dashboard', icon: '📦', reportName: null },
     { path: '/app/inventory', label: 'Inventory Report', icon: '📊', reportName: 'inventory' },
     { path: '/app/low-stock', label: 'Low Stock Report', icon: '⚠️', reportName: 'low-stock' },
-    { path: '/app/low-stock-admin', label: 'Low Stock Thresholds', icon: '⚙️', reportName: 'low-stock' },
-    { path: '/app/aging-inventory', label: 'Aging Inventory', icon: '📅', reportName: 'aging-inventory' },
+    { path: '/app/aging-inventory', label: 'Aging Inventory', icon: '⏰', reportName: 'aging-inventory' },
     { path: '/app/financial-warehouse', label: 'Financial Report', icon: '💰', reportName: 'financial-warehouse' },
     { path: '/app/locations', label: 'Locations Report', icon: '📍', reportName: 'locations' },
     { path: '/app/performance', label: 'Performance Metrics', icon: '📈', reportName: 'performance' },
-    { path: '/app/inventory-turnover', label: 'Inventory Turnover', icon: '🔄', reportName: 'inventory-turnover' },
-    { path: '/app/membership/upgrade', label: 'Upgrade Membership', icon: '⭐', reportName: 'inventory' }, // Available to all customers
   ]
 
-  // Admin navigation items (only for admins)
-  const adminNavItems = [
-    { path: '/app/admin', label: 'Admin Dashboard', icon: '🏠' },
-    { path: '/app/admin/customers', label: 'Customer Management', icon: '👥' },
-    { path: '/app/admin/tiers', label: 'Tier Configuration', icon: '👑' },
-  ]
-
-  // Determine navigation items based on user role
-  const navItems = hasRole('Admin') 
-    ? adminNavItems
-    : customerNavItems.filter(item => 
-        item.path === '/app/' || canAccessReport(item.reportName)
-      )
+  const navItems = allNavItems.filter(item => 
+    !item.reportName || canAccessReport(item.reportName)
+  )
 
   const handleLogout = () => {
     logout()
     window.location.href = '/login'
   }
-
-  const getCurrentLevelName = () => {
-    if (!membershipInfo) return 'Loading...';
-    return membershipInfo.currentLevelName;
-  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -58,24 +38,28 @@ export default function Layout({ children }: LayoutProps) {
           <div className="flex justify-between h-16">
             <div className="flex">
               <div className="flex-shrink-0 flex items-center">
-                <h1 className="text-xl font-bold text-gray-900">Whoptix</h1>
+                <h1 className="text-xl font-bold text-gray-900">SkuVault SaaS</h1>
               </div>
             </div>
             
             <div className="flex items-center space-x-4">
-              <Link 
-                to="/app/membership/upgrade"
-                className="flex items-center space-x-2 bg-gray-50 hover:bg-gray-100 px-3 py-1 rounded-lg transition-colors cursor-pointer"
-                title="Click to upgrade membership"
-              >
-                <Crown className="w-4 h-4 text-yellow-500" />
-                <span className="text-sm font-medium text-gray-700">
-                  {getCurrentLevelName()}
-                </span>
-              </Link>
               <span className="text-sm text-gray-700">
                 {user?.email}
+                {membershipInfo?.currentLevelName && (
+                  <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-semibold">
+                    {membershipInfo.currentLevelName} Plan
+                  </span>
+                )}
               </span>
+              <Link
+                to="/app/account-settings"
+                className="p-2 text-gray-500 hover:text-blue-600 hover:bg-gray-100 rounded-full transition-colors"
+                title="Account Settings"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </Link>
               <button
                 onClick={handleLogout}
                 className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm font-medium transition-colors"

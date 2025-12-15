@@ -1,7 +1,8 @@
-using System.Net.Mail;
-using System.Net;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
+using MailKit.Net.Smtp;
+using MailKit.Security;
+using MimeKit;
 
 namespace SkuVaultSaaS.Infrastructure.Services
 {
@@ -25,27 +26,32 @@ namespace SkuVaultSaaS.Infrastructure.Services
         {
             try
             {
-                using var client = new SmtpClient(_emailSettings.SmtpHost, _emailSettings.SmtpPort)
-                {
-                    EnableSsl = _emailSettings.UseSsl,
-                    UseDefaultCredentials = false,
-                    Credentials = new NetworkCredential(_emailSettings.Username, _emailSettings.Password)
-                };
+                var message = new MimeMessage();
+                message.From.Add(new MailboxAddress(_emailSettings.FromName, _emailSettings.FromEmail));
+                message.To.Add(new MailboxAddress(customerName, toEmail));
+                message.Subject = $"Low Stock Alert for {customerName}";
 
-                var subject = $"Low Stock Alert for {customerName}";
-                var body = GenerateLowStockEmailBody(customerName, lowStockItems);
-
-                var message = new MailMessage
+                var bodyBuilder = new BodyBuilder
                 {
-                    From = new MailAddress(_emailSettings.FromEmail, _emailSettings.FromName),
-                    Subject = subject,
-                    Body = body,
-                    IsBodyHtml = true
+                    HtmlBody = GenerateLowStockEmailBody(customerName, lowStockItems)
                 };
+                message.Body = bodyBuilder.ToMessageBody();
+
+                using var client = new SmtpClient();
                 
-                message.To.Add(toEmail);
+                // Determine the correct security options based on port
+                var secureSocketOptions = _emailSettings.SmtpPort switch
+                {
+                    465 => SecureSocketOptions.SslOnConnect, // SMTPS
+                    587 => SecureSocketOptions.StartTls,     // SMTP with STARTTLS
+                    25 => SecureSocketOptions.Auto,          // Plain SMTP (auto-detect)
+                    _ => SecureSocketOptions.Auto
+                };
 
-                await client.SendMailAsync(message);
+                await client.ConnectAsync(_emailSettings.SmtpHost, _emailSettings.SmtpPort, secureSocketOptions);
+                await client.AuthenticateAsync(_emailSettings.Username, _emailSettings.Password);
+                await client.SendAsync(message);
+                await client.DisconnectAsync(true);
                 
                 _logger.LogInformation("Low stock notification email sent to {Email} for customer {CustomerName}", 
                     toEmail, customerName);

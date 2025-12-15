@@ -11,8 +11,12 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.Text.Json.Serialization;
 using SkuVaultSaaS.Api.Services;
+using SkuVaultSaaS.Core.Models;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Load environment variables from .env file
+DotNetEnv.Env.Load();
 
 // Register a pluggable secret provider. The default implementation reads from IConfiguration
 // which includes environment variables and any other configuration providers registered below.
@@ -38,9 +42,18 @@ builder.Services.AddScoped<SkuVaultSaaS.Core.Services.IReportAccessService, SkuV
 builder.Services.Configure<SkuVaultSaaS.Infrastructure.Configuration.SyncSettings>(
     builder.Configuration.GetSection("SyncSettings"));
 
-// Configure Email and Notification Settings
-builder.Services.Configure<SkuVaultSaaS.Infrastructure.Services.EmailSettings>(
-    builder.Configuration.GetSection("EmailSettings"));
+// Configure Email and Notification Settings with environment variable substitution
+builder.Services.Configure<SkuVaultSaaS.Infrastructure.Services.EmailSettings>(options =>
+{
+    var emailSection = builder.Configuration.GetSection("EmailSettings");
+    emailSection.Bind(options);
+    
+    // Replace environment variable placeholders
+    if (options.Password.Contains("${EMAIL_PASSWORD}"))
+    {
+        options.Password = options.Password.Replace("${EMAIL_PASSWORD}", Environment.GetEnvironmentVariable("EMAIL_PASSWORD"));
+    }
+});
 builder.Services.Configure<SkuVaultSaaS.Infrastructure.HostedServices.LowStockNotificationSettings>(
     builder.Configuration.GetSection("LowStockNotificationSettings"));
 
@@ -58,16 +71,32 @@ builder.Services.AddHostedService<SkuVaultSaaS.Infrastructure.HostedServices.Low
 // job tries to read columns that may not exist. Re-enable when the schema is compatible.
 // builder.Services.AddHostedService<SkuVaultSyncJob>();
 
-// MySQL connection string
+
+// MySQL connection string with environment variable substitution
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+
+// Replace environment variable placeholders
+connectionString = connectionString.Replace("${DB_NAME}", Environment.GetEnvironmentVariable("DB_NAME"));
+connectionString = connectionString.Replace("${DB_USER}", Environment.GetEnvironmentVariable("DB_USER"));
+connectionString = connectionString.Replace("${DB_PASSWORD}", Environment.GetEnvironmentVariable("DB_PASSWORD"));
+
+// Log the final connection string for debugging (DO NOT log passwords in production)
+//Console.WriteLine($"[DEBUG] Final DB Connection String: {connectionString}");
+
+// Also handle other configuration substitutions
+var allowedHosts = builder.Configuration["AllowedHosts"];
+if (!string.IsNullOrEmpty(allowedHosts) && allowedHosts.Contains("${ALLOWED_HOSTS}"))
+{
+    builder.Configuration["AllowedHosts"] = allowedHosts.Replace("${ALLOWED_HOSTS}", Environment.GetEnvironmentVariable("ALLOWED_HOSTS"));
+}
 
 // Add DbContext
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
 
 // Add Identity (include Roles so RoleManager/RoleStore are available)
-builder.Services.AddDefaultIdentity<IdentityUser>(options => options.SignIn.RequireConfirmedAccount = false)
+builder.Services.AddDefaultIdentity<ApplicationUser>(options => options.SignIn.RequireConfirmedAccount = false)
     .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>();
 
@@ -92,6 +121,8 @@ if (!string.IsNullOrWhiteSpace(jwtKey))
             ValidateIssuer = true,
             ValidateAudience = true,
             ValidateIssuerSigningKey = true,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.Zero,
             ValidIssuer = jwtIssuer,
             ValidAudience = jwtAudience,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
@@ -126,6 +157,12 @@ if (!string.IsNullOrWhiteSpace(jwtKey))
             OnAuthenticationFailed = context =>
             {
                 Console.WriteLine($"[AUTH DEBUG] Authentication failed: {context.Exception?.Message}");
+                Console.WriteLine($"[AUTH DEBUG] Exception details: {context.Exception}");
+                return Task.CompletedTask;
+            },
+            OnTokenValidated = context =>
+            {
+                Console.WriteLine($"[AUTH DEBUG] Token validated successfully for user: {context.Principal?.Identity?.Name}");
                 return Task.CompletedTask;
             }
         };
@@ -168,7 +205,7 @@ builder.Services.AddSwaggerGen(c =>
 // the provider schema is missing optional columns). Enabled so we can reseed on startup.
 builder.Services.AddHostedService<SkuVaultSaaS.Infrastructure.Data.SeedHostedService>();
 
-// CORS for frontend and Railway deployment
+// CORS for frontend
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("FrontendDev", policy =>
@@ -176,8 +213,9 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(
             "http://localhost:5173", // Vite default
             "http://127.0.0.1:5173",
-            "https://*.up.railway.app", // Railway domain pattern
-            "https://whoptix-saas.up.railway.app" // Specific Railway URL
+            "https://lemon-coast-0de10660f-preview.eastus2.3.azurestaticapps.net", // Azure Static Web App
+            "https://*.azurestaticapps.net", // Azure Static Web Apps pattern
+            "https://riva-nymphean-followingly.ngrok-free.dev" // ngrok tunnel
         )
         .AllowAnyHeader()
         .AllowAnyMethod()
@@ -187,25 +225,8 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Configure port for Railway deployment
-var port = Environment.GetEnvironmentVariable("PORT");
-var isRailway = !string.IsNullOrEmpty(port);
-
-Console.WriteLine($"=== Whoptix API Startup ===");
+Console.WriteLine($"=== SkuVault SaaS API Startup ===");
 Console.WriteLine($"Environment: {app.Environment.EnvironmentName}");
-Console.WriteLine($"PORT env var: {port ?? "not set"}");
-Console.WriteLine($"ASPNETCORE_URLS: {Environment.GetEnvironmentVariable("ASPNETCORE_URLS") ?? "not set"}");
-Console.WriteLine($"Railway detected: {isRailway}");
-
-if (isRailway)
-{
-    Console.WriteLine($"[RAILWAY] Port {port} detected from environment");
-    Console.WriteLine("[RAILWAY] Using ASPNETCORE_URLS for port binding");
-}
-else
-{
-    Console.WriteLine("[LOCAL] Using default port configuration");
-}
 
 // Configure static file serving for React app
 // In production, files are in wwwroot; in development, they're in frontend/dist
@@ -235,8 +256,7 @@ app.UseSwaggerUI(c =>
 
 app.UseCors("FrontendDev");
 
-// Only enable HTTPS redirection in development
-// Railway handles SSL termination
+// Enable HTTPS redirection
 if (app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();
@@ -246,13 +266,13 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-// Simple health check endpoint for Railway deployment (no database dependency)
+// Simple health check endpoint
 app.MapGet("/api/health", () => 
 {
     return Results.Ok(new { 
         status = "healthy",
         timestamp = DateTime.UtcNow.ToString("o"),
-        service = "Whoptix API"
+        service = "SkuVault SaaS API"
     });
 });
 
@@ -268,9 +288,8 @@ app.MapGet("/api/health/detailed", async (ApplicationDbContext dbContext) =>
             status = "healthy", 
             timestamp = DateTime.UtcNow.ToString("o"),
             version = "1.0.0",
-            service = "Whoptix API",
+            service = "SkuVault SaaS API",
             environment = app.Environment.EnvironmentName,
-            port = Environment.GetEnvironmentVariable("PORT") ?? "5000",
             database = "connected"
         });
     }
@@ -280,9 +299,8 @@ app.MapGet("/api/health/detailed", async (ApplicationDbContext dbContext) =>
             status = "unhealthy",
             timestamp = DateTime.UtcNow.ToString("o"),
             version = "1.0.0", 
-            service = "Whoptix API",
+            service = "SkuVault SaaS API",
             environment = app.Environment.EnvironmentName,
-            port = Environment.GetEnvironmentVariable("PORT") ?? "5000",
             database = "disconnected",
             error = ex.Message
         }, statusCode: 503);

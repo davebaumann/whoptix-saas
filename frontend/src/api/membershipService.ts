@@ -31,6 +31,7 @@ export interface CustomerWithMembership {
 }
 
 export const MEMBERSHIP_LEVELS = {
+  BASIC: 1,
   STANDARD: 2,
   PREMIUM: 3,
   ENTERPRISE: 4

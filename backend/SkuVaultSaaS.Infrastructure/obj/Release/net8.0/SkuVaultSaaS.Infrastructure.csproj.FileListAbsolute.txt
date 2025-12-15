@@ -1,5 +1,4 @@
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\bin\Release\net8.0\SkuVaultSaaS.Infrastructure.deps.json
-C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\bin\Release\net8.0\SkuVaultSaaS.Infrastructure.runtimeconfig.json
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\bin\Release\net8.0\SkuVaultSaaS.Infrastructure.dll
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\bin\Release\net8.0\SkuVaultSaaS.Infrastructure.pdb
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\bin\Release\net8.0\SkuVaultSaaS.Core.dll
@@ -13,5 +12,5 @@ C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Release
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Release\net8.0\SkuVaultSaaS.Infrastructure.dll
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Release\net8.0\refint\SkuVaultSaaS.Infrastructure.dll
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Release\net8.0\SkuVaultSaaS.Infrastructure.pdb
-C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Release\net8.0\SkuVaultSaaS.Infrastructure.genruntimeconfig.cache
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Release\net8.0\ref\SkuVaultSaaS.Infrastructure.dll
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Release\net8.0\SkuVaultSaaS.Infrastructure.sourcelink.json

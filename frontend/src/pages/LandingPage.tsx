@@ -124,7 +124,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
-              Powerful Inventory Management
+              Powerful Inventory Management<hr></hr>
               <span className="text-blue-600"> Made Simple</span>
             </h1>
             <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
@@ -147,7 +147,7 @@ export default function LandingPage() {
               </a>
             </div>
             <p className="text-sm text-gray-500 mt-4">
-              Professional warehouse optimization • Cancel anytime
+              Professional warehouse optimization
             </p>
           </div>
         </div>
@@ -368,7 +368,7 @@ export default function LandingPage() {
 
           <div className="text-center mt-12">
             <p className="text-gray-600 mb-4">
-              Professional warehouse optimization solutions • No setup fees • Cancel anytime
+              Professional warehouse optimization solutions • No setup fees
             </p>
             <Link 
               to="/login" 

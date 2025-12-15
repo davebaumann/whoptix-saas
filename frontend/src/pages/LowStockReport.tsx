@@ -76,6 +76,44 @@ export default function LowStockReport() {
     })
   }
 
+  const exportData = (format: 'csv' | 'excel') => {
+    if (!lowStockData?.items) return
+    
+    const headers = ['SKU', 'Product Name', 'Location Code', 'Location Name', 'On Hand', 'Available', 'Allocated', 'Status', 'Last Updated']
+    const rows = lowStockData.items.map(item => [
+      item.sku,
+      item.productName || 'N/A',
+      item.locationCode,
+      item.locationName,
+      item.quantityOnHand,
+      item.quantityAvailable,
+      item.quantityAllocated,
+      item.stockLevel,
+      formatDate(item.updatedAtUtc)
+    ])
+    
+    if (format === 'csv') {
+      const csvContent = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n')
+      const blob = new Blob([csvContent], { type: 'text/csv' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `low-stock-report-${new Date().toISOString().split('T')[0]}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    } else {
+      // Excel format using tab-separated values
+      const excelContent = [headers, ...rows].map(row => row.join('\t')).join('\n')
+      const blob = new Blob([excelContent], { type: 'application/vnd.ms-excel' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `low-stock-report-${new Date().toISOString().split('T')[0]}.xls`
+      a.click()
+      URL.revokeObjectURL(url)
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -297,10 +335,16 @@ export default function LowStockReport() {
             <p className="text-xs text-gray-500">Download this report for further analysis</p>
           </div>
           <div className="flex gap-2">
-            <button className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700">
+            <button 
+              onClick={() => exportData('csv')}
+              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            >
               Export CSV
             </button>
-            <button className="px-4 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700">
+            <button 
+              onClick={() => exportData('excel')}
+              className="px-4 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700"
+            >
               Export Excel
             </button>
           </div>

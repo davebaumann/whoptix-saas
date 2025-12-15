@@ -26,6 +26,12 @@ namespace SkuVaultSaaS.Infrastructure.HostedServices
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            if (!_settings.IsEnabled)
+            {
+                _logger.LogInformation("Low Stock Notification Service is disabled - skipping execution");
+                return;
+            }
+
             _logger.LogInformation("Low Stock Notification Service started - Interval: {Interval} minutes", 
                 _settings.CheckIntervalMinutes);
 
@@ -60,7 +66,8 @@ namespace SkuVaultSaaS.Infrastructure.HostedServices
             {
                 // Get all customers that have email notifications enabled
                 var customers = await context.Customers
-                    .Where(c => !string.IsNullOrEmpty(c.Email))
+                    .Where(c => c.LowStockNotificationsEnabled && 
+                               !string.IsNullOrEmpty(c.LowStockNotificationEmail))
                     .ToListAsync();
 
                 foreach (var customer in customers)
@@ -84,12 +91,12 @@ namespace SkuVaultSaaS.Infrastructure.HostedServices
                             }).ToList();
 
                             await emailService.SendLowStockNotificationAsync(
-                                customer.Email!, 
+                                customer.LowStockNotificationEmail!, 
                                 customer.Name, 
                                 emailItems);
 
                             _logger.LogInformation("Low stock notification sent to {Email} for {Count} items", 
-                                customer.Email, lowStockItems.Count);
+                                customer.LowStockNotificationEmail, lowStockItems.Count);
                         }
                         else
                         {
@@ -99,7 +106,7 @@ namespace SkuVaultSaaS.Infrastructure.HostedServices
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Error processing low stock notifications for customer {CustomerName} ({Email})", 
-                            customer.Name, customer.Email);
+                            customer.Name, customer.LowStockNotificationEmail);
                     }
                 }
 

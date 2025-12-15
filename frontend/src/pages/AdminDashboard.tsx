@@ -2,12 +2,23 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { membershipService } from '../api/membershipService';
 import { Users, Crown, Settings, TrendingUp, Shield, Star, Zap } from 'lucide-react';
+import SystemHealth from '../components/SystemHealth';
+import UsageAnalytics from '../components/UsageAnalytics';
 
 export default function AdminDashboard() {
+  console.log('🔍 AdminDashboard component is rendering!');
   // Get customers with membership info for admin overview
-  const { data: customerStats, isLoading } = useQuery({
+  const { data: customerStats, isLoading, error } = useQuery({
     queryKey: ['adminCustomerStats'],
     queryFn: () => membershipService.getAllCustomersWithMembership(),
+  });
+
+  // Debug logging
+  console.log('AdminDashboard Debug:', { 
+    customerStats, 
+    isLoading, 
+    error,
+    dataLength: customerStats?.length 
   });
 
   const getMembershipStats = () => {
@@ -57,6 +68,23 @@ export default function AdminDashboard() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
+          <h2 className="text-red-800 text-lg font-semibold mb-2">Error Loading Admin Dashboard</h2>
+          <p className="text-red-700">{error instanceof Error ? error.message : 'Unknown error'}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
@@ -156,7 +184,7 @@ export default function AdminDashboard() {
             </p>
             <div className="space-y-2">
               <Link
-                to="/admin/customers"
+                to="/app/admin/customers"
                 className="block w-full text-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
               >
                 Manage Customers
@@ -175,13 +203,23 @@ export default function AdminDashboard() {
             </p>
             <div className="space-y-2">
               <Link
-                to="/admin/tiers"
+                to="/app/admin/tiers"
                 className="block w-full text-center px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors"
               >
                 Configure Tiers
               </Link>
             </div>
           </div>
+        </div>
+
+        {/* System Health Dashboard */}
+        <div className="mb-8">
+          <SystemHealth />
+        </div>
+
+        {/* Usage Analytics */}
+        <div className="mb-8">
+          <UsageAnalytics />
         </div>
 
         {/* Recent Activity */}

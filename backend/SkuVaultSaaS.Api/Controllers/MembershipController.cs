@@ -42,7 +42,7 @@ namespace SkuVaultSaaS.Api.Controllers
                     return NotFound("Customer not found");
                 }
 
-                var availableReports = _reportAccessService.GetAvailableReports(customer.MembershipLevel);
+                var availableReports = _reportAccessService.GetAvailableReports((int)customer.MembershipLevel);
 
                 var allTiers = GetAllMembershipTiers(customer.MembershipLevel);
 
@@ -113,7 +113,7 @@ namespace SkuVaultSaaS.Api.Controllers
                         c.Email,
                         MembershipLevel = c.MembershipLevel,
                         MembershipLevelName = c.MembershipLevel.ToString(),
-                        AvailableReports = _reportAccessService.GetAvailableReports(c.MembershipLevel).Count(),
+                        AvailableReports = _reportAccessService.GetAvailableReports((int)c.MembershipLevel).Count(),
                         c.LastSyncedAt
                     })
                     .OrderBy(c => c.Name)
@@ -133,6 +133,43 @@ namespace SkuVaultSaaS.Api.Controllers
         {
             var tiers = GetAllMembershipTiers(null);
             return Ok(tiers);
+        }
+
+        [HttpGet("admin/report-access-config")]
+        [Authorize(Roles = "Admin")]
+        public IActionResult GetReportAccessConfig()
+        {
+            var config = _reportAccessService.GetReportAccessConfig();
+            return Ok(config);
+        }
+
+        [HttpPost("admin/report-access-config")]
+        [Authorize(Roles = "Admin")]
+        public IActionResult UpdateReportAccessConfig([FromBody] Dictionary<string, int> config)
+        {
+            try
+            {
+                _logger.LogInformation("Received config update request. Config is null: {IsNull}", config == null);
+                if (config != null)
+                {
+                    _logger.LogInformation("Config has {Count} entries: {Config}", config.Count, string.Join(", ", config.Select(kvp => $"{kvp.Key}={kvp.Value}")));
+                }
+
+                if (config == null || !config.Any())
+                {
+                    _logger.LogWarning("Configuration data is null or empty");
+                    return BadRequest("Configuration data is required");
+                }
+
+                _reportAccessService.SetReportAccessConfig(config);
+                _logger.LogInformation("Report access configuration updated successfully with {Count} entries", config.Count);
+                return Ok(new { message = "Report access config updated successfully" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating report access configuration");
+                return StatusCode(500, "Error updating report access configuration");
+            }
         }
 
         private IEnumerable<MembershipTierDto> GetAllMembershipTiers(MembershipLevel? currentLevel)

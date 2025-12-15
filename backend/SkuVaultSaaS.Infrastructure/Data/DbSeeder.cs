@@ -33,6 +33,7 @@ namespace SkuVaultSaaS.Infrastructure.Data
                 try
                 {
                     // Try EF-based seeding first (preferred when schema matches models)
+                    /*
                     var tenant = new Tenant 
                     { 
                         Name = "Test Tenant",
@@ -42,6 +43,7 @@ namespace SkuVaultSaaS.Infrastructure.Data
                     context.Tenants.Add(tenant);
                     context.Customers.Add(new Customer { Name = "Customer 1", Tenant = tenant, ExternalId = "EXT001", Email = "Kim.baumann@skuvault.com", LastSyncedAt = DateTime.UtcNow });
                     await context.SaveChangesAsync();
+                    */
                 }
                 catch (DbUpdateException ex)
                 {
@@ -56,6 +58,7 @@ namespace SkuVaultSaaS.Infrastructure.Data
                     // Retrieve the newly inserted tenant id using a raw SQL scalar query to avoid EF mapping
                     // attempting to read missing columns.
                     var connection = context.Database.GetDbConnection();
+                    logger?.LogInformation("Connection Failed: " + connection.ConnectionString);
                     try
                     {
                         if (connection.State != System.Data.ConnectionState.Open)
@@ -90,7 +93,7 @@ namespace SkuVaultSaaS.Infrastructure.Data
             }
 
             // Identity seeding: create roles and users when appropriate.
-            var userManager = scope.ServiceProvider.GetService<UserManager<IdentityUser>>();
+            var userManager = scope.ServiceProvider.GetService<UserManager<ApplicationUser>>();
             var roleManager = scope.ServiceProvider.GetService<RoleManager<IdentityRole>>();
 
             if (userManager == null || roleManager == null || config == null)
@@ -136,7 +139,7 @@ namespace SkuVaultSaaS.Infrastructure.Data
         }
 
         private static async Task EnsureRolesAndUsersAsync(ApplicationDbContext context,
-            UserManager<IdentityUser> userManager,
+            UserManager<ApplicationUser> userManager,
             RoleManager<IdentityRole> roleManager,
             ILogger? logger,
             string defaultUserEmail,
@@ -162,56 +165,62 @@ namespace SkuVaultSaaS.Infrastructure.Data
             var user = await userManager.FindByEmailAsync(defaultUserEmail);
             if (user == null)
             {
-                user = new IdentityUser { UserName = defaultUserEmail, Email = defaultUserEmail, EmailConfirmed = true };
+                user = new ApplicationUser { UserName = defaultUserEmail, Email = defaultUserEmail, EmailConfirmed = true };
                 var createResult = await userManager.CreateAsync(user, defaultUserPassword);
                 if (createResult.Succeeded)
                 {
                     await userManager.AddToRoleAsync(user, roleName);
                     logger?.LogInformation("Created seeded user {Email} and added to role {Role}", defaultUserEmail, roleName);
 
-                    // Optionally associate this user with an existing customer record.
-                    // Avoid EF projections here because the provider-managed DB may be missing columns
-                    // referenced by the model (which would cause "Unknown column" errors). Use a
-                    // lightweight raw SQL lookup and insert instead.
+                    // Associate user with customer
                     var connection = context.Database.GetDbConnection();
                     try
                     {
                         if (connection.State != System.Data.ConnectionState.Open)
                             await connection.OpenAsync();
 
-                        // Check if a customer already exists for this email
-                        using (var checkCmd = connection.CreateCommand())
-                        {
-                            checkCmd.CommandText = "SELECT Id FROM Customers WHERE Email = @email LIMIT 1";
-                            var p = checkCmd.CreateParameter();
-                            p.ParameterName = "@email";
-                            p.Value = user.Email ?? string.Empty;
-                            checkCmd.Parameters.Add(p);
+                        // Find customer by email
+                        using var checkCmd = connection.CreateCommand();
+                        checkCmd.CommandText = "SELECT Id FROM Customers WHERE Email = @email LIMIT 1";
+                        var p = checkCmd.CreateParameter();
+                        p.ParameterName = "@email";
+                        p.Value = user.Email ?? string.Empty;
+                        checkCmd.Parameters.Add(p);
 
-                            var existing = await checkCmd.ExecuteScalarAsync();
-                            if (existing == null)
+                        var customerId = await checkCmd.ExecuteScalarAsync();
+                        if (customerId != null && int.TryParse(customerId.ToString(), out var cId))
+                        {
+                            // Update user with CustomerId
+                            user.CustomerId = cId;
+                            await userManager.UpdateAsync(user);
+                            logger?.LogInformation("Associated user {Email} with customer {CustomerId}", user.Email, cId);
+                        }
+                        else
+                        {
+                            // Create customer if none exists
+                            using var tenantCmd = connection.CreateCommand();
+                            tenantCmd.CommandText = "SELECT Id FROM Tenants LIMIT 1";
+                            var tRes = await tenantCmd.ExecuteScalarAsync();
+                            if (tRes != null && int.TryParse(tRes.ToString(), out var tenantId))
                             {
-                                // No customer exists; find any tenant id to attach this customer to.
-                                using var tenantCmd = connection.CreateCommand();
-                                tenantCmd.CommandText = "SELECT Id FROM Tenants LIMIT 1";
-                                var tRes = await tenantCmd.ExecuteScalarAsync();
-                                if (tRes != null && int.TryParse(tRes.ToString(), out var tenantId))
+                                await context.Database.ExecuteSqlRawAsync(
+                                    "INSERT INTO Customers (`ExternalId`, `Name`, `Email`, `TenantId`, `LastSyncedAt`) VALUES ({0}, {1}, {2}, {3}, {4})",
+                                    "TEST_EXT_001", "Test Customer from Seeder", user.Email ?? string.Empty, tenantId, DateTime.UtcNow);
+                                
+                                // Get the new customer ID
+                                var newCustomerId = await checkCmd.ExecuteScalarAsync();
+                                if (newCustomerId != null && int.TryParse(newCustomerId.ToString(), out var newCId))
                                 {
-                                    // Insert the customer row using only the known columns.
-                                    await context.Database.ExecuteSqlRawAsync(
-                                        "INSERT INTO Customers (`ExternalId`, `Name`, `Email`, `TenantId`, `LastSyncedAt`) VALUES ({0}, {1}, {2}, {3}, {4})",
-                                        "TEST_EXT_001", "Test Customer from Seeder", user.Email ?? string.Empty, tenantId, DateTime.UtcNow);
-                                }
-                                else
-                                {
-                                    logger?.LogWarning("No tenant found to associate seeded customer {Email}", user.Email);
+                                    user.CustomerId = newCId;
+                                    await userManager.UpdateAsync(user);
+                                    logger?.LogInformation("Created customer and associated user {Email} with customer {CustomerId}", user.Email, newCId);
                                 }
                             }
                         }
                     }
                     catch (Exception ex)
                     {
-                        logger?.LogError(ex, "Failed to create/associate customer for seeded user {Email} using raw SQL fallback.", user?.Email);
+                        logger?.LogError(ex, "Failed to associate customer for user {Email}", user?.Email);
                     }
                     finally
                     {
@@ -229,7 +238,7 @@ namespace SkuVaultSaaS.Infrastructure.Data
             var adminUser = await userManager.FindByEmailAsync(adminEmail);
             if (adminUser == null)
             {
-                adminUser = new IdentityUser { UserName = adminEmail, Email = adminEmail, EmailConfirmed = true };
+                adminUser = new ApplicationUser { UserName = adminEmail, Email = adminEmail, EmailConfirmed = true };
                 var adminResult = await userManager.CreateAsync(adminUser, adminPassword);
                 if (adminResult.Succeeded)
                 {

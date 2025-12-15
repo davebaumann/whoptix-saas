@@ -12,5 +12,10 @@ namespace SkuVaultSaaS.Core.Models
         public Tenant Tenant { get; set; } = null!;
         public DateTime LastSyncedAt { get; set; }
         public MembershipLevel MembershipLevel { get; set; } = MembershipLevel.Basic;
+        
+        // Low Stock Notification Preferences
+        public bool LowStockNotificationsEnabled { get; set; } = false;
+        public string? LowStockNotificationEmail { get; set; }
+        public int LowStockCheckIntervalMinutes { get; set; } = 240; // 4 hours default
     }
 }

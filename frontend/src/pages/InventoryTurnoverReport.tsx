@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
 import AutoRefreshControls from '../components/AutoRefreshControls'
 import WithMembershipCheck from '../components/WithMembershipCheck'
-import { BarChart3, TrendingUp, TrendingDown, Clock, Package, AlertTriangle } from 'lucide-react'
+import { TrendingUp, TrendingDown, Package, AlertTriangle } from 'lucide-react'
 
 interface InventoryTurnoverItem {
   sku: string
@@ -60,7 +60,7 @@ const InventoryTurnoverContent = () => {
     }
   }
 
-  const getPerformanceCategory = (turnoverRate: number, daysOnHand: number) => {
+  const getPerformanceCategory = (turnoverRate: number) => {
     if (turnoverRate >= 4) return 'fast'
     if (turnoverRate >= 2) return 'medium'
     if (turnoverRate >= 0.5) return 'slow'
@@ -84,7 +84,7 @@ const InventoryTurnoverContent = () => {
     
     if (selectedCategory !== 'all') {
       filtered = filtered.filter(item => {
-        const category = getPerformanceCategory(item.turnoverRate, item.daysOnHand)
+        const category = getPerformanceCategory(item.turnoverRate)
         return category === selectedCategory
       })
     }
@@ -102,13 +102,6 @@ const InventoryTurnoverContent = () => {
 
     const startIndex = (currentPage - 1) * pageSize
     return sorted.slice(startIndex, startIndex + pageSize)
-  }
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(value)
   }
 
   const formatDate = (dateString: string) => {
@@ -139,10 +132,10 @@ const InventoryTurnoverContent = () => {
     if (!turnoverData) return null
 
     const data = turnoverData.turnoverData
-    const fastMoving = data.filter(item => getPerformanceCategory(item.turnoverRate, item.daysOnHand) === 'fast')
-    const mediumMoving = data.filter(item => getPerformanceCategory(item.turnoverRate, item.daysOnHand) === 'medium')
-    const slowMoving = data.filter(item => getPerformanceCategory(item.turnoverRate, item.daysOnHand) === 'slow')
-    const deadStock = data.filter(item => getPerformanceCategory(item.turnoverRate, item.daysOnHand) === 'dead')
+    const fastMoving = data.filter(item => getPerformanceCategory(item.turnoverRate) === 'fast')
+    const mediumMoving = data.filter(item => getPerformanceCategory(item.turnoverRate) === 'medium')
+    const slowMoving = data.filter(item => getPerformanceCategory(item.turnoverRate) === 'slow')
+    const deadStock = data.filter(item => getPerformanceCategory(item.turnoverRate) === 'dead')
 
     return {
       total: data.length,
@@ -192,7 +185,7 @@ const InventoryTurnoverContent = () => {
         <div className="flex items-center gap-4">
           {/* Auto-refresh controls */}
           <AutoRefreshControls 
-            queryKey={['inventoryTurnoverReport', customerId.toString(), days]} 
+            queryKey={['inventoryTurnoverReport', customerId.toString(), days.toString()]} 
             defaultInterval={300000} // 5 minutes default
             className="bg-white px-3 py-2 rounded-md border border-gray-300"
           />
@@ -331,7 +324,7 @@ const InventoryTurnoverContent = () => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {sortedData.map((item, index) => {
-                const category = getPerformanceCategory(item.turnoverRate, item.daysOnHand)
+                const category = getPerformanceCategory(item.turnoverRate)
                 const performance = getPerformanceLabel(category)
                 const stockStatus = getStockStatus(item.daysOnHand)
                 const StatusIcon = stockStatus.icon

@@ -3,18 +3,16 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 interface User {
   id: string
   email: string
-  roles: string[]
-  customerId?: number
-  customerName?: string
+  customerId: number
+  roles?: string[]
 }
 
 interface AuthContextType {
   user: User | null
-  login: (email: string, expires: string) => void
+  login: (email: string, expires: string) => Promise<void>
   logout: () => void
   isAuthenticated: boolean
   isLoading: boolean
-  hasRole: (role: string) => boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -50,7 +48,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
       
       if (response.ok) {
         const userData = await response.json()
-        setUser(userData)
+        // Set user data - use fallback customerId for now until proper association is implemented
+        setUser({
+          id: userData.id,
+          email: userData.email,
+          customerId: typeof userData.customerId === 'number' ? userData.customerId : 1 // Temporary fallback
+        })
+        
+        if (typeof userData.customerId !== 'number') {
+          console.warn('User has no customer association - using fallback customerId')
+        }
       } else {
         setUser(null)
       }
@@ -62,13 +69,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
-  const login = async (email: string, _expires: string) => {
-    setUser({
-      id: '', // Will be populated by checkAuthStatus
-      email,
-      roles: []
-    })
-    // Cookie is already set by the server, trigger auth check to get full user data
+  const login = async (_email: string, _expires: string) => {
+    // Cookie is already set by the server, check auth status to get full user data
     await checkAuthStatus()
   }
 
@@ -85,17 +87,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
-  const hasRole = (role: string): boolean => {
-    return user?.roles?.includes(role) || false
-  }
-
   const value = {
     user,
     login,
     logout,
     isAuthenticated: !!user,
-    isLoading,
-    hasRole
+    isLoading
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

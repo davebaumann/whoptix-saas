@@ -16,7 +16,7 @@ namespace SkuVaultSaaS.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.8")
+                .HasAnnotation("ProductVersion", "8.0.11")
                 .HasAnnotation("Relational:MaxIdentifierLength", 64);
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
@@ -227,6 +227,15 @@ namespace SkuVaultSaaS.Infrastructure.Migrations
 
                     b.Property<DateTime>("LastSyncedAt")
                         .HasColumnType("datetime(6)");
+
+                    b.Property<int>("LowStockCheckIntervalMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<string>("LowStockNotificationEmail")
+                        .HasColumnType("longtext");
+
+                    b.Property<bool>("LowStockNotificationsEnabled")
+                        .HasColumnType("tinyint(1)");
 
                     b.Property<int>("MembershipLevel")
                         .HasColumnType("int");
@@ -462,6 +471,53 @@ namespace SkuVaultSaaS.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Products");
+                });
+
+            modelBuilder.Entity("SkuVaultSaaS.Core.Models.Sale", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("CustomerEmail")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CustomerName")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("OrderNumber")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("SaleDate")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("SaleId")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Sku")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Sales");
                 });
 
             modelBuilder.Entity("SkuVaultSaaS.Core.Models.Tenant", b =>

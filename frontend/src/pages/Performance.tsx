@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { TrendingUp, TrendingDown, Activity, Package, BarChart3, Target, AlertTriangle, DollarSign, ShoppingCart, Zap } from 'lucide-react';
+// import PackerPerformanceDetail from '../components/PackerPerformanceDetail';
+import { TrendingUp, TrendingDown, Activity, Package, BarChart3, AlertTriangle, DollarSign, ShoppingCart, Zap } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import WithMembershipCheck from '../components/WithMembershipCheck';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,6 +11,7 @@ const PerformanceContent: React.FC = () => {
   const [selectedTimeframe, setSelectedTimeframe] = useState('30days');
   const [selectedMetric, setSelectedMetric] = useState('velocity');
   const customerId = user?.customerId || 1
+  const [pickerModal, setPickerModal] = useState<{ pickerName: string | null }>({ pickerName: null });
 
   const { data: performanceData, isLoading, error } = useQuery({
     queryKey: ['performance-report', customerId, selectedTimeframe],
@@ -329,7 +331,7 @@ const PerformanceContent: React.FC = () => {
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-medium text-gray-900 mb-4">Performance Trends</h3>
           <div className="space-y-4">
-            {trends?.slice(0, 5).map((trend, index) => (
+            {trends?.slice(0, 5).map((trend: any, index: number) => (
               <div key={index} className="flex items-center justify-between">
                 <div className="flex items-center">
                   <div className={`w-2 h-2 rounded-full mr-3 ${
@@ -359,8 +361,8 @@ const PerformanceContent: React.FC = () => {
             <div className="mt-5">
               <div className="flow-root">
                 <ul className="-my-5 divide-y divide-gray-200">
-                  {topPerformers?.slice(0, 5).map((performer, index) => (
-                    <li key={index} className="py-4">
+                  {topPerformers?.slice(0, 5).map((performer: any, index: number) => (
+                    <li key={index} className="py-4 cursor-pointer hover:bg-blue-50 rounded" onClick={() => setPickerModal({ pickerName: performer.sku })}>
                       <div className="flex items-center space-x-4">
                         <div className="flex-shrink-0">
                           <div className="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center">
@@ -397,8 +399,8 @@ const PerformanceContent: React.FC = () => {
             <div className="mt-5">
               <div className="flow-root">
                 <ul className="-my-5 divide-y divide-gray-200">
-                  {underPerformers?.slice(0, 5).map((performer, index) => (
-                    <li key={index} className="py-4">
+                  {underPerformers?.slice(0, 5).map((performer: any, index: number) => (
+                    <li key={index} className="py-4 cursor-pointer hover:bg-red-50 rounded" onClick={() => setPickerModal({ pickerName: performer.sku })}>
                       <div className="flex items-center space-x-4">
                         <div className="flex-shrink-0">
                           <div className="h-8 w-8 bg-red-100 rounded-full flex items-center justify-center">
@@ -429,6 +431,19 @@ const PerformanceContent: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* PickerPerformanceDetail Modal (implement or import as needed) */}
+      {pickerModal.pickerName && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-30">
+          <div className="bg-white p-6 rounded shadow-lg">
+            <h2 className="text-lg font-bold mb-2">Picker Details</h2>
+            <p>Picker: {pickerModal.pickerName}</p>
+            <button className="mt-4 px-4 py-2 bg-blue-600 text-white rounded" onClick={() => setPickerModal({ pickerName: null })}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -4,7 +4,7 @@ using SkuVaultSaaS.Core.Models;
 
 namespace SkuVaultSaaS.Infrastructure.Data
 {
-    public class ApplicationDbContext : IdentityDbContext
+    public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     {
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
             : base(options) { }
@@ -17,6 +17,8 @@ namespace SkuVaultSaaS.Infrastructure.Data
         public DbSet<InventoryMovement> InventoryMovements => Set<InventoryMovement>();
         public DbSet<Transaction> Transactions => Set<Transaction>();
         public DbSet<LowStockThreshold> LowStockThresholds => Set<LowStockThreshold>();
+        public DbSet<Sale> Sales => Set<Sale>();
+        public DbSet<Shipment> Shipments => Set<Shipment>();
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -131,6 +133,26 @@ namespace SkuVaultSaaS.Infrastructure.Data
                 .WithMany()
                 .HasForeignKey(lst => lst.LocationId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            // Shipment configuration
+            builder.Entity<Shipment>()
+                .HasIndex(s => new { s.CustomerId, s.ShipmentId })
+                .IsUnique();
+            builder.Entity<Shipment>()
+                .Property(s => s.ShippingCost)
+                .HasColumnType("decimal(18,2)");
+            builder.Entity<Shipment>()
+                .HasOne(s => s.Customer)
+                .WithMany()
+                .HasForeignKey(s => s.CustomerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // ApplicationUser-Customer relationship
+            builder.Entity<ApplicationUser>()
+                .HasOne(u => u.Customer)
+                .WithMany()
+                .HasForeignKey(u => u.CustomerId)
+                .OnDelete(DeleteBehavior.SetNull);
         }
     }
 }

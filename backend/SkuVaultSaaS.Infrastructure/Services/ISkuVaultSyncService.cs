@@ -38,5 +38,15 @@ namespace SkuVaultSaaS.Infrastructure.Services
         /// Synchronizes all customers for all tenants
         /// </summary>
         Task SyncAllCustomersAsync();
+
+        /// <summary>
+        /// Synchronizes sales for a specific customer
+        /// </summary>
+        Task SyncSalesAsync(int customerId);
+
+        /// <summary>
+        /// Synchronizes shipments for a specific customer
+        /// </summary>
+        Task SyncShipmentsAsync(int customerId);
     }
 }

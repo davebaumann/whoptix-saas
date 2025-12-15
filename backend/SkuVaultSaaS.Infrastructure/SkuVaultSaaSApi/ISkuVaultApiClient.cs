@@ -1,15 +1,18 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using SkuVaultSaaS.Core.Models;
 
 namespace SkuVaultSaaS.Infrastructure.SkuVaultSaaSApi
 {
     public interface ISkuVaultApiClient
     {
         Task<SkuVaultTokensDto> GetTokensAsync(string email, string password);
-    Task<List<SkuVaultProductDto>> GetProductsAsync(string tenantToken, string userToken);
-    Task<List<SkuVaultLocationDto>> GetLocationsAsync(string tenantToken, string userToken);
-    Task<List<SkuVaultInventoryDto>> GetInventoryAsync(string tenantToken, string userToken);
-    Task<List<SkuVaultInventoryMovementDto>> GetInventoryMovementsAsync(string tenantToken, string userToken, DateTime? fromDate = null, DateTime? toDate = null);
+        Task<List<SkuVaultProductDto>> GetProductsAsync(string tenantToken, string userToken);
+        Task<List<SkuVaultLocationDto>> GetLocationsAsync(string tenantToken, string userToken);
+        Task<List<SkuVaultInventoryDto>> GetInventoryAsync(string tenantToken, string userToken);
+        Task<List<SkuVaultInventoryMovementDto>> GetInventoryMovementsAsync(string tenantToken, string userToken, DateTime? fromDate = null, DateTime? toDate = null);
+        Task<List<SkuVaultSaleDto>> GetSalesAsync(string tenantToken, string userToken, DateTime? fromDate = null, DateTime? toDate = null);
+        Task<List<SkuVaultShipmentDto>> GetShipmentsAsync(string tenantToken, string userToken, DateTime? fromDate = null, DateTime? toDate = null);
     }
 
     public class SkuVaultTokensDto
@@ -66,6 +69,26 @@ namespace SkuVaultSaaS.Infrastructure.SkuVaultSaaSApi
         public DateTime TransactionDate { get; set; }
         public string? TransactionType { get; set; }  // e.g., "Remove", "Add", "Transfer"
         public string? Context { get; set; }
+    }
+
+    public class SkuVaultShipmentDto
+    {
+        public string ShipmentId { get; set; } = string.Empty;
+        public string OrderId { get; set; } = string.Empty;
+        public string TrackingNumber { get; set; } = string.Empty;
+        public string Carrier { get; set; } = string.Empty;
+        public string Service { get; set; } = string.Empty;
+        public DateTime ShippedDate { get; set; }
+        public DateTime CreatedDate { get; set; }
+        public DateTime UpdatedDate { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public decimal ShippingCost { get; set; }
+        public string RecipientName { get; set; } = string.Empty;
+        public string RecipientAddress { get; set; } = string.Empty;
+        public string RecipientCity { get; set; } = string.Empty;
+        public string RecipientState { get; set; } = string.Empty;
+        public string RecipientZip { get; set; } = string.Empty;
+        public string RecipientCountry { get; set; } = string.Empty;
     }
 }
 

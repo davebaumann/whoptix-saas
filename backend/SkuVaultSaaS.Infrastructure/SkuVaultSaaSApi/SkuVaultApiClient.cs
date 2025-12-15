@@ -8,6 +8,8 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
+using SkuVaultSaaS.Core.Models;
+// ...existing usings...
 namespace SkuVaultSaaS.Infrastructure.SkuVaultSaaSApi
 {
     public class SkuVaultApiClient : ISkuVaultApiClient
@@ -21,17 +23,55 @@ namespace SkuVaultSaaS.Infrastructure.SkuVaultSaaSApi
             _httpClient = httpClient;
             _options = options.Value;
             _logger = logger;
-            
-            // Configure base URL from options
+            // ...existing constructor code...
             if (!string.IsNullOrEmpty(_options.BaseUrl))
             {
                 _httpClient.BaseAddress = new Uri(_options.BaseUrl);
             }
-            
-            // Configure default headers
             _httpClient.DefaultRequestHeaders.Accept.Clear();
             _httpClient.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
-    }
+        }
+
+        public async Task<List<SkuVaultSaleDto>> GetSalesAsync(string tenantToken, string userToken, DateTime? fromDate = null, DateTime? toDate = null)
+        {
+            EnsureTenantToken(tenantToken);
+            EnsureUserToken(userToken);
+            var from = fromDate ?? DateTime.UtcNow.AddDays(-7);
+            var to = toDate ?? DateTime.UtcNow;
+            var body = new
+            {
+                TenantToken = tenantToken,
+                UserToken = userToken,
+                FromDate = from.ToString("yyyy-MM-ddTHH:mm:ss"),
+                ToDate = to.ToString("yyyy-MM-ddTHH:mm:ss")
+            };
+            return await PostAndParseListWithRetry<SkuVaultSaleDto>(
+                "sales/getSales",
+                token => body,
+                "Sales",
+                userToken);
+        }
+
+        public async Task<List<SkuVaultShipmentDto>> GetShipmentsAsync(string tenantToken, string userToken, DateTime? fromDate = null, DateTime? toDate = null)
+        {
+            EnsureTenantToken(tenantToken);
+            EnsureUserToken(userToken);
+            var from = fromDate ?? DateTime.UtcNow.AddDays(-7);
+            var to = toDate ?? DateTime.UtcNow;
+            var body = new
+            {
+                TenantToken = tenantToken,
+                UserToken = userToken,
+                FromDate = from.ToString("yyyy-MM-ddTHH:mm:ss"),
+                ToDate = to.ToString("yyyy-MM-ddTHH:mm:ss")
+            };
+            return await PostAndParseListWithRetry<SkuVaultShipmentDto>(
+                "shipments/getShipments",
+                token => body,
+                "Shipments",
+                userToken);
+        }
+        // ...existing methods (GetTokensAsync, GetProductsAsync, etc.)...
 
         public async Task<SkuVaultTokensDto> GetTokensAsync(string email, string password)
         {
@@ -79,13 +119,51 @@ namespace SkuVaultSaaS.Infrastructure.SkuVaultSaaSApi
         {
             EnsureTenantToken(tenantToken);
             EnsureUserToken(userToken);
-            
-            // Try without pagination parameters first - some SkuVault endpoints don't require them
-            // or use different parameter names
-            return await PostAndParseListWithRetry<SkuVaultProductDto>( 
-                "products/getProducts",
-                token => new { TenantToken = tenantToken, UserToken = userToken },
-                "Products", userToken);
+
+            const int pageSize = 500;
+            int page = 1;
+            bool morePages = true;
+            var allProducts = new List<SkuVaultProductDto>();
+            int maxRetries = 5;
+            int delayMs = 2000;
+
+            while (morePages)
+            {
+                for (int attempt = 0; attempt < maxRetries; attempt++)
+                {
+                    try
+                    {
+                        var result = await PostAndParseListWithRetry<SkuVaultProductDto>(
+                            "products/getProducts",
+                            token => new { TenantToken = tenantToken, UserToken = userToken, Page = page, PageSize = pageSize },
+                            "Products", userToken);
+                        if (result.Count > 0)
+                        {
+                            allProducts.AddRange(result);
+                            if (result.Count < pageSize)
+                            {
+                                morePages = false;
+                            }
+                            else
+                            {
+                                page++;
+                            }
+                        }
+                        else
+                        {
+                            morePages = false;
+                        }
+                        break;
+                    }
+                    catch (HttpRequestException ex) when (ex.Message.Contains("429"))
+                    {
+                        if (attempt == maxRetries - 1)
+                            throw;
+                        await Task.Delay(delayMs * (attempt + 1));
+                    }
+                }
+            }
+            return allProducts;
         }
 
     public async Task<List<SkuVaultLocationDto>> GetLocationsAsync(string tenantToken, string userToken)
@@ -102,23 +180,31 @@ namespace SkuVaultSaaS.Infrastructure.SkuVaultSaaSApi
         {
             EnsureTenantToken(tenantToken);
             EnsureUserToken(userToken);
-            
-            // Inventory endpoint returns a dictionary structure, not an array
+
+            int maxRetries = 5;
+            int delayMs = 2000;
             var body = new { TenantToken = tenantToken, UserToken = userToken };
-            _logger?.LogInformation($"SkuVault API call to inventory/getInventoryByLocation with body: {JsonSerializer.Serialize(body)}");
-            
-            var response = await _httpClient.PostAsJsonAsync("inventory/getInventoryByLocation", body);
-            var raw = await response.Content.ReadAsStringAsync();
-            
-            _logger?.LogInformation($"SkuVault API call to inventory/getInventoryByLocation succeeded with {raw?.Length ?? 0} bytes response");
-            
-            if (!response.IsSuccessStatusCode)
+            for (int attempt = 0; attempt < maxRetries; attempt++)
             {
-                _logger?.LogWarning($"SkuVault API returned {response.StatusCode}");
-                throw new HttpRequestException($"SkuVault API error: {response.StatusCode}");
+                var response = await _httpClient.PostAsJsonAsync("inventory/getInventoryByLocation", body);
+                var raw = await response.Content.ReadAsStringAsync();
+                if (response.IsSuccessStatusCode)
+                {
+                    return ParseInventoryDictionary(raw ?? string.Empty);
+                }
+                if ((int)response.StatusCode == 429)
+                {
+                    if (attempt == maxRetries - 1)
+                        throw new HttpRequestException($"SkuVault API error: {response.StatusCode}");
+                    await Task.Delay(delayMs * (attempt + 1));
+                }
+                else
+                {
+                    _logger?.LogWarning($"SkuVault API returned {response.StatusCode}");
+                    throw new HttpRequestException($"SkuVault API error: {response.StatusCode}");
+                }
             }
-            
-            return ParseInventoryDictionary(raw ?? string.Empty);
+            throw new Exception("SkuVault getInventory failed after retries");
         }
 
     public async Task<List<SkuVaultInventoryMovementDto>> GetInventoryMovementsAsync(string tenantToken, string userToken, DateTime? fromDate = null, DateTime? toDate = null)
@@ -163,56 +249,39 @@ namespace SkuVaultSaaS.Infrastructure.SkuVaultSaaSApi
 
         private async Task<List<T>> PostAndParseListWithRetry<T>(string relativePath, Func<string?, object> buildBody, string primaryArrayProperty, string userToken)
         {
-            // First attempt with provided UserToken
             var attemptBody = buildBody(userToken);
-            
-            // Log the request details for debugging
-            _logger?.LogInformation("SkuVault API call to {Path} with body: {Body}", relativePath, System.Text.Json.JsonSerializer.Serialize(attemptBody));
-            
             var (response, raw) = await SendPostAsync(relativePath, attemptBody);
 
             if (response.IsSuccessStatusCode)
             {
-                _logger?.LogInformation("SkuVault API call to {Path} succeeded with {Length} bytes response", relativePath, raw?.Length ?? 0);
                 return ParseListFromRaw<T>(raw ?? string.Empty, primaryArrayProperty);
             }
 
             var status = (int)response.StatusCode;
-            _logger?.LogWarning("SkuVault call {Path} failed on first attempt with {Status}. Body: {Body}", relativePath, status, Truncate(raw ?? string.Empty));
-
-            // If unauthorized, no auto-refresh since we use pre-configured tokens
-                if (status == 401) 
+            if (status == 401)
             {
                 _logger?.LogError("SkuVault 401 Unauthorized - check UserToken and TenantToken configuration");
                 throw CreateHttpException(response, raw ?? string.Empty);
             }
-
-            // If not found, try a few fallback route variants and base URLs
             if (status == 404)
             {
                 foreach (var alt in GetAlternatePaths(relativePath))
                 {
-                    _logger?.LogInformation("Trying alternate SkuVault path: {Alt}", alt);
-                        (response, raw) = await SendPostAsync(alt, buildBody(userToken));
+                    (response, raw) = await SendPostAsync(alt, buildBody(userToken));
                     if (response.IsSuccessStatusCode)
                     {
                         return ParseListFromRaw<T>(raw ?? string.Empty, primaryArrayProperty);
                     }
                 }
-
-                // Try alternate base URLs with absolute requests
                 foreach (var absoluteUrl in GetAlternateBaseUrls(relativePath))
                 {
-                    _logger?.LogInformation("Trying alternate SkuVault base URL: {Url}", absoluteUrl);
-                        (response, raw) = await SendPostAbsoluteAsync(absoluteUrl, buildBody(userToken));
+                    (response, raw) = await SendPostAbsoluteAsync(absoluteUrl, buildBody(userToken));
                     if (response.IsSuccessStatusCode)
                     {
                         return ParseListFromRaw<T>(raw ?? string.Empty, primaryArrayProperty);
                     }
                 }
             }
-
-            // If we get here, throw with as much detail as we can
             throw CreateHttpException(response, raw ?? string.Empty);
         }
 

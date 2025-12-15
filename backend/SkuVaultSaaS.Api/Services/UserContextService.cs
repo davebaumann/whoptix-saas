@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using SkuVaultSaaS.Infrastructure.Data;
+using SkuVaultSaaS.Core.Models;
 using System.Security.Claims;
 
 namespace SkuVaultSaaS.Api.Services
@@ -18,13 +19,13 @@ namespace SkuVaultSaaS.Api.Services
     public class UserContextService : IUserContextService
     {
         private readonly IHttpContextAccessor _httpContextAccessor;
-        private readonly UserManager<IdentityUser> _userManager;
+        private readonly UserManager<ApplicationUser> _userManager;
         private readonly ApplicationDbContext _context;
         private readonly ILogger<UserContextService> _logger;
 
         public UserContextService(
             IHttpContextAccessor httpContextAccessor,
-            UserManager<IdentityUser> userManager,
+            UserManager<ApplicationUser> userManager,
             ApplicationDbContext context,
             ILogger<UserContextService> logger)
         {
@@ -62,16 +63,14 @@ namespace SkuVaultSaaS.Api.Services
 
         public async Task<int?> GetCurrentCustomerIdAsync()
         {
-            var userEmail = GetCurrentUserEmail();
-            if (string.IsNullOrEmpty(userEmail)) return null;
+            var userId = GetCurrentUserId();
+            if (string.IsNullOrEmpty(userId)) return null;
 
             // Admins don't have an associated customer
             if (IsAdmin()) return null;
 
-            var customer = await _context.Customers
-                .FirstOrDefaultAsync(c => c.Email == userEmail);
-
-            return customer?.Id;
+            var user = await _userManager.FindByIdAsync(userId);
+            return user?.CustomerId;
         }
 
         public async Task<bool> CanAccessCustomerAsync(int customerId)

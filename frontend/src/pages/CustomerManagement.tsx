@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient, AdminCustomerResponse, AdminCustomerCreate, AdminCustomerUpdate } from '../api/client'
 import { membershipService } from '../api/membershipService'
-import { Crown, Shield, Star, Zap } from 'lucide-react'
+import { Crown, Shield, Star, Zap, Eye, User, Activity } from 'lucide-react'
 
 export default function AdminDashboard() {
   const [currentPage, setCurrentPage] = useState(1)
@@ -14,6 +14,8 @@ export default function AdminDashboard() {
   const [selectedCustomer, setSelectedCustomer] = useState<AdminCustomerResponse | null>(null)
   const [selectedMembershipLevel, setSelectedMembershipLevel] = useState<number>(1)
   const [membershipReason, setMembershipReason] = useState('')
+  const [showCustomerDetailsModal, setShowCustomerDetailsModal] = useState(false)
+  const [customerDetails, setCustomerDetails] = useState<any>(null)
   const pageSize = 10
 
   const queryClient = useQueryClient()
@@ -80,6 +82,42 @@ export default function AdminDashboard() {
     setSelectedMembershipLevel(membershipCustomer?.membershipLevel || 1)
     setMembershipReason('')
     setShowMembershipModal(true)
+  }
+
+  const handleViewAsCustomer = (customer: AdminCustomerResponse) => {
+    // Store admin context and switch to customer view
+    sessionStorage.setItem('adminViewingAs', JSON.stringify({
+      adminId: 'current-admin-id', // You'd get this from auth context
+      customerId: customer.id,
+      customerName: customer.name,
+      timestamp: new Date().toISOString()
+    }))
+    
+    // Navigate to customer dashboard
+    window.location.href = '/app/dashboard'
+  }
+
+  const handleCustomerDetails = async (customer: AdminCustomerResponse) => {
+    try {
+      // Fetch detailed customer information
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/membership/customer/${customer.id}`, {
+        credentials: 'include'
+      })
+      
+      if (response.ok) {
+        const details = await response.json()
+        setCustomerDetails({
+          ...customer,
+          ...details,
+          lastActivity: new Date().toISOString() // Mock data
+        })
+        setSelectedCustomer(customer)
+        setShowCustomerDetailsModal(true)
+      }
+    } catch (error) {
+      console.error('Failed to fetch customer details:', error)
+      alert('Failed to load customer details')
+    }
   }
 
   const getMembershipIcon = (level: number) => {
@@ -170,6 +208,9 @@ export default function AdminDashboard() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Last Synced
                 </th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Support Tools
+                </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
@@ -178,7 +219,7 @@ export default function AdminDashboard() {
             <tbody className="bg-white divide-y divide-gray-200">
               {customersData?.customers?.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={8} className="px-6 py-4 text-center text-gray-500">
                     No customers found
                   </td>
                 </tr>
@@ -220,6 +261,26 @@ export default function AdminDashboard() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {customer.lastSyncedAt ? new Date(customer.lastSyncedAt).toLocaleDateString() : 'Never'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <div className="flex justify-center space-x-2">
+                          <button
+                            onClick={() => handleViewAsCustomer(customer)}
+                            className="inline-flex items-center px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded hover:bg-blue-100"
+                            title="View application as this customer"
+                          >
+                            <Eye className="w-3 h-3 mr-1" />
+                            View As
+                          </button>
+                          <button
+                            onClick={() => handleCustomerDetails(customer)}
+                            className="inline-flex items-center px-2 py-1 text-xs font-medium text-green-600 bg-green-50 rounded hover:bg-green-100"
+                            title="View customer details and activity"
+                          >
+                            <User className="w-3 h-3 mr-1" />
+                            Details
+                          </button>
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="space-x-2">
@@ -426,6 +487,128 @@ export default function AdminDashboard() {
               >
                 {membershipMutation.isPending ? 'Updating...' : 'Update Membership'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCustomerDetailsModal && selectedCustomer && customerDetails && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full m-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold text-gray-900">Customer Support Details</h2>
+              <button 
+                onClick={() => setShowCustomerDetailsModal(false)} 
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="space-y-6">
+              {/* Customer Info */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="text-lg font-medium text-gray-900 mb-3">Customer Information</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Name</label>
+                    <p className="text-sm text-gray-900">{selectedCustomer.name}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Email</label>
+                    <p className="text-sm text-gray-900">{selectedCustomer.email}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Tenant</label>
+                    <p className="text-sm text-gray-900">{selectedCustomer.tenantName}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Last Synced</label>
+                    <p className="text-sm text-gray-900">
+                      {selectedCustomer.lastSyncedAt ? new Date(selectedCustomer.lastSyncedAt).toLocaleString() : 'Never'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Membership Details */}
+              <div className="bg-blue-50 rounded-lg p-4">
+                <h3 className="text-lg font-medium text-gray-900 mb-3">Membership & Access</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Current Level</label>
+                    <div className="flex items-center space-x-2 mt-1">
+                      {getMembershipIcon(customerDetails.currentLevel || 1)}
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getMembershipBadgeColor(customerDetails.currentLevel || 1)}`}>
+                        {customerDetails.currentLevelName || 'Basic'}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Available Reports</label>
+                    <p className="text-sm text-gray-900">{customerDetails.availableReports?.length || 0} reports</p>
+                  </div>
+                </div>
+                
+                {customerDetails.availableReports && customerDetails.availableReports.length > 0 && (
+                  <div className="mt-3">
+                    <label className="text-sm font-medium text-gray-500">Accessible Reports</label>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {customerDetails.availableReports.map((report: string, index: number) => (
+                        <span key={index} className="inline-flex items-center px-2 py-1 rounded text-xs bg-green-100 text-green-800">
+                          {report}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Quick Actions */}
+              <div className="bg-yellow-50 rounded-lg p-4">
+                <h3 className="text-lg font-medium text-gray-900 mb-3">Support Actions</h3>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => handleViewAsCustomer(selectedCustomer)}
+                    className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700"
+                  >
+                    <Eye className="w-4 h-4 mr-2" />
+                    View as Customer
+                  </button>
+                  <button
+                    onClick={() => handleMembershipEdit(selectedCustomer)}
+                    className="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-600 bg-blue-100 rounded hover:bg-blue-200"
+                  >
+                    <Crown className="w-4 h-4 mr-2" />
+                    Change Membership
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowCustomerDetailsModal(false)
+                      setShowEditModal(true)
+                    }}
+                    className="inline-flex items-center px-3 py-2 text-sm font-medium text-green-600 bg-green-100 rounded hover:bg-green-200"
+                  >
+                    <User className="w-4 h-4 mr-2" />
+                    Edit Customer
+                  </button>
+                </div>
+              </div>
+
+              {/* Activity Summary */}
+              <div className="bg-green-50 rounded-lg p-4">
+                <h3 className="text-lg font-medium text-gray-900 mb-3">Recent Activity</h3>
+                <div className="text-sm text-gray-600">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Activity className="w-4 h-4" />
+                    <span>Last login: {customerDetails.lastActivity ? new Date(customerDetails.lastActivity).toLocaleString() : 'Unknown'}</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Activity className="w-4 h-4" />
+                    <span>Data sync status: {selectedCustomer.lastSyncedAt ? 'Active' : 'Inactive'}</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

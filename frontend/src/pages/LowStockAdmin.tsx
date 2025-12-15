@@ -42,12 +42,20 @@ const LowStockAdmin: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingThreshold, setEditingThreshold] = useState<LowStockThreshold | null>(null);
+  const [showNotificationSettings, setShowNotificationSettings] = useState(false);
 
   // Form state for adding/editing thresholds
   const [formData, setFormData] = useState({
     productId: 0,
     locationId: undefined as number | undefined,
     thresholdQuantity: 10
+  });
+
+  // Notification preferences state
+  const [notificationPrefs, setNotificationPrefs] = useState({
+    lowStockNotificationsEnabled: false,
+    lowStockNotificationEmail: '',
+    lowStockCheckIntervalMinutes: 240
   });
 
   // Get customer ID from user context (assuming it's available)
@@ -143,6 +151,44 @@ const LowStockAdmin: React.FC = () => {
     }
   });
 
+  // Notification preferences query
+  const { data: notificationData } = useQuery({
+    queryKey: ['notificationPreferences', customerId],
+    queryFn: async () => {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/customernotification/${customerId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (!response.ok) throw new Error('Failed to fetch notification preferences');
+      return response.json();
+    }
+  });
+
+  // Update local state when data is loaded
+  React.useEffect(() => {
+    if (notificationData) {
+      setNotificationPrefs(notificationData);
+    }
+  }, [notificationData]);
+
+  const updateNotificationMutation = useMutation({
+    mutationFn: async (data: typeof notificationPrefs) => {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/customernotification/${customerId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(data)
+      });
+      if (!response.ok) throw new Error('Failed to update notification preferences');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notificationPreferences', customerId] });
+      setShowNotificationSettings(false);
+    }
+  });
+
   const resetForm = () => {
     setFormData({
       productId: 0,
@@ -208,17 +254,26 @@ const LowStockAdmin: React.FC = () => {
             Set custom low stock thresholds for your products and locations
           </p>
         </div>
-        <button
-          onClick={() => {
-            resetForm();
-            setEditingThreshold(null);
-            setIsAddModalOpen(true);
-          }}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-        >
-          <span className="text-lg">+</span>
-          Add Threshold
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowNotificationSettings(true)}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+          >
+            <span>📧</span>
+            Email Settings
+          </button>
+          <button
+            onClick={() => {
+              resetForm();
+              setEditingThreshold(null);
+              setIsAddModalOpen(true);
+            }}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+          >
+            <span className="text-lg">+</span>
+            Add Threshold
+          </button>
+        </div>
       </div>
 
       {/* Search and Filter */}
@@ -414,6 +469,89 @@ const LowStockAdmin: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Notification Settings Modal */}
+      {showNotificationSettings && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+              <span>📧</span>
+              Email Notification Settings
+            </h2>
+            <div className="space-y-4">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="enableNotifications"
+                  checked={notificationPrefs.lowStockNotificationsEnabled}
+                  onChange={(e) => setNotificationPrefs({
+                    ...notificationPrefs,
+                    lowStockNotificationsEnabled: e.target.checked
+                  })}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="enableNotifications" className="ml-2 block text-sm text-gray-900">
+                  Enable low stock email notifications
+                </label>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Notification Email Address
+                </label>
+                <input
+                  type="email"
+                  value={notificationPrefs.lowStockNotificationEmail}
+                  onChange={(e) => setNotificationPrefs({
+                    ...notificationPrefs,
+                    lowStockNotificationEmail: e.target.value
+                  })}
+                  placeholder="Enter email address"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Check Interval (minutes)
+                </label>
+                <select
+                  value={notificationPrefs.lowStockCheckIntervalMinutes}
+                  onChange={(e) => setNotificationPrefs({
+                    ...notificationPrefs,
+                    lowStockCheckIntervalMinutes: parseInt(e.target.value)
+                  })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value={60}>Every hour</option>
+                  <option value={120}>Every 2 hours</option>
+                  <option value={240}>Every 4 hours</option>
+                  <option value={480}>Every 8 hours</option>
+                  <option value={720}>Every 12 hours</option>
+                  <option value={1440}>Daily</option>
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowNotificationSettings(false)}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => updateNotificationMutation.mutate(notificationPrefs)}
+                  disabled={updateNotificationMutation.isPending}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                >
+                  {updateNotificationMutation.isPending ? 'Saving...' : 'Save Settings'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

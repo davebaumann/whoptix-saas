@@ -136,8 +136,7 @@ namespace SkuVaultSaaS.Api.Controllers
             {
                 return NotFound("Customer not found");
             }
-
-            if (!_reportAccessService.CanAccessReport(customer.MembershipLevel, reportName))
+            if (!_reportAccessService.CanAccessReport((int)customer.MembershipLevel, reportName))
             {
                 var requiredLevel = _reportAccessService.GetRequiredMembershipLevel(reportName);
                 return StatusCode(403, new
@@ -149,7 +148,7 @@ namespace SkuVaultSaaS.Api.Controllers
                 });
             }
 
-            return null; // Access granted
+            return null!; // Access granted - null indicates success
         }
 
         [HttpGet("customer/{customerId}/inventory")]

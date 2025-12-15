@@ -10,6 +10,7 @@ interface SignupForm {
   firstName: string
   lastName: string
   phoneNumber: string
+  agreeToContract: boolean
 }
 
 export default function Signup() {
@@ -20,7 +21,8 @@ export default function Signup() {
     companyName: '',
     firstName: '',
     lastName: '',
-    phoneNumber: ''
+    phoneNumber: '',
+    agreeToContract: false
   })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -50,6 +52,13 @@ export default function Signup() {
     // Validate required fields
     if (!formData.email || !formData.password || !formData.companyName || !formData.firstName) {
       setError('Please fill in all required fields')
+      setIsLoading(false)
+      return
+    }
+
+    // Validate contract agreement
+    if (!formData.agreeToContract) {
+      setError('You must agree to the contract terms to continue')
       setIsLoading(false)
       return
     }
@@ -213,6 +222,20 @@ export default function Signup() {
                 placeholder="Confirm Password"
               />
             </div>
+          </div>
+
+          <div className="flex items-start">
+            <input
+              id="agreeToContract"
+              name="agreeToContract"
+              type="checkbox"
+              checked={formData.agreeToContract}
+              onChange={(e) => setFormData({...formData, agreeToContract: e.target.checked})}
+              className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            />
+            <label htmlFor="agreeToContract" className="ml-2 block text-sm text-gray-700">
+              I agree to the contract terms and conditions (contract terms to be determined) *
+            </label>
           </div>
 
           {error && (

@@ -12,5 +12,18 @@ export default defineConfig({
         changeOrigin: true,
       }
     }
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          charts: ['recharts'],
+          query: ['@tanstack/react-query'],
+          stripe: ['@stripe/react-stripe-js', '@stripe/stripe-js']
+        }
+      }
+    },
+    chunkSizeWarningLimit: 1000
   }
 })

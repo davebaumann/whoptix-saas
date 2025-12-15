@@ -1,0 +1,15 @@
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Tools\bin\Debug\net8.0\SkuVaultSaaS.Tools.exe
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Tools\bin\Debug\net8.0\SkuVaultSaaS.Tools.deps.json
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Tools\bin\Debug\net8.0\SkuVaultSaaS.Tools.runtimeconfig.json
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Tools\bin\Debug\net8.0\SkuVaultSaaS.Tools.dll
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Tools\bin\Debug\net8.0\SkuVaultSaaS.Tools.pdb
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Tools\obj\Debug\net8.0\SkuVaultSaaS.Tools.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Tools\obj\Debug\net8.0\SkuVaultSaaS.Tools.AssemblyInfoInputs.cache
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Tools\obj\Debug\net8.0\SkuVaultSaaS.Tools.AssemblyInfo.cs
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Tools\obj\Debug\net8.0\SkuVaultSaaS.Tools.csproj.CoreCompileInputs.cache
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Tools\obj\Debug\net8.0\SkuVaultSaaS.Tools.sourcelink.json
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Tools\obj\Debug\net8.0\SkuVaultSaaS.Tools.dll
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Tools\obj\Debug\net8.0\refint\SkuVaultSaaS.Tools.dll
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Tools\obj\Debug\net8.0\SkuVaultSaaS.Tools.pdb
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Tools\obj\Debug\net8.0\SkuVaultSaaS.Tools.genruntimeconfig.cache
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Tools\obj\Debug\net8.0\ref\SkuVaultSaaS.Tools.dll

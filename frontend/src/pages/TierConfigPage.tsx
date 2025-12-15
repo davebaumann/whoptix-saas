@@ -14,6 +14,17 @@ const TierConfigPage: React.FC = () => {
     queryFn: () => membershipService.getMembershipTiers(),
   });
 
+  const { data: reportConfig, isLoading: isConfigLoading } = useQuery({
+    queryKey: ['reportAccessConfig'],
+    queryFn: async () => {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/membership/admin/report-access-config`, {
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to load config');
+      return response.json();
+    },
+  });
+
   // Initial report access configuration
   const reportAccess = {
     'inventory': { tier: 1, name: 'Inventory Report', description: 'Basic inventory tracking and stock levels' },
@@ -24,27 +35,49 @@ const TierConfigPage: React.FC = () => {
     'performance': { tier: 4, name: 'Performance Analytics', description: 'Advanced metrics including velocity, turnover, and trends' }
   };
 
-  // Initialize edited state with current values
+  // Initialize edited state with current values from backend
   React.useEffect(() => {
-    if (!isEditing) {
-      const currentAccess: Record<string, number> = {};
-      Object.entries(reportAccess).forEach(([key, config]) => {
-        currentAccess[key] = config.tier;
-      });
-      setEditedReportAccess(currentAccess);
+    if (!isEditing && reportConfig) {
+      console.log('Initializing editedReportAccess from backend:', reportConfig);
+      setEditedReportAccess(reportConfig);
     }
-  }, [isEditing]);
+  }, [isEditing, reportConfig]);
 
   const updateReportAccessMutation = useMutation({
     mutationFn: async (newAccess: Record<string, number>) => {
-      // This would call a backend API to update the ReportAccessService configuration
-      // For now, we'll simulate the API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      return newAccess;
+      console.log('Mutation function called with:', newAccess);
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/membership/admin/report-access-config`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify(newAccess),
+        });
+        console.log('Response received:', response.status, response.statusText);
+        if (!response.ok) {
+          const errorText = await response.clone().text();
+          console.log('Error response text:', errorText);
+          throw new Error(`Failed to update report access config (${response.status}): ${errorText}`);
+        }
+        const result = await response.json();
+        console.log('Success response:', result);
+        return result;
+      } catch (error) {
+        console.error('Mutation function error:', error);
+        throw error;
+      }
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('Mutation success:', data);
       queryClient.invalidateQueries({ queryKey: ['membershipTiers'] });
+      queryClient.invalidateQueries({ queryKey: ['reportAccessConfig'] });
       setIsEditing(false);
+    },
+    onError: (error) => {
+      console.error('Mutation error callback:', error);
+      alert(`Failed to save changes: ${error.message}`);
     },
   });
 
@@ -56,6 +89,9 @@ const TierConfigPage: React.FC = () => {
   };
 
   const handleSave = () => {
+    console.log('Save button clicked');
+    console.log('editedReportAccess:', editedReportAccess);
+    console.log('API URL:', `${import.meta.env.VITE_API_BASE_URL}/api/membership/admin/report-access-config`);
     updateReportAccessMutation.mutate(editedReportAccess);
   };
 
@@ -79,7 +115,7 @@ const TierConfigPage: React.FC = () => {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || isConfigLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -228,7 +264,7 @@ const TierConfigPage: React.FC = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {Object.entries(reportAccess).map(([reportKey, report]) => {
-                    const currentTier = isEditing ? editedReportAccess[reportKey] : report.tier;
+                    const currentTier = isEditing ? editedReportAccess[reportKey] : (reportConfig?.[reportKey] ?? report.tier);
                     return (
                       <tr key={reportKey}>
                         <td className="px-6 py-4 whitespace-nowrap">

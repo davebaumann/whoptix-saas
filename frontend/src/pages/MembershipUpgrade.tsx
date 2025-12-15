@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useMembership } from '../contexts/MembershipContext'
 import { useAuth } from '../contexts/AuthContext'
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
-import { Crown, Shield, Star, Zap, Check, X } from 'lucide-react'
+import { Crown, Star, Zap, Check } from 'lucide-react'
 
 // Initialize Stripe - you'll need to replace with your actual publishable key
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_test_your_stripe_publishable_key_here')
@@ -390,10 +390,7 @@ export default function MembershipUpgrade() {
               </p>
             </div>
             <div>
-              <h3 className="font-semibold text-gray-900 mb-2">Can I cancel anytime?</h3>
-              <p className="text-gray-600 text-sm">
-                Yes, you can cancel your subscription at any time. Your access will continue until the end of your billing period.
-              </p>
+              {/* Removed 'Can I cancel anytime?' section */}
             </div>
           </div>
         </div>

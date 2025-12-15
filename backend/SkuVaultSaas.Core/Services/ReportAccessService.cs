@@ -1,53 +1,92 @@
-using SkuVaultSaaS.Core.Enums;
+using System.Collections.Generic;
+using System.IO;
+using System.Text.Json;
 
 namespace SkuVaultSaaS.Core.Services
 {
-    public interface IReportAccessService
-    {
-        bool CanAccessReport(MembershipLevel membershipLevel, string reportName);
-        IEnumerable<string> GetAvailableReports(MembershipLevel membershipLevel);
-        MembershipLevel GetRequiredMembershipLevel(string reportName);
-    }
-
     public class ReportAccessService : IReportAccessService
     {
-        private readonly Dictionary<string, MembershipLevel> _reportRequirements = new()
-        {
-            // Basic reports - available to all membership levels
-            { "inventory", MembershipLevel.Basic },
-            
-            // Standard reports - Standard and above
-            { "low-stock", MembershipLevel.Standard },
-            
-            // Premium reports - Premium and above
-            { "aging-inventory", MembershipLevel.Premium },
-            { "financial-warehouse", MembershipLevel.Premium },
-            { "locations", MembershipLevel.Premium },
-            
-            // Enterprise reports - Enterprise only
-            { "performance", MembershipLevel.Enterprise }
-        };
+        private const string ConfigFile = "reportAccessConfig.json";
+        private Dictionary<string, int> _config;
 
-        public bool CanAccessReport(MembershipLevel membershipLevel, string reportName)
+        public ReportAccessService()
         {
-            if (!_reportRequirements.ContainsKey(reportName))
+            try
+            {
+                if (File.Exists(ConfigFile))
+                {
+                    var json = File.ReadAllText(ConfigFile);
+                    _config = JsonSerializer.Deserialize<Dictionary<string, int>>(json) ?? GetDefaultConfig();
+                }
+                else
+                {
+                    _config = GetDefaultConfig();
+                    SaveConfig();
+                }
+            }
+            catch (Exception)
+            {
+                // If file operations fail, use default configuration
+                _config = GetDefaultConfig();
+            }
+        }
+
+        private Dictionary<string, int> GetDefaultConfig()
+        {
+            return new Dictionary<string, int>
+            {
+                { "inventory", 1 },
+                { "low-stock", 2 },
+                { "aging-inventory", 3 },
+                { "financial-warehouse", 3 },
+                { "locations", 3 },
+                { "performance", 4 }
+            };
+        }
+
+        public Dictionary<string, int> GetReportAccessConfig() => new(_config);
+
+        public void SetReportAccessConfig(Dictionary<string, int> config)
+        {
+            _config = new(config);
+            SaveConfig();
+        }
+
+        public List<string> GetAvailableReports(int membershipLevel)
+        {
+            var result = new List<string>();
+            foreach (var kvp in _config)
+            {
+                if (membershipLevel >= kvp.Value)
+                    result.Add(kvp.Key);
+            }
+            return result;
+        }
+
+        public bool CanAccessReport(int membershipLevel, string reportName)
+        {
+            if (!_config.ContainsKey(reportName))
                 return false;
-
-            var requiredLevel = _reportRequirements[reportName];
-            return membershipLevel >= requiredLevel;
+            return membershipLevel >= _config[reportName];
         }
 
-        public IEnumerable<string> GetAvailableReports(MembershipLevel membershipLevel)
+        public int GetRequiredMembershipLevel(string reportName)
         {
-            return _reportRequirements
-                .Where(kvp => membershipLevel >= kvp.Value)
-                .Select(kvp => kvp.Key)
-                .ToList();
+            return _config.TryGetValue(reportName, out var level) ? level : 4;
         }
 
-        public MembershipLevel GetRequiredMembershipLevel(string reportName)
+        private void SaveConfig()
         {
-            return _reportRequirements.GetValueOrDefault(reportName, MembershipLevel.Enterprise);
+            try
+            {
+                var json = JsonSerializer.Serialize(_config, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(ConfigFile, json);
+            }
+            catch (Exception)
+            {
+                // If file write fails, continue with in-memory configuration
+                // This allows the service to function even if file system access is restricted
+            }
         }
     }
 }

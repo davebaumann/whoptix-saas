@@ -129,22 +129,34 @@ namespace SkuVaultSaaS.Api.Controllers
                 {
                     case "payment_intent.succeeded":
                         var paymentIntent = stripeEvent.Data.Object as PaymentIntent;
-                        await HandlePaymentSuccess(paymentIntent);
+                        if (paymentIntent != null)
+                        {
+                            await HandlePaymentSuccess(paymentIntent);
+                        }
                         break;
 
                     case "customer.subscription.created":
                         var subscription = stripeEvent.Data.Object as Subscription;
-                        await HandleSubscriptionCreated(subscription);
+                        if (subscription != null)
+                        {
+                            await HandleSubscriptionCreated(subscription);
+                        }
                         break;
 
                     case "customer.subscription.updated":
                         var updatedSubscription = stripeEvent.Data.Object as Subscription;
-                        await HandleSubscriptionUpdated(updatedSubscription);
+                        if (updatedSubscription != null)
+                        {
+                            await HandleSubscriptionUpdated(updatedSubscription);
+                        }
                         break;
 
                     case "customer.subscription.deleted":
                         var deletedSubscription = stripeEvent.Data.Object as Subscription;
-                        await HandleSubscriptionCanceled(deletedSubscription);
+                        if (deletedSubscription != null)
+                        {
+                            await HandleSubscriptionCanceled(deletedSubscription);
+                        }
                         break;
 
                     default:
@@ -171,7 +183,7 @@ namespace SkuVaultSaaS.Api.Controllers
                 var customer = await _context.Customers.FindAsync(customerId);
                 if (customer != null)
                 {
-                    var newLevel = GetMembershipLevelFromPriceId(priceId);
+                    var newLevel = GetMembershipLevelFromPriceId(priceId!);
                     if (newLevel.HasValue)
                     {
                         customer.MembershipLevel = newLevel.Value;
@@ -189,18 +201,21 @@ namespace SkuVaultSaaS.Api.Controllers
         {
             // Handle new subscription creation
             _logger.LogInformation("New subscription created: {SubscriptionId}", subscription.Id);
+            await Task.CompletedTask;
         }
 
         private async Task HandleSubscriptionUpdated(Subscription subscription)
         {
             // Handle subscription updates (plan changes, etc.)
             _logger.LogInformation("Subscription updated: {SubscriptionId}", subscription.Id);
+            await Task.CompletedTask;
         }
 
         private async Task HandleSubscriptionCanceled(Subscription subscription)
         {
             // Handle subscription cancellation
             _logger.LogInformation("Subscription canceled: {SubscriptionId}", subscription.Id);
+            await Task.CompletedTask;
         }
 
         private int GetPriceAmount(string priceId)
