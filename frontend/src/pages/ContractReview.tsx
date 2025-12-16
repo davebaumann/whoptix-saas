@@ -4,8 +4,8 @@ import { FileText, CheckCircle } from 'lucide-react';
 
 const getTierInfo = (tier: string) => {
   const tierMap: Record<string, { name: string; price: string }> = {
-    '2': { name: 'Standard', price: '$29/month' },
-    '3': { name: 'Premium', price: '$79/month' },
+    '2': { name: 'Standard', price: '$59/month' },
+    '3': { name: 'Premium', price: '$99/month' },
     '4': { name: 'Enterprise', price: '$199/month' }
   };
   return tierMap[tier] || { name: 'Unknown', price: 'N/A' };
@@ -180,7 +180,17 @@ export default function ContractReview() {
                   </section>
 
                   <section>
-                    <h4 className="font-semibold text-gray-900 mb-2">9. Force Majeure</h4>
+                    <h4 className="font-semibold text-gray-900 mb-2">9. Data Retention and Purge</h4>
+                    <p>
+                      Upon termination or expiration of this Agreement, Company will retain Customer data for ninety (90) days 
+                      to allow for potential service restoration. If the subscription does not become current within this 
+                      ninety (90) day period, Company will permanently purge all Customer data from its systems. 
+                      Customer is responsible for exporting any required data prior to termination.
+                    </p>
+                  </section>
+
+                  <section>
+                    <h4 className="font-semibold text-gray-900 mb-2">10. Force Majeure</h4>
                     <p>
                       Neither party shall be liable for failure to perform due to events beyond reasonable control, including natural 
                       disasters, acts of government, or infrastructure failures.
@@ -188,7 +198,7 @@ export default function ContractReview() {
                   </section>
 
                   <section>
-                    <h4 className="font-semibold text-gray-900 mb-2">10. Intellectual Property</h4>
+                    <h4 className="font-semibold text-gray-900 mb-2">11. Intellectual Property</h4>
                     <p>
                       Company retains all right, title, and interest in the Services. 
                       Customer is granted a limited, non exclusive, non transferable license to use the Services during the Subscription 
@@ -197,7 +207,7 @@ export default function ContractReview() {
                   </section>
 
                   <section>
-                    <h4 className="font-semibold text-gray-900 mb-2">11. Reporting Disclaimer</h4>
+                    <h4 className="font-semibold text-gray-900 mb-2">12. Reporting Disclaimer</h4>
                     <p>
                       Customer acknowledges that all reporting, analytics, and outputs are dependent upon Customer data, 
                       configurations, and operational practices. 
@@ -207,7 +217,7 @@ export default function ContractReview() {
                   </section>
 
                   <section>
-                    <h4 className="font-semibold text-gray-900 mb-2">12. Disclaimer of Warranties</h4>
+                    <h4 className="font-semibold text-gray-900 mb-2">13. Disclaimer of Warranties</h4>
                     <p>
                       The Services are provided "as is" and "as available." Company disclaims all warranties, express or implied, 
                       including merchantability and fitness for a particular purpose.
@@ -215,7 +225,7 @@ export default function ContractReview() {
                   </section>
 
                   <section>
-                    <h4 className="font-semibold text-gray-900 mb-2">13. Limitation of Liability</h4>
+                    <h4 className="font-semibold text-gray-900 mb-2">14. Limitation of Liability</h4>
                     <p>
                       To the maximum extent permitted by law, Company total liability shall not exceed the fees paid by Customer in the 
                       twelve (12) months preceding the claim. 
@@ -224,7 +234,7 @@ export default function ContractReview() {
                   </section>
 
                   <section>
-                    <h4 className="font-semibold text-gray-900 mb-2">14. Indemnification</h4>
+                    <h4 className="font-semibold text-gray-900 mb-2">15. Indemnification</h4>
                     <p>
                       Customer shall indemnify and hold harmless Company from claims arising from Customer data, misuse of the 
                       Services, or violation of this Agreement.
@@ -232,21 +242,21 @@ export default function ContractReview() {
                   </section>
 
                   <section>
-                    <h4 className="font-semibold text-gray-900 mb-2">15. Suspension and Termination for Cause</h4>
+                    <h4 className="font-semibold text-gray-900 mb-2">16. Suspension and Termination for Cause</h4>
                     <p>
                       Company may suspend or terminate access for material breach, including non payment, upon reasonable notice.
                     </p>
                   </section>
 
                   <section>
-                    <h4 className="font-semibold text-gray-900 mb-2">16. Confidentiality</h4>
+                    <h4 className="font-semibold text-gray-900 mb-2">17. Confidentiality</h4>
                     <p>
                       Each party shall protect confidential information using reasonable care.
                     </p>
                   </section>
 
                   <section>
-                    <h4 className="font-semibold text-gray-900 mb-2">17. Governing Law and Venue</h4>
+                    <h4 className="font-semibold text-gray-900 mb-2">18. Governing Law and Venue</h4>
                     <p>
                       This Agreement shall be governed by the laws of the state specified in the Order Form, without regard to conflict of 
                       law principles.
@@ -254,21 +264,21 @@ export default function ContractReview() {
                   </section>
 
                   <section>
-                    <h4 className="font-semibold text-gray-900 mb-2">18. Assignment</h4>
+                    <h4 className="font-semibold text-gray-900 mb-2">19. Assignment</h4>
                     <p>
                       Customer may not assign this Agreement without Company prior written consent.
                     </p>
                   </section>
 
                   <section>
-                    <h4 className="font-semibold text-gray-900 mb-2">19. Entire Agreement</h4>
+                    <h4 className="font-semibold text-gray-900 mb-2">20. Entire Agreement</h4>
                     <p>
                       This Agreement and all Order Forms constitute the entire agreement and supersede prior understandings.
                     </p>
                   </section>
 
                   <section>
-                    <h4 className="font-semibold text-gray-900 mb-2">20. Electronic Execution</h4>
+                    <h4 className="font-semibold text-gray-900 mb-2">21. Electronic Execution</h4>
                     <p>
                       Electronic acceptance constitutes binding execution of this Agreement.
                     </p>

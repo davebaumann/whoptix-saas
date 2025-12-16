@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useMembership } from '../contexts/MembershipContext'
 import { useAuth } from '../contexts/AuthContext'
 import { loadStripe } from '@stripe/stripe-js'
@@ -36,8 +37,7 @@ const membershipPlans: MembershipPlan[] = [
       'Threshold Management',
       'Basic Reports',
       'Priority Support'
-    ],
-    popular: true
+    ]
   },
   {
     level: 3,
@@ -73,7 +73,8 @@ const membershipPlans: MembershipPlan[] = [
       'Growth Trends',
       'Top Performers',
       'Dedicated Account Manager',
-    ]
+    ],
+    popular: true
   }
 ]
 
@@ -220,6 +221,7 @@ function CheckoutForm({ plan, onSuccess, onCancel }: CheckoutFormProps) {
 
 export default function MembershipUpgrade() {
   const { membershipInfo } = useMembership()
+  const navigate = useNavigate()
   const [selectedPlan, setSelectedPlan] = useState<MembershipPlan | null>(null)
   const [showSuccess, setShowSuccess] = useState(false)
 
@@ -227,7 +229,8 @@ export default function MembershipUpgrade() {
 
   const handleUpgrade = (plan: MembershipPlan) => {
     if (plan.level <= currentLevel) return
-    setSelectedPlan(plan)
+    // Route through contract review flow
+    navigate(`/app/contract-review?tier=${plan.level}`)
   }
 
   const handleSuccess = () => {

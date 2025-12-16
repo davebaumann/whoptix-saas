@@ -16,8 +16,7 @@ const membershipPlans = [
       'Threshold Management',
       'Basic Reports',
       'Priority Support'
-    ],
-    popular: true
+    ]
   },
   {
     level: 3,
@@ -51,9 +50,8 @@ const membershipPlans = [
       'Growth Trends',
       'Top Performers',
       'Dedicated Account Manager',
-      'API Access',
-      'Custom Reports'
-    ]
+    ],
+    popular: true
   }
 ]
 
@@ -299,6 +297,189 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Screenshots Section */}
+      <section className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">
+              See WhOptix in Action
+            </h2>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              Get a preview of our powerful dashboard and reporting capabilities that enhance your SkuVault data.
+            </p>
+          </div>
+
+          {/* Picker Dashboard Screenshot */}
+          <div className="mb-16">
+            <h3 className="text-2xl font-semibold text-gray-900 mb-6 text-center">Picker Performance Dashboard</h3>
+            <div className="bg-white rounded-lg shadow-2xl border border-gray-200 overflow-hidden">
+              {/* Mock Dashboard Header */}
+              <div className="bg-blue-600 text-white p-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-lg font-semibold">WhOptix Dashboard</h4>
+                  <div className="text-sm">Today: March 15, 2024</div>
+                </div>
+              </div>
+              
+              {/* Mock Dashboard Content */}
+              <div className="p-6">
+                {/* KPI Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div className="text-green-600 text-sm font-medium">Total Picks Today</div>
+                    <div className="text-2xl font-bold text-green-900">1,247</div>
+                    <div className="text-green-600 text-xs">↑ 12% vs yesterday</div>
+                  </div>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="text-blue-600 text-sm font-medium">Active Pickers</div>
+                    <div className="text-2xl font-bold text-blue-900">23</div>
+                    <div className="text-blue-600 text-xs">8 above target</div>
+                  </div>
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <div className="text-yellow-600 text-sm font-medium">Avg Pick Rate</div>
+                    <div className="text-2xl font-bold text-yellow-900">47/hr</div>
+                    <div className="text-yellow-600 text-xs">↑ 8% this week</div>
+                  </div>
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                    <div className="text-purple-600 text-sm font-medium">Efficiency</div>
+                    <div className="text-2xl font-bold text-purple-900">94.2%</div>
+                    <div className="text-purple-600 text-xs">Target: 90%</div>
+                  </div>
+                </div>
+
+                {/* Mock Performance Table */}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h5 className="font-semibold text-gray-900 mb-4">Top Performers Today</h5>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center bg-white p-3 rounded border">
+                      <span className="font-medium">Sarah Johnson</span>
+                      <div className="text-right">
+                        <div className="font-semibold text-green-600">67 picks/hr</div>
+                        <div className="text-xs text-gray-500">156 total picks</div>
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center bg-white p-3 rounded border">
+                      <span className="font-medium">Mike Chen</span>
+                      <div className="text-right">
+                        <div className="font-semibold text-green-600">61 picks/hr</div>
+                        <div className="text-xs text-gray-500">142 total picks</div>
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center bg-white p-3 rounded border">
+                      <span className="font-medium">Alex Rodriguez</span>
+                      <div className="text-right">
+                        <div className="font-semibold text-blue-600">58 picks/hr</div>
+                        <div className="text-xs text-gray-500">134 total picks</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Reports Screenshots */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Low Stock Report */}
+            <div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-4 text-center">Low Stock Alert Report</h3>
+              <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+                <div className="bg-red-50 border-b border-red-200 p-4">
+                  <h4 className="font-semibold text-red-800">Critical Stock Levels</h4>
+                  <p className="text-red-600 text-sm">23 items need immediate attention</p>
+                </div>
+                <div className="p-4">
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center p-2 bg-red-50 rounded border-l-4 border-red-400">
+                      <div>
+                        <div className="font-medium text-gray-900">SKU-12345</div>
+                        <div className="text-sm text-gray-600">Wireless Headphones</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold text-red-600">2 left</div>
+                        <div className="text-xs text-gray-500">Min: 25</div>
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center p-2 bg-yellow-50 rounded border-l-4 border-yellow-400">
+                      <div>
+                        <div className="font-medium text-gray-900">SKU-67890</div>
+                        <div className="text-sm text-gray-600">Phone Case - Black</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold text-yellow-600">8 left</div>
+                        <div className="text-xs text-gray-500">Min: 15</div>
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center p-2 bg-orange-50 rounded border-l-4 border-orange-400">
+                      <div>
+                        <div className="font-medium text-gray-900">SKU-11111</div>
+                        <div className="text-sm text-gray-600">USB Cable - 6ft</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold text-orange-600">12 left</div>
+                        <div className="text-xs text-gray-500">Min: 20</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Performance Analytics */}
+            <div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-4 text-center">Performance Analytics</h3>
+              <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+                <div className="bg-blue-50 border-b border-blue-200 p-4">
+                  <h4 className="font-semibold text-blue-800">Weekly Performance Trends</h4>
+                  <p className="text-blue-600 text-sm">March 9-15, 2024</p>
+                </div>
+                <div className="p-4">
+                  {/* Mock Chart Area */}
+                  <div className="bg-gradient-to-r from-blue-100 to-green-100 rounded-lg p-6 mb-4">
+                    <div className="flex items-end justify-between h-24">
+                      <div className="bg-blue-500 rounded-t" style={{height: '60%', width: '12%'}}></div>
+                      <div className="bg-blue-500 rounded-t" style={{height: '75%', width: '12%'}}></div>
+                      <div className="bg-blue-500 rounded-t" style={{height: '45%', width: '12%'}}></div>
+                      <div className="bg-blue-500 rounded-t" style={{height: '85%', width: '12%'}}></div>
+                      <div className="bg-green-500 rounded-t" style={{height: '95%', width: '12%'}}></div>
+                      <div className="bg-green-500 rounded-t" style={{height: '88%', width: '12%'}}></div>
+                      <div className="bg-green-500 rounded-t" style={{height: '100%', width: '12%'}}></div>
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-600 mt-2">
+                      <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-green-600">↑ 15%</div>
+                      <div className="text-sm text-gray-600">Week over Week</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-blue-600">47.3</div>
+                      <div className="text-sm text-gray-600">Avg Picks/Hour</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="text-center mt-12">
+            <p className="text-gray-600 mb-6">
+              These are just a few examples of the powerful insights WhOptix provides for your SkuVault data.
+            </p>
+            <Link 
+              to="/signup" 
+              className="inline-flex items-center bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+            >
+              See Your Data in Action
+              <ArrowRight className="w-5 h-5 ml-2" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* Pricing Section */}
       <section id="pricing" className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -424,7 +605,6 @@ export default function LandingPage() {
               <ul className="space-y-2">
                 <li><a href="#" className="text-gray-400 hover:text-white text-sm">Features</a></li>
                 <li><a href="#pricing" className="text-gray-400 hover:text-white text-sm">Pricing</a></li>
-                <li><a href="#" className="text-gray-400 hover:text-white text-sm">Integrations</a></li>
               </ul>
             </div>
             <div>
@@ -432,9 +612,9 @@ export default function LandingPage() {
                 Support
               </h3>
               <ul className="space-y-2">
-                <li><a href="#" className="text-gray-400 hover:text-white text-sm">Help Center</a></li>
-                <li><a href="#" className="text-gray-400 hover:text-white text-sm">Contact Us</a></li>
-                <li><a href="#" className="text-gray-400 hover:text-white text-sm">Status</a></li>
+                <li><Link to="/support" className="text-gray-400 hover:text-white text-sm">Help Center</Link></li>
+                <li><Link to="/contact" className="text-gray-400 hover:text-white text-sm">Contact Us</Link></li>
+                <li><Link to="/status" className="text-gray-400 hover:text-white text-sm">Status</Link></li>
               </ul>
             </div>
             <div>
@@ -442,7 +622,7 @@ export default function LandingPage() {
                 Company
               </h3>
               <ul className="space-y-2">
-                <li><a href="#" className="text-gray-400 hover:text-white text-sm">About</a></li>
+                <li><Link to="/about" className="text-gray-400 hover:text-white text-sm">About</Link></li>
                 <li><Link to="/privacy" className="text-gray-400 hover:text-white text-sm">Privacy</Link></li>
                 <li><Link to="/terms" className="text-gray-400 hover:text-white text-sm">Terms</Link></li>
               </ul>

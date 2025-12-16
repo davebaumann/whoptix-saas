@@ -28,8 +28,13 @@ import AccountSetup from './pages/AccountSetup'
 import ContractReview from './pages/ContractReview'
 import EmailVerification from './pages/EmailVerification'
 import LandingPage from './pages/LandingPage'
+import LandingPageAB from './pages/LandingPageAB'
 import TermsOfService from './pages/TermsOfService'
 import PrivacyPolicy from './pages/PrivacyPolicy'
+import ContactUs from './pages/ContactUs'
+import Support from './pages/Support'
+import Status from './pages/Status'
+import About from './pages/About'
 
 function App() {
   return (
@@ -37,10 +42,15 @@ function App() {
       <MembershipProvider>
         <Routes>
           <Route path="/" element={<LandingPage />} />
+          <Route path="/ab" element={<LandingPageAB />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/terms" element={<TermsOfService />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/contact" element={<ContactUs />} />
+          <Route path="/support" element={<Support />} />
+          <Route path="/status" element={<Status />} />
+          <Route path="/about" element={<About />} />
           <Route path="/email-verification" element={<EmailVerification />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />

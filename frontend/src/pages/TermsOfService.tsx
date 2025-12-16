@@ -22,12 +22,23 @@ export default function TermsOfService() {
         <div className="bg-white shadow rounded-lg p-8 prose max-w-none">
           <h2>1. Acceptance of Terms</h2>
           <p>
-            By accessing and using Whoptix ("Service"), you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to abide by the above, please do not use this service.
+            By accessing and using the Whoptix website and general features, you accept and agree to be bound by these terms. However, <strong>a separate Service Agreement is required to access customer data and premium features</strong>. Basic website functionality and information are available without a contract.
           </p>
+          
+          <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg my-4">
+            <h3 className="text-blue-800 font-semibold mb-2">Contract Requirements</h3>
+            <p className="text-blue-700 mb-0">
+              <strong>No Contract Required:</strong> Website browsing, general information, account creation<br/>
+              <strong>Service Agreement Required:</strong> Access to customer data, SkuVault integration, premium analytics and reporting features
+            </p>
+          </div>
 
           <h2>2. Description of Service</h2>
           <p>
-            Whoptix provides cloud-based warehouse optimization and inventory analytics software that integrates with SkuVault systems. Our solutions include advanced reporting, analytics, performance tracking, and warehouse management tools. The Service is provided on a subscription basis with multiple tiers of functionality.
+            Whoptix provides cloud-based warehouse optimization and inventory analytics software that integrates with SkuVault systems. Our solutions include advanced reporting, analytics, performance tracking, and warehouse management tools.
+          </p>
+          <p>
+            <strong>Service Tiers:</strong> Basic website access is available to all users. Premium features including customer data access, SkuVault integration, and advanced analytics require a separate Service Agreement and active subscription.
           </p>
           
           <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg my-6">
@@ -77,6 +88,9 @@ export default function TermsOfService() {
           <h2>6. Data and Privacy</h2>
           <p>
             Your privacy is important to us. Please review our Privacy Policy, which also governs your use of the Service. You retain ownership of your data, and we will handle it in accordance with our Privacy Policy.
+          </p>
+          <p>
+            <strong>Data Protection Commitment:</strong> We do not sell, rent, or trade your personal or business data to third parties for their commercial purposes. Your customer data is used solely to provide our services to you.
           </p>
 
           <h2>7. Intellectual Property</h2>
