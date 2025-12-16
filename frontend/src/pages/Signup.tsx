@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
 
 interface SignupForm {
   email: string
@@ -27,7 +26,6 @@ export default function Signup() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const navigate = useNavigate()
-  const { login } = useAuth()
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -104,23 +102,29 @@ export default function Signup() {
           'Content-Type': 'application/json'
         },
         credentials: 'include',
-        body: JSON.stringify(formData)
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+          confirmPassword: formData.confirmPassword,
+          companyName: formData.companyName,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          phoneNumber: formData.phoneNumber
+        })
       })
 
       if (!response.ok) {
-        const errorData = await response.text()
-        throw new Error(errorData || 'Signup failed')
+        const errorData = await response.text();
+        throw new Error(errorData || 'Signup failed');
       }
 
-      const data = await response.json()
+      await response.json()
       
-      // Auto-login after successful signup (cookie is already set by server)
-      login(data.email, data.expires)
-      
-      // Navigate to dashboard
-      navigate('/app')
+      // Navigate to email verification page
+      navigate(`/email-verification?email=${encodeURIComponent(formData.email)}`)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Signup failed')
+      const errorMessage = err instanceof Error ? err.message : 'Signup failed';
+      setError(errorMessage);
     } finally {
       setIsLoading(false)
     }

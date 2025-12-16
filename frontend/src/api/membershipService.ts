@@ -61,7 +61,7 @@ export const membershipService = {
           'Low stock alerts',
           'Automated notifications',
           'Priority support',
-          'Up to 5 user accounts'
+          'Up to 2 user accounts'
         ],
         isCurrentTier: false,
         canUpgrade: true
@@ -77,7 +77,7 @@ export const membershipService = {
           'Location optimization',
           'Advanced analytics',
           'Phone support',
-          'Up to 20 user accounts'
+          'Up to 5 user accounts'
         ],
         isCurrentTier: false,
         canUpgrade: true
@@ -93,8 +93,7 @@ export const membershipService = {
           'Turnover analysis',
           'Custom reporting',
           'Dedicated account manager',
-          'Unlimited user accounts',
-          'API access'
+          'Up to 10 user accounts'
         ],
         isCurrentTier: false,
         canUpgrade: false

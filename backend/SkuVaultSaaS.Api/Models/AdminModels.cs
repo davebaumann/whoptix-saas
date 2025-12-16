@@ -47,4 +47,39 @@ namespace SkuVaultSaaS.Api.Models
         public string SkuVaultTenantToken { get; set; } = null!;
         public string SkuVaultUserToken { get; set; } = null!;
     }
+
+    public class DatabaseSpecsResponse
+    {
+        public string DatabaseName { get; set; } = null!;
+        public string DatabaseSize { get; set; } = null!;
+        public long DatabaseSizeBytes { get; set; }
+        public int TableCount { get; set; }
+        public Dictionary<string, TableInfo> Tables { get; set; } = new();
+        public DateTime LastUpdated { get; set; }
+    }
+
+    public class TableInfo
+    {
+        public string TableName { get; set; } = null!;
+        public long RowCount { get; set; }
+        public string DataSize { get; set; } = null!;
+        public long DataSizeBytes { get; set; }
+        public string IndexSize { get; set; } = null!;
+        public long IndexSizeBytes { get; set; }
+    }
+
+    public class CreateUserRequest
+    {
+        public string Email { get; set; } = null!;
+        public string Password { get; set; } = null!;
+        public string Role { get; set; } = "CustomerUser";
+        public int? CustomerId { get; set; }
+    }
+
+    public class UpdateUserRequest
+    {
+        public string Email { get; set; } = null!;
+        public string Role { get; set; } = "CustomerUser";
+        public int? CustomerId { get; set; }
+    }
 }

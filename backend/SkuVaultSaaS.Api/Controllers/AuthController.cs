@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using SkuVaultSaaS.Api.Models;
+using SkuVaultSaaS.Api.Services;
 using SkuVaultSaaS.Core.Models;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -18,14 +19,20 @@ namespace SkuVaultSaaS.Api.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly IConfiguration _config;
+        private readonly IEmailService _emailService;
+        private readonly ILogger<AuthController> _logger;
 
         public AuthController(UserManager<ApplicationUser> userManager,
             SignInManager<ApplicationUser> signInManager,
-            IConfiguration config)
+            IConfiguration config,
+            IEmailService emailService,
+            ILogger<AuthController> logger)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _config = config;
+            _emailService = emailService;
+            _logger = logger;
         }
 
         [HttpPost("login")]
@@ -121,6 +128,90 @@ namespace SkuVaultSaaS.Api.Controllers
             return Ok(result);
         }
         
+        [HttpPost("signup")]
+        [AllowAnonymous]
+        public async Task<IActionResult> Signup([FromBody] SignupRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
+            {
+                return BadRequest("Email and password are required.");
+            }
+
+            var existingUser = await _userManager.FindByEmailAsync(request.Email);
+            if (existingUser != null)
+            {
+                return BadRequest("User with this email already exists.");
+            }
+
+            var user = new ApplicationUser
+            {
+                UserName = request.Email,
+                Email = request.Email,
+                EmailConfirmed = false // Require email verification
+            };
+
+            var result = await _userManager.CreateAsync(user, request.Password);
+            if (!result.Succeeded)
+            {
+                return BadRequest(result.Errors.Select(e => e.Description));
+            }
+
+            await _userManager.AddToRoleAsync(user, "CustomerUser");
+
+            // Generate email confirmation token
+            var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+            var confirmationLink = $"{Request.Scheme}://{Request.Host}/api/auth/confirm-email?userId={user.Id}&token={Uri.EscapeDataString(token)}";
+
+            // Send verification email (don't await to avoid blocking signup)
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _emailService.SendEmailVerificationAsync(request.Email, confirmationLink);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to send verification email to {Email}", request.Email);
+                }
+            });
+
+            return Ok(new { 
+                message = "Account created successfully. Please check your email to verify your account.",
+                verificationLink = confirmationLink // For development - remove in production
+            });
+        }
+
+        [HttpGet("confirm-email")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ConfirmEmail([FromQuery] string userId, [FromQuery] string token)
+        {
+            if (string.IsNullOrWhiteSpace(userId) || string.IsNullOrWhiteSpace(token))
+            {
+                return BadRequest("Invalid confirmation link.");
+            }
+
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                return BadRequest("Invalid confirmation link.");
+            }
+
+            if (user.EmailConfirmed)
+            {
+                // Already confirmed, redirect to Stripe
+                return Redirect("/app/stripe-setup");
+            }
+
+            var result = await _userManager.ConfirmEmailAsync(user, token);
+            if (!result.Succeeded)
+            {
+                return BadRequest("Email confirmation failed. The link may be expired or invalid.");
+            }
+
+            // Email confirmed successfully, redirect to account setup
+            return Redirect("/app/account-setup");
+        }
+
         [HttpGet("test")]
         [AllowAnonymous]
         public IActionResult Test() => Ok(new { message = "test works" });

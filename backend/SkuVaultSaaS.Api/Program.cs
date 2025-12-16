@@ -53,6 +53,12 @@ builder.Services.Configure<SkuVaultSaaS.Infrastructure.Services.EmailSettings>(o
     {
         options.Password = options.Password.Replace("${EMAIL_PASSWORD}", Environment.GetEnvironmentVariable("EMAIL_PASSWORD"));
     }
+
+    // Add this after the email configuration is loaded
+    var emailPassword = builder.Configuration["EmailSettings:Password"];
+    Console.WriteLine($"Email Password loaded: {(string.IsNullOrEmpty(emailPassword) ? "NOT SET" : "SET")}");
+
+
 });
 builder.Services.Configure<SkuVaultSaaS.Infrastructure.HostedServices.LowStockNotificationSettings>(
     builder.Configuration.GetSection("LowStockNotificationSettings"));
@@ -65,6 +71,9 @@ builder.Services.AddHostedService<SkuVaultSaaS.Infrastructure.HostedServices.Sku
 
 // Enable low stock notification service
 builder.Services.AddHostedService<SkuVaultSaaS.Infrastructure.HostedServices.LowStockNotificationHostedService>();
+
+// Enable customer data purge service
+builder.Services.AddHostedService<SkuVaultSaaS.Infrastructure.HostedServices.CustomerDataPurgeService>();
 
 // Note: SkuVaultSyncJob is disabled for local development against the managed remote DB
 // because the hosted DB schema on the provider doesn't match migrations and the sync

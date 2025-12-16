@@ -16,6 +16,7 @@ export default function AdminDashboard() {
   const [membershipReason, setMembershipReason] = useState('')
   const [showCustomerDetailsModal, setShowCustomerDetailsModal] = useState(false)
   const [customerDetails, setCustomerDetails] = useState<any>(null)
+  const [showCancelModal, setShowCancelModal] = useState(false)
   const pageSize = 10
 
   const queryClient = useQueryClient()
@@ -71,8 +72,25 @@ export default function AdminDashboard() {
     },
     onError: (error) => {
       console.error('Failed to update membership:', error)
-      // You could show a toast notification here
       alert(`Failed to update membership: ${error.message}`)
+    },
+  })
+
+  const cancelMutation = useMutation({
+    mutationFn: (customerId: number) => {
+      const token = localStorage.getItem('token')
+      return fetch(`/api/admin/customers/${customerId}/cancel`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      }).then(res => res.json())
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adminCustomers'] })
+      setShowCancelModal(false)
+      setSelectedCustomer(null)
     },
   })
 
@@ -292,6 +310,15 @@ export default function AdminDashboard() {
                             className="text-blue-600 hover:text-blue-900"
                           >
                             Edit
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedCustomer(customer)
+                              setShowCancelModal(true)
+                            }}
+                            className="text-orange-600 hover:text-orange-900"
+                          >
+                            Cancel
                           </button>
                           <button
                             onClick={() => {
@@ -609,6 +636,37 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCancelModal && selectedCustomer && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full m-4">
+            <h2 className="text-lg font-semibold mb-4">Cancel Customer Membership</h2>
+            <p className="text-gray-600 mb-4">
+              Are you sure you want to cancel the membership for <strong>{selectedCustomer.name}</strong>?
+            </p>
+            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4">
+              <p className="text-sm text-yellow-700">
+                <strong>Note:</strong> Customer data will be automatically purged after 90 days of inactivity.
+              </p>
+            </div>
+            <div className="flex justify-end space-x-2">
+              <button 
+                onClick={() => { setShowCancelModal(false); setSelectedCustomer(null) }} 
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => cancelMutation.mutate(selectedCustomer.id)} 
+                disabled={cancelMutation.isPending} 
+                className="px-4 py-2 text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 rounded-md disabled:opacity-50"
+              >
+                {cancelMutation.isPending ? 'Cancelling...' : 'Cancel Membership'}
+              </button>
             </div>
           </div>
         </div>

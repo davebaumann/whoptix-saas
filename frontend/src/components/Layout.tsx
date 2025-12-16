@@ -32,6 +32,10 @@ export default function Layout({ children }: LayoutProps) {
 
   // Use admin navigation for admin users, customer navigation for regular users
   const navItems = user?.isAdmin ? adminNavItems : allNavItems.filter(item => {
+    // Hide Picker Dashboard for users without subscription or SkuVault association
+    if (item.path === '/app/' && (!user?.customerId || !membershipInfo?.currentLevel)) {
+      return false
+    }
     if (item.reportName && !canAccessReport(item.reportName)) return false
     return true
   })

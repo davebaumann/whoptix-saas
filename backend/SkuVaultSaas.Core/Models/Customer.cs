@@ -17,5 +17,10 @@ namespace SkuVaultSaaS.Core.Models
         public bool LowStockNotificationsEnabled { get; set; } = false;
         public string? LowStockNotificationEmail { get; set; }
         public int LowStockCheckIntervalMinutes { get; set; } = 240; // 4 hours default
+        
+        // Membership Status Tracking
+        public bool IsActive { get; set; } = true;
+        public DateTime? CancelledAt { get; set; }
+        public DateTime? ScheduledForDeletion { get; set; }
     }
 }

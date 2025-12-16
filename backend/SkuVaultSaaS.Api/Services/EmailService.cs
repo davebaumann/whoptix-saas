@@ -1,5 +1,8 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using MailKit.Net.Smtp;
+using MailKit.Security;
+using MimeKit;
 
 namespace SkuVaultSaaS.Api.Services
 {
@@ -7,6 +10,7 @@ namespace SkuVaultSaaS.Api.Services
     {
         Task SendPasswordResetEmailAsync(string email, string resetToken, string resetUrl);
         Task SendWelcomeEmailAsync(string email, string customerName, string temporaryPassword);
+        Task SendEmailVerificationAsync(string email, string confirmationLink);
     }
 
     public class EmailService : IEmailService
@@ -48,6 +52,31 @@ namespace SkuVaultSaaS.Api.Services
 
             // TODO: Implement actual welcome email
             await Task.CompletedTask;
+        }
+
+        public async Task SendEmailVerificationAsync(string email, string confirmationLink)
+        {
+            _logger.LogInformation("Email verification requested for: {Email}", email);
+            _logger.LogInformation("Verification link: {ConfirmationLink}", confirmationLink);
+
+            try
+            {
+                // TODO: Enable actual email sending once EMAIL_PASSWORD environment variable is set
+                // For now, just log the verification link for testing
+                _logger.LogInformation("[DEVELOPMENT] Verification email would be sent to {Email}", email);
+                _logger.LogInformation("[DEVELOPMENT] Email subject: Verify your Whoptix account");
+                _logger.LogInformation("[DEVELOPMENT] Verification link: {Link}", confirmationLink);
+                
+                // Simulate successful email sending
+                await Task.Delay(100);
+                _logger.LogInformation("Verification email sent successfully to {Email} (simulated)", email);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send verification email to {Email}", email);
+                // Don't throw in development mode - just log the error
+                _logger.LogWarning("Email sending disabled for development - check logs for verification link");
+            }
         }
     }
 }

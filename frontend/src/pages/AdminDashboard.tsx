@@ -4,6 +4,8 @@ import { membershipService } from '../api/membershipService';
 import { Users, Crown, Settings, TrendingUp, Shield, Star, Zap } from 'lucide-react';
 import SystemHealth from '../components/SystemHealth';
 import UsageAnalytics from '../components/UsageAnalytics';
+import DatabaseSpecs from '../components/DatabaseSpecs';
+import CustomerPurgeStatus from '../components/CustomerPurgeStatus';
 
 export default function AdminDashboard() {
   console.log('🔍 AdminDashboard component is rendering!');
@@ -172,7 +174,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           {/* Customer Management */}
           <div className="bg-white rounded-lg shadow p-6 border border-gray-200">
             <div className="flex items-center mb-4">
@@ -188,6 +190,25 @@ export default function AdminDashboard() {
                 className="block w-full text-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
               >
                 Manage Customers
+              </Link>
+            </div>
+          </div>
+
+          {/* User Management */}
+          <div className="bg-white rounded-lg shadow p-6 border border-gray-200">
+            <div className="flex items-center mb-4">
+              <Shield className="w-8 h-8 text-green-500" />
+              <h3 className="text-lg font-semibold text-gray-900 ml-3">User Management</h3>
+            </div>
+            <p className="text-gray-600 text-sm mb-4">
+              Manage AspNetUser accounts, roles, and user permissions.
+            </p>
+            <div className="space-y-2">
+              <Link
+                to="/app/admin/users"
+                className="block w-full text-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+              >
+                Manage Users
               </Link>
             </div>
           </div>
@@ -220,6 +241,16 @@ export default function AdminDashboard() {
         {/* Usage Analytics */}
         <div className="mb-8">
           <UsageAnalytics />
+        </div>
+
+        {/* Database Specifications */}
+        <div className="mb-8">
+          <DatabaseSpecs />
+        </div>
+
+        {/* Customer Purge Status */}
+        <div className="mb-8">
+          <CustomerPurgeStatus />
         </div>
 
         {/* Recent Activity */}

@@ -349,6 +349,19 @@ namespace SkuVaultSaaS.Infrastructure.SkuVaultSaaSApi
             {
                 using var doc = JsonDocument.Parse(raw);
                 
+                // Check if root is directly an array
+                if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                {
+                    _logger?.LogInformation("Root element is directly an array with {Count} items", doc.RootElement.GetArrayLength());
+                    var list = new List<T>();
+                    foreach (var item in doc.RootElement.EnumerateArray())
+                    {
+                        var model = item.Deserialize<T>(new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                        if (model != null) list.Add(model);
+                    }
+                    return list;
+                }
+                
                 // Log all root properties to see what we got
                 var properties = string.Join(", ", doc.RootElement.EnumerateObject().Select(p => p.Name));
                 _logger?.LogInformation("Response root properties: {Properties}", properties);

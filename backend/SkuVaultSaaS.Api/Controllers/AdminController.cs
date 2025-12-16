@@ -7,6 +7,7 @@ using SkuVaultSaaS.Api.Services;
 using SkuVaultSaaS.Core.Models;
 using SkuVaultSaaS.Infrastructure.Data;
 using System.Text;
+using System.Data.Common;
 
 namespace SkuVaultSaaS.Api.Controllers
 {
@@ -374,5 +375,296 @@ namespace SkuVaultSaaS.Api.Controllers
             
             return new string(password);
         }
+
+        [HttpGet("database-specs")]
+        public async Task<IActionResult> GetDatabaseSpecs()
+        {
+            try
+            {
+                var connectionString = _context.Database.GetConnectionString();
+                var databaseName = ExtractDatabaseName(connectionString);
+                
+                // Get database size using ExecuteSqlRaw for MySQL
+                var dbSizeQuery = $@"
+                    SELECT 
+                        ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS DatabaseSizeMB,
+                        SUM(data_length + index_length) AS DatabaseSizeBytes
+                    FROM information_schema.tables 
+                    WHERE table_schema = '{databaseName}'";
+                
+                var dbSizeCommand = _context.Database.GetDbConnection().CreateCommand();
+                dbSizeCommand.CommandText = dbSizeQuery;
+                await _context.Database.OpenConnectionAsync();
+                
+                DatabaseSizeResult? dbSizeResult = null;
+                using (var reader = await dbSizeCommand.ExecuteReaderAsync())
+                {
+                    if (await reader.ReadAsync())
+                    {
+                        dbSizeResult = new DatabaseSizeResult
+                        {
+                            DatabaseSizeMB = reader.IsDBNull(0) ? 0 : reader.GetDecimal(0),
+                            DatabaseSizeBytes = reader.IsDBNull(1) ? 0 : reader.GetInt64(1)
+                        };
+                    }
+                }
+                
+                // Get table information
+                var tableInfoQuery = $@"
+                    SELECT 
+                        table_name as TableName,
+                        COALESCE(table_rows, 0) as RowCount,
+                        ROUND(COALESCE(data_length, 0) / 1024 / 1024, 2) AS DataSizeMB,
+                        COALESCE(data_length, 0) as DataSizeBytes,
+                        ROUND(COALESCE(index_length, 0) / 1024 / 1024, 2) AS IndexSizeMB,
+                        COALESCE(index_length, 0) as IndexSizeBytes
+                    FROM information_schema.tables 
+                    WHERE table_schema = '{databaseName}'
+                    ORDER BY (COALESCE(data_length, 0) + COALESCE(index_length, 0)) DESC";
+                
+                var tableCommand = _context.Database.GetDbConnection().CreateCommand();
+                tableCommand.CommandText = tableInfoQuery;
+                
+                var tableResults = new List<TableSizeResult>();
+                using (var reader = await tableCommand.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        tableResults.Add(new TableSizeResult
+                        {
+                            TableName = reader.GetString(0),
+                            RowCount = reader.IsDBNull(1) ? 0 : reader.GetInt64(1),
+                            DataSizeMB = reader.IsDBNull(2) ? 0 : reader.GetDecimal(2),
+                            DataSizeBytes = reader.IsDBNull(3) ? 0 : reader.GetInt64(3),
+                            IndexSizeMB = reader.IsDBNull(4) ? 0 : reader.GetDecimal(4),
+                            IndexSizeBytes = reader.IsDBNull(5) ? 0 : reader.GetInt64(5)
+                        });
+                    }
+                }
+                
+                await _context.Database.CloseConnectionAsync();
+                
+                var response = new DatabaseSpecsResponse
+                {
+                    DatabaseName = databaseName,
+                    DatabaseSize = $"{dbSizeResult?.DatabaseSizeMB ?? 0:F2} MB",
+                    DatabaseSizeBytes = dbSizeResult?.DatabaseSizeBytes ?? 0,
+                    TableCount = tableResults.Count,
+                    LastUpdated = DateTime.UtcNow,
+                    Tables = tableResults.ToDictionary(
+                        t => t.TableName,
+                        t => new TableInfo
+                        {
+                            TableName = t.TableName,
+                            RowCount = t.RowCount,
+                            DataSize = $"{t.DataSizeMB:F2} MB",
+                            DataSizeBytes = t.DataSizeBytes,
+                            IndexSize = $"{t.IndexSizeMB:F2} MB",
+                            IndexSizeBytes = t.IndexSizeBytes
+                        }
+                    )
+                };
+                
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to retrieve database specs");
+                await _context.Database.CloseConnectionAsync();
+                return StatusCode(500, "Failed to retrieve database specifications.");
+            }
+        }
+        
+        [HttpPost("customers/{id}/cancel")]
+        public async Task<IActionResult> CancelCustomer(int id)
+        {
+            var customer = await _context.Customers.FindAsync(id);
+            if (customer == null)
+            {
+                return NotFound("Customer not found.");
+            }
+
+            customer.IsActive = false;
+            customer.CancelledAt = DateTime.UtcNow;
+            
+            await _context.SaveChangesAsync();
+            
+            _logger.LogInformation("Customer {CustomerId} ({CustomerName}) marked as cancelled", 
+                customer.Id, customer.Name);
+            
+            return Ok(new { message = "Customer cancelled successfully. Data will be purged after 90 days of inactivity." });
+        }
+
+        [HttpGet("purge-eligible")]
+        public async Task<IActionResult> GetPurgeEligibleCustomers()
+        {
+            var cutoffDate = DateTime.UtcNow.Subtract(TimeSpan.FromDays(90));
+            
+            var eligibleCustomers = await _context.Customers
+                .Where(c => !c.IsActive && 
+                           c.CancelledAt.HasValue && 
+                           c.CancelledAt.Value <= cutoffDate &&
+                           !c.ScheduledForDeletion.HasValue)
+                .Select(c => new
+                {
+                    c.Id,
+                    c.Name,
+                    c.Email,
+                    c.CancelledAt
+                })
+                .ToListAsync();
+            
+            var result = eligibleCustomers.Select(c => new
+            {
+                c.Id,
+                c.Name,
+                c.Email,
+                c.CancelledAt,
+                DaysInactive = c.CancelledAt.HasValue ? (int)(DateTime.UtcNow - c.CancelledAt.Value).TotalDays : 0
+            }).ToList();
+                
+            return Ok(result);
+        }
+
+        [HttpGet("users")]
+        public async Task<IActionResult> GetUsers([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        {
+            var users = await _userManager.Users
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+            
+            var userList = new List<object>();
+            foreach (var user in users)
+            {
+                var roles = await _userManager.GetRolesAsync(user);
+                userList.Add(new
+                {
+                    user.Id,
+                    user.Email,
+                    user.UserName,
+                    user.EmailConfirmed,
+                    user.LockoutEnd,
+                    Roles = roles,
+                    user.CustomerId
+                });
+            }
+            
+            var totalCount = await _userManager.Users.CountAsync();
+            
+            return Ok(new
+            {
+                Users = userList,
+                TotalCount = totalCount,
+                Page = page,
+                PageSize = pageSize,
+                TotalPages = (int)Math.Ceiling((double)totalCount / pageSize)
+            });
+        }
+
+        [HttpPost("users")]
+        public async Task<IActionResult> CreateUser([FromBody] CreateUserRequest request)
+        {
+            var existingUser = await _userManager.FindByEmailAsync(request.Email);
+            if (existingUser != null)
+            {
+                return BadRequest("User with this email already exists.");
+            }
+
+            var user = new ApplicationUser
+            {
+                UserName = request.Email,
+                Email = request.Email,
+                EmailConfirmed = true,
+                CustomerId = request.CustomerId
+            };
+
+            var result = await _userManager.CreateAsync(user, request.Password);
+            if (!result.Succeeded)
+            {
+                return BadRequest(result.Errors.Select(e => e.Description));
+            }
+
+            if (!string.IsNullOrEmpty(request.Role))
+            {
+                await _userManager.AddToRoleAsync(user, request.Role);
+            }
+
+            return Ok(new { message = "User created successfully.", userId = user.Id });
+        }
+
+        [HttpPut("users/{id}")]
+        public async Task<IActionResult> UpdateUser(string id, [FromBody] UpdateUserRequest request)
+        {
+            var user = await _userManager.FindByIdAsync(id);
+            if (user == null)
+            {
+                return NotFound("User not found.");
+            }
+
+            user.Email = request.Email;
+            user.UserName = request.Email;
+            user.CustomerId = request.CustomerId;
+
+            var result = await _userManager.UpdateAsync(user);
+            if (!result.Succeeded)
+            {
+                return BadRequest(result.Errors.Select(e => e.Description));
+            }
+
+            if (!string.IsNullOrEmpty(request.Role))
+            {
+                var currentRoles = await _userManager.GetRolesAsync(user);
+                await _userManager.RemoveFromRolesAsync(user, currentRoles);
+                await _userManager.AddToRoleAsync(user, request.Role);
+            }
+
+            return Ok(new { message = "User updated successfully." });
+        }
+
+        [HttpDelete("users/{id}")]
+        public async Task<IActionResult> DeleteUser(string id)
+        {
+            var user = await _userManager.FindByIdAsync(id);
+            if (user == null)
+            {
+                return NotFound("User not found.");
+            }
+
+            var result = await _userManager.DeleteAsync(user);
+            if (!result.Succeeded)
+            {
+                return BadRequest(result.Errors.Select(e => e.Description));
+            }
+
+            return Ok(new { message = "User deleted successfully." });
+        }
+
+        private static string ExtractDatabaseName(string? connectionString)
+        {
+            if (string.IsNullOrEmpty(connectionString))
+                return "Unknown";
+                
+            var parts = connectionString.Split(';');
+            var dbPart = parts.FirstOrDefault(p => p.Trim().StartsWith("Database=", StringComparison.OrdinalIgnoreCase));
+            return dbPart?.Split('=')[1] ?? "Unknown";
+        }
+    }
+    
+    // Helper classes for raw SQL queries
+    public class DatabaseSizeResult
+    {
+        public decimal DatabaseSizeMB { get; set; }
+        public long DatabaseSizeBytes { get; set; }
+    }
+    
+    public class TableSizeResult
+    {
+        public string TableName { get; set; } = null!;
+        public long RowCount { get; set; }
+        public decimal DataSizeMB { get; set; }
+        public long DataSizeBytes { get; set; }
+        public decimal IndexSizeMB { get; set; }
+        public long IndexSizeBytes { get; set; }
     }
 }
