@@ -50,6 +50,39 @@ export default function Dashboard() {
     }
   }
 
+  // Get date params for picker detail modal (includes end of day)
+  const getPickerDateParams = () => {
+    const now = new Date()
+    switch (dateRange) {
+      case 'today':
+        return {
+          from: format(startOfToday(), 'yyyy-MM-dd'),
+          to: format(endOfToday(), 'yyyy-MM-dd HH:mm:ss')
+        }
+      case 'yesterday':
+        const yesterday = subDays(now, 1)
+        return {
+          from: format(yesterday, 'yyyy-MM-dd'),
+          to: format(new Date(yesterday.getTime() + 24 * 60 * 60 * 1000 - 1), 'yyyy-MM-dd HH:mm:ss')
+        }
+      case 'last7':
+        return {
+          from: format(subDays(now, 7), 'yyyy-MM-dd'),
+          to: format(endOfToday(), 'yyyy-MM-dd HH:mm:ss')
+        }
+      case 'custom':
+        if (fromDate && !toDate) {
+          return { from: fromDate, to: format(endOfToday(), 'yyyy-MM-dd HH:mm:ss') }
+        }
+        return fromDate && toDate ? { 
+          from: fromDate, 
+          to: format(new Date(toDate + ' 23:59:59'), 'yyyy-MM-dd HH:mm:ss')
+        } : undefined
+      default:
+        return undefined
+    }
+  }
+
   const dateParams = getDateParams()
 
   const { data: transactions, isLoading: loadingTransactions } = useQuery({
@@ -410,7 +443,7 @@ export default function Dashboard() {
           customerId={customerId}
           pickerName={selectedPicker}
           onClose={() => setSelectedPicker(null)}
-          dateRange={dateParams}
+          dateRange={getPickerDateParams()}
         />
       )}
     </div>

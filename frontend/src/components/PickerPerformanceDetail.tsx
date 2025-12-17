@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { X, BarChart3, TrendingUp, Calendar, User } from 'lucide-react';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface PickerPerformanceDetailProps {
   customerId: number;
@@ -18,7 +18,25 @@ const PickerPerformanceDetail: React.FC<PickerPerformanceDetailProps> = ({
 }) => {
   const [period, setPeriod] = useState<'day' | 'week' | 'month'>('day');
 
-  const { data: performanceData, isLoading } = useQuery({
+  // Debug query to see available users
+  const { data: debugData } = useQuery({
+    queryKey: ['picker-debug', customerId],
+    queryFn: async () => {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL}/api/Picker/customer/${customerId}/debug`,
+        {
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+      if (response.ok) {
+        return response.json();
+      }
+      return null;
+    }
+  });
+
+  const { data: performanceData, isLoading, error } = useQuery({
     queryKey: ['picker-detail', customerId, pickerName, period, dateRange],
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -26,6 +44,8 @@ const PickerPerformanceDetail: React.FC<PickerPerformanceDetailProps> = ({
         ...(dateRange?.from && { from: dateRange.from }),
         ...(dateRange?.to && { to: dateRange.to })
       });
+
+      console.log('Fetching picker data:', { customerId, pickerName, period, dateRange });
 
       const response = await fetch(
         `${import.meta.env.VITE_API_BASE_URL}/api/Picker/customer/${customerId}/picker/${encodeURIComponent(pickerName)}?${params}`,
@@ -36,24 +56,29 @@ const PickerPerformanceDetail: React.FC<PickerPerformanceDetailProps> = ({
       );
 
       if (!response.ok) {
-        throw new Error('Failed to fetch picker performance data');
+        const errorText = await response.text();
+        console.error('API Error:', response.status, errorText);
+        throw new Error(`Failed to fetch picker performance data: ${response.status}`);
       }
 
-      return response.json();
+      const data = await response.json();
+      console.log('Received picker data:', data);
+      return data;
     }
   });
 
-  // Map backend response to chart data
-  const formatChartData = (data: any[]) => {
-    return data.map(item => ({
-      ...item,
-      name:
-        period === 'day'
-          ? item.date
-          : period === 'week'
-          ? `${item.weekStart} - ${item.weekEnd}`
-          : item.month
-    }));
+  // Get chart title based on period
+  const getChartTitle = () => {
+    switch (period) {
+      case 'day':
+        return 'Hourly Performance'
+      case 'week':
+        return 'Daily Performance (Week View)'
+      case 'month':
+        return 'Daily Performance (Month View)'
+      default:
+        return 'Performance Over Time'
+    }
   };
 
   return (
@@ -100,6 +125,11 @@ const PickerPerformanceDetail: React.FC<PickerPerformanceDetailProps> = ({
             <div className="flex justify-center items-center h-64">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
             </div>
+          ) : error ? (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+              <p className="text-red-800 font-semibold mb-2">Error loading picker data</p>
+              <p className="text-red-600 text-sm">{error instanceof Error ? error.message : 'Unknown error'}</p>
+            </div>
           ) : (
             <>
               {/* Debug Info */}
@@ -107,7 +137,26 @@ const PickerPerformanceDetail: React.FC<PickerPerformanceDetailProps> = ({
                 <p>Debug: Found {performanceData?.summary?.totalTransactions || 0} transactions</p>
                 <p>Date range: {dateRange?.from} to {dateRange?.to}</p>
                 <p>Period: {period}</p>
+                <p>Performance data length: {performanceData?.performanceData?.length || 0}</p>
+                <p>API URL: /api/Picker/customer/{customerId}/picker/{encodeURIComponent(pickerName)}</p>
+                {debugData && (
+                  <>
+                    <p>Available users: {debugData.pickerNames?.join(', ') || 'None'}</p>
+                    <p>Transaction types: {debugData.transactionTypes?.map((t: any) => `${t.TransactionType}(${t.Count})`).join(', ') || 'None'}</p>
+                  </>
+                )}
               </div>
+
+              {/* No Data Message */}
+              {(!performanceData?.summary?.totalTransactions || performanceData.summary.totalTransactions === 0) && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center mb-6">
+                  <p className="text-yellow-800 font-semibold mb-2">No data found for {pickerName}</p>
+                  <p className="text-yellow-600 text-sm">
+                    No transactions found for the selected date range ({dateRange?.from} to {dateRange?.to}).
+                    Try selecting a different date range or check if the picker name is correct.
+                  </p>
+                </div>
+              )}
 
               {/* Summary Cards */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -165,35 +214,24 @@ const PickerPerformanceDetail: React.FC<PickerPerformanceDetailProps> = ({
               {/* Performance Chart - dynamic by period */}
               <div className="bg-white border rounded-lg p-6 mb-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                  Performance Over Time ({period})
+                  {getChartTitle()}
                 </h3>
                 <div className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
-                    {period === 'day' ? (
-                      <BarChart data={formatChartData(performanceData?.performanceData || [])}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" tick={{ fontSize: 12 }} height={60} />
-                        <YAxis />
-                        <Tooltip />
-                        <Bar dataKey="totalTransactions" fill="#3B82F6" name="Transactions" />
-                      </BarChart>
-                    ) : period === 'week' ? (
-                      <LineChart data={formatChartData(performanceData?.performanceData || [])}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" tick={{ fontSize: 12 }} height={60} />
-                        <YAxis />
-                        <Tooltip />
-                        <Line type="monotone" dataKey="totalTransactions" stroke="#10B981" name="Hourly Transactions" />
-                      </LineChart>
-                    ) : (
-                      <BarChart data={formatChartData(performanceData?.performanceData || [])}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" tick={{ fontSize: 12 }} height={60} />
-                        <YAxis />
-                        <Tooltip />
-                        <Bar dataKey="totalTransactions" fill="#F59E0B" name="Daily Transactions" />
-                      </BarChart>
-                    )}
+                    <LineChart data={performanceData?.performanceData || []}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" tick={{ fontSize: 12 }} height={60} angle={period !== 'day' ? -45 : 0} textAnchor={period !== 'day' ? 'end' : 'middle'} />
+                      <YAxis />
+                      <Tooltip />
+                      <Line 
+                        type="monotone" 
+                        dataKey="totalTransactions" 
+                        stroke={period === 'day' ? '#3B82F6' : '#10B981'} 
+                        name={period === 'day' ? 'Hourly Transactions' : 'Daily Transactions'} 
+                        strokeWidth={2} 
+                        dot={{ r: 4 }} 
+                      />
+                    </LineChart>
                   </ResponsiveContainer>
                 </div>
               </div>
@@ -208,7 +246,7 @@ const PickerPerformanceDetail: React.FC<PickerPerformanceDetailProps> = ({
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          {period === 'day' ? 'Date' : period === 'week' ? 'Week' : 'Month'}
+                          {period === 'day' ? 'Hour' : 'Date'}
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Total Transactions
@@ -234,9 +272,7 @@ const PickerPerformanceDetail: React.FC<PickerPerformanceDetailProps> = ({
                       {(performanceData?.performanceData || []).map((item: any, index: number) => (
                         <tr key={index}>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {period === 'day' ? new Date(item.date).toLocaleDateString() :
-                             period === 'week' ? `${new Date(item.weekStart).toLocaleDateString()} - ${new Date(item.weekEnd).toLocaleDateString()}` :
-                             new Date(item.month + '-01').toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}
+                            {period === 'day' ? item.name : new Date(item.date).toLocaleDateString()}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {item.totalTransactions.toLocaleString()}
