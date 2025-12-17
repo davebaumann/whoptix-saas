@@ -28,7 +28,7 @@ const PackerPerformanceDetail: React.FC<PackerPerformanceDetailProps> = ({
       });
 
       const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/api/PackerPerformance/customer/${customerId}/packer/${encodeURIComponent(packerName)}?${params}`,
+        `${import.meta.env.VITE_API_BASE_URL}/api/Picker/customer/${customerId}/picker/${encodeURIComponent(packerName)}?${params}`,
         {
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Crown, Star, Zap, Check, ArrowRight, Package, AlertTriangle, Users, Clock, Target } from 'lucide-react'
+import { Crown, Star, Zap, Check, ArrowRight, AlertTriangle, Users, Clock, Target } from 'lucide-react'
 
 const membershipPlans = [
   {
@@ -57,36 +57,36 @@ const membershipPlans = [
 
 const painPoints = [
   {
-    icon: <AlertTriangle className="w-8 h-8 text-red-500" />,
-    problem: "SkuVault's reporting is basic",
-    solution: "Get advanced analytics and insights your team actually needs"
+    icon: <AlertTriangle className="w-8 h-8 text-blue-500" />,
+    problem: "Need advanced reporting beyond SkuVault's standard features",
+    solution: "Get powerful analytics and insights that complement your system"
   },
   {
-    icon: <Users className="w-8 h-8 text-orange-500" />,
-    problem: "No picker performance tracking",
+    icon: <Users className="w-8 h-8 text-blue-500" />,
+    problem: "Want picker performance visibility",
     solution: "Real-time picker dashboards and performance metrics"
   },
   {
-    icon: <Clock className="w-8 h-8 text-yellow-500" />,
-    problem: "Manual low stock monitoring",
+    icon: <Clock className="w-8 h-8 text-blue-500" />,
+    problem: "Looking for proactive inventory management",
     solution: "Automated alerts with customizable thresholds"
   },
   {
-    icon: <Target className="w-8 h-8 text-green-500" />,
-    problem: "Limited sales performance data",
+    icon: <Target className="w-8 h-8 text-blue-500" />,
+    problem: "Need deeper sales performance insights",
     solution: "Comprehensive sales analytics and trend reporting"
   }
 ]
 
 const testimonials = [
   {
-    quote: "Finally, the reporting we've been asking SkuVault for! WhOptix gives us the picker dashboard and low stock insights we desperately needed.",
+    quote: "Finally, the reporting we've been asking SkuVault for! JUSTSKU gives us the picker dashboard and low stock insights we desperately needed.",
     author: "Sarah M.",
     title: "Warehouse Manager",
     company: "TechGear Distribution"
   },
   {
-    quote: "We were spending hours manually tracking performance. WhOptix automated everything and our efficiency jumped 23% in the first month.",
+    quote: "We were spending hours manually tracking performance. JUSTSKU automated everything and our efficiency jumped 23% in the first month.",
     author: "Mike R.",
     title: "Operations Director", 
     company: "SportsPro Fulfillment"
@@ -107,8 +107,7 @@ export default function LandingPageAB() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center">
-              <Package className="w-8 h-8 text-blue-600 mr-3" />
-              <h1 className="text-2xl font-bold text-gray-900">WhOptix</h1>
+              <img src="/JUSTSKU LOGO.png" alt="JUSTSKU" className="h-20" />
             </div>
             <div className="flex space-x-4">
               <Link 
@@ -142,7 +141,7 @@ export default function LandingPageAB() {
             <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
               You've invested in SkuVault, but you're still manually tracking picker performance, 
               missing low stock alerts, and lacking the sales insights you need. 
-              <strong> WhOptix fills those gaps.</strong>
+              <strong> JUSTSKU fills those gaps.</strong>
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link 
@@ -204,14 +203,14 @@ export default function LandingPageAB() {
                 Stop Wasting Time on Manual Workarounds
               </h3>
               <p className="text-blue-800 mb-4">
-                WhOptix connects to your existing SkuVault system and automatically generates 
+                JUSTSKU connects to your existing SkuVault system and automatically generates 
                 the reports and dashboards you've been requesting for years.
               </p>
               <Link 
                 to="/signup" 
-                className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors inline-flex items-center"
+                className="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors inline-flex items-center"
               >
-                Get Started Risk-Free
+                Enhance My SkuVault
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Link>
             </div>
@@ -271,18 +270,18 @@ export default function LandingPageAB() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              Before WhOptix vs. After WhOptix
+              SkuVault + JUSTSKU: Better Together
             </h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              See the difference WhOptix makes for SkuVault users
+              See how WhOptix enhances your SkuVault experience
             </p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
             {/* Before */}
-            <div className="bg-red-50 rounded-lg p-8 border-2 border-red-200">
-              <h3 className="text-2xl font-bold text-red-800 mb-6 text-center">
-                😤 Before WhOptix (Just SkuVault)
+            <div className="bg-gray-50 rounded-lg p-8 border-2 border-gray-200">
+              <h3 className="text-2xl font-bold text-gray-800 mb-6 text-center">
+                📊 SkuVault Alone
               </h3>
               <ul className="space-y-4">
                 <li className="flex items-start">
@@ -319,9 +318,9 @@ export default function LandingPageAB() {
             </div>
 
             {/* After */}
-            <div className="bg-green-50 rounded-lg p-8 border-2 border-green-200">
-              <h3 className="text-2xl font-bold text-green-800 mb-6 text-center">
-                😊 After WhOptix (SkuVault + WhOptix)
+            <div className="bg-blue-50 rounded-lg p-8 border-2 border-blue-200">
+              <h3 className="text-2xl font-bold text-blue-800 mb-6 text-center">
+                🚀 SkuVault + JUSTSKU
               </h3>
               <ul className="space-y-4">
                 <li className="flex items-start">
@@ -375,22 +374,22 @@ export default function LandingPageAB() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              The Reports SkuVault Should Have Built
+              Advanced Reports That Enhance SkuVault
             </h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              See exactly what you'll get when you connect WhOptix to your SkuVault system
+              See exactly what you'll get when you enhance your SkuVault system with JUSTSKU
             </p>
           </div>
 
           {/* Picker Dashboard Screenshot */}
           <div className="mb-16">
             <h3 className="text-2xl font-semibold text-gray-900 mb-6 text-center">
-              🎯 Picker Performance Dashboard (Most Requested Feature)
+              🎯 Enhanced Picker Performance Dashboard
             </h3>
             <div className="bg-white rounded-lg shadow-2xl border border-gray-200 overflow-hidden">
               <div className="bg-blue-600 text-white p-4">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-lg font-semibold">WhOptix Picker Dashboard</h4>
+                  <h4 className="text-lg font-semibold">JUSTSKU Picker Dashboard</h4>
                   <div className="text-sm">Live Data from Your SkuVault</div>
                 </div>
               </div>
@@ -444,7 +443,7 @@ export default function LandingPageAB() {
 
           <div className="text-center">
             <p className="text-lg text-gray-600 mb-6">
-              <strong>This is just one example.</strong> WhOptix provides 15+ advanced reports that SkuVault users have been requesting for years.
+              <strong>This is just one example.</strong> JUSTSKU provides 15+ advanced reports that perfectly complement your SkuVault system.
             </p>
             <Link 
               to="/signup" 
@@ -462,11 +461,11 @@ export default function LandingPageAB() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              Stop Paying for SkuVault Without Getting the Reports You Need
+              Maximize Your SkuVault Investment
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              For less than what you probably spend on coffee each month, get the advanced reporting 
-              and analytics that should have been included with SkuVault from day one.
+              For less than what you spend on coffee each month, add powerful reporting 
+              and analytics that take your SkuVault system to the next level.
             </p>
           </div>
 
@@ -548,10 +547,10 @@ export default function LandingPageAB() {
       <section className="py-20 bg-red-600">
         <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
           <h2 className="text-4xl font-bold text-white mb-4">
-            How Much Longer Will You Struggle With SkuVault's Limited Reporting?
+            Ready to Unlock Your SkuVault's Full Potential?
           </h2>
           <p className="text-xl text-red-100 mb-8">
-            Every day without proper reporting costs you money. Join 847+ SkuVault users who've already solved this problem.
+            Every day is an opportunity to optimize your operations. Join 847+ SkuVault users who've enhanced their system.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link 
@@ -574,8 +573,8 @@ export default function LandingPageAB() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
               <div className="flex items-center mb-4">
-                <Package className="w-6 h-6 text-blue-400 mr-2" />
-                <span className="text-lg font-semibold">WhOptix</span>
+                <img src="/JUSTSKU LOGO.png" alt="JUSTSKU" className="h-6 mr-2" />
+                <span className="text-lg font-semibold">JUSTSKU</span>
               </div>
               <p className="text-gray-400 text-sm">
                 The reporting and analytics platform that SkuVault users have been waiting for.
@@ -613,7 +612,7 @@ export default function LandingPageAB() {
           </div>
           <div className="border-t border-gray-800 mt-12 pt-8 text-center">
             <p className="text-gray-400 text-sm">
-              © 2025 WhOptix. All rights reserved. Not affiliated with SkuVault.
+              © 2025 JUSTSKU. All rights reserved. Not affiliated with SkuVault.
             </p>
           </div>
         </div>

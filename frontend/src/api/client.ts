@@ -44,19 +44,26 @@ export interface PerformanceMetrics {
   totalItems: number
 }
 
-export interface PackerPerformance {
-  user: string
+export interface PickerPerformance {
+  pickerName: string
+  totalTransactions: number
   pickCount: number
-  packCount: number
-  totalQuantityPicked: number
-  totalQuantityPacked: number
+  removeCount: number
+  addCount: number
+  createCount: number
   totalQuantity: number
-  firstActivity: string
-  lastActivity: string
+  pickQuantity: number
+  hoursWorked: number
+  firstTransaction: string
+  lastTransaction: string
+  pickRate: number
+  transactionRate: number
 }
 
-export interface PackerPerformanceResponse {
-  packers: PackerPerformance[]
+export interface PickerPerformanceResponse {
+  period: string
+  fromDate: string
+  pickers: PickerPerformance[]
 }
 
 export interface DailyCount {
@@ -343,14 +350,12 @@ class ApiClient {
     );
   }
 
-  async getPackerPerformance(customerId: number, from?: string, to?: string): Promise<PackerPerformanceResponse> {
+  async getPickerPerformance(customerId: number, period: string = 'today'): Promise<PickerPerformanceResponse> {
     const params = new URLSearchParams();
-    if (from) params.append('from', from);
-    if (to) params.append('to', to);
+    params.append('period', period);
 
-    const queryString = params.toString();
-    return this.fetch<PackerPerformanceResponse>(
-      `/api/transactions/customer/${customerId}/packers${queryString ? `?${queryString}` : ''}`
+    return this.fetch<PickerPerformanceResponse>(
+      `/api/Picker/customer/${customerId}/summary?${params.toString()}`
     );
   }
 

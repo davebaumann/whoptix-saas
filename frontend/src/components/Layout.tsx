@@ -49,13 +49,12 @@ export default function Layout({ children }: LayoutProps) {
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
+          <div className="flex justify-between items-center" style={{ minHeight: '64px', paddingTop: '8px', paddingBottom: '8px' }}>
             <div className="flex">
               <div className="flex-shrink-0 flex items-center">
-                <h1 className="text-xl font-bold text-gray-900">SkuVault SaaS</h1>
+                <img src="/JUSTSKU LOGO.png" alt="JUSTSKU" className="h-12 md:h-16 lg:h-20" style={{ maxHeight: '56px', width: 'auto' }} />
               </div>
             </div>
-            
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-700">
                 {user?.email}

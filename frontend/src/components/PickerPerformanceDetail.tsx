@@ -28,7 +28,7 @@ const PickerPerformanceDetail: React.FC<PickerPerformanceDetailProps> = ({
       });
 
       const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/api/PackerPerformance/customer/${customerId}/packer/${encodeURIComponent(pickerName)}?${params}`,
+        `${import.meta.env.VITE_API_BASE_URL}/api/Picker/customer/${customerId}/picker/${encodeURIComponent(pickerName)}?${params}`,
         {
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
@@ -220,13 +220,13 @@ const PickerPerformanceDetail: React.FC<PickerPerformanceDetailProps> = ({
                           Picks
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Ships
+                          Removes
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Receives
+                          Adds
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Other
+                          Creates
                         </th>
                       </tr>
                     </thead>
@@ -247,14 +247,14 @@ const PickerPerformanceDetail: React.FC<PickerPerformanceDetailProps> = ({
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-semibold">
                             {item.pickCount.toLocaleString()}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-semibold">
-                            {item.shipCount?.toLocaleString() || 0}
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-semibold">
+                            {item.removeCount?.toLocaleString() || 0}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
+                            {item.addCount?.toLocaleString() || 0}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-600">
-                            {item.receiveCount.toLocaleString()}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {item.otherCount.toLocaleString()}
+                            {item.createCount?.toLocaleString() || 0}
                           </td>
                         </tr>
                       ))}

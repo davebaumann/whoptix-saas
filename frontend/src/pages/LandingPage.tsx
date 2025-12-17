@@ -96,8 +96,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center">
-              <Package className="w-8 h-8 text-blue-600 mr-3" />
-              <h1 className="text-2xl font-bold text-gray-900">WhOptix</h1>
+              <img src="/JUSTSKU LOGO.png" alt="JUSTSKU" className="h-20" />
             </div>
             <div className="flex space-x-4">
               <Link 
@@ -170,13 +169,13 @@ export default function LandingPage() {
               Built for SkuVault Users
             </h2>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto mb-8">
-              WhOptix enhances your existing SkuVault investment with powerful reporting and analytics tools. 
+              JUSTSKU enhances your existing SkuVault investment with powerful reporting and analytics tools. 
               We integrate seamlessly with SkuVault's API to provide advanced warehouse optimization features 
               that aren't available in the standard SkuVault interface.
             </p>
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 max-w-2xl mx-auto">
               <p className="text-sm text-yellow-800">
-                <strong>Note:</strong> WhOptix is an independent software solution that integrates with SkuVault. 
+                <strong>Note:</strong> JUSTSKU is an independent software solution that integrates with SkuVault. 
                 We are not affiliated with or owned by SkuVault, but we specialize in maximizing the value of your SkuVault data.
               </p>
             </div>
@@ -192,7 +191,7 @@ export default function LandingPage() {
               Everything You Need to Optimize Your SkuVault Data
             </h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              WhOptix enhances your existing SkuVault investment with advanced reporting, 
+              JUSTSKU enhances your existing SkuVault investment with advanced reporting, 
               analytics, and warehouse optimization tools.
             </p>
           </div>
@@ -221,7 +220,7 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
               <h2 className="text-4xl font-bold text-gray-900 mb-6">
-                Why Choose WhOptix?
+                Why Choose JUSTSKU?
               </h2>
               <div className="space-y-6">
                 <div className="flex items-start">
@@ -302,7 +301,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              See WhOptix in Action
+              See JUSTSKU in Action
             </h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
               Get a preview of our powerful dashboard and reporting capabilities that enhance your SkuVault data.
@@ -316,7 +315,7 @@ export default function LandingPage() {
               {/* Mock Dashboard Header */}
               <div className="bg-blue-600 text-white p-4">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-lg font-semibold">WhOptix Dashboard</h4>
+                  <h4 className="text-lg font-semibold">JUSTSKU Dashboard</h4>
                   <div className="text-sm">Today: March 15, 2024</div>
                 </div>
               </div>
@@ -467,7 +466,7 @@ export default function LandingPage() {
 
           <div className="text-center mt-12">
             <p className="text-gray-600 mb-6">
-              These are just a few examples of the powerful insights WhOptix provides for your SkuVault data.
+              These are just a few examples of the powerful insights JUSTSKU provides for your SkuVault data.
             </p>
             <Link 
               to="/signup" 
@@ -568,7 +567,7 @@ export default function LandingPage() {
             Ready to Transform Your Inventory Management?
           </h2>
           <p className="text-xl text-blue-100 mb-8">
-            Join thousands of businesses that trust WhOptix to enhance their SkuVault experience.
+            Join thousands of businesses that trust JUSTSKU to enhance their SkuVault experience.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link 
@@ -591,8 +590,8 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
               <div className="flex items-center mb-4">
-                <Package className="w-6 h-6 text-blue-400 mr-2" />
-                <span className="text-lg font-semibold">WhOptix</span>
+                <img src="/JUSTSKU LOGO.png" alt="JUSTSKU" className="h-6 mr-2" />
+                <span className="text-lg font-semibold">JUSTSKU</span>
               </div>
               <p className="text-gray-400 text-sm">
                 Warehouse optimization solutions that enhance your SkuVault system.
@@ -630,7 +629,7 @@ export default function LandingPage() {
           </div>
           <div className="border-t border-gray-800 mt-12 pt-8 text-center">
             <p className="text-gray-400 text-sm">
-              © 2025 WhOptix. All rights reserved.
+              © 2025 JUSTSKU. All rights reserved.
             </p>
           </div>
         </div>
