@@ -49,7 +49,7 @@ export default function Layout({ children }: LayoutProps) {
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center" style={{ minHeight: '64px', paddingTop: '8px', paddingBottom: '8px' }}>
+          <div className="flex justify-between items-center py-2" style={{ minHeight: '56px' }}>
             <div className="flex">
               <div className="flex-shrink-0 flex items-center">
                 <img src="/JUSTSKU LOGO.png" alt="JUSTSKU" className="h-12 md:h-16 lg:h-20" style={{ maxHeight: '56px', width: 'auto' }} />

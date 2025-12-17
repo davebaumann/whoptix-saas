@@ -235,7 +235,7 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-Console.WriteLine($"=== SkuVault SaaS API Startup ===");
+Console.WriteLine($"=== JUSTSKU API Startup ===");
 Console.WriteLine($"Environment: {app.Environment.EnvironmentName}");
 
 // Configure static file serving for React app
@@ -260,7 +260,7 @@ if (Directory.Exists(frontendPath))
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "SkuVault SaaS API v1");
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "JUSTSKU API v1");
     c.RoutePrefix = "swagger";
 });
 
@@ -296,7 +296,7 @@ app.MapGet("/api/health", () =>
     return Results.Ok(new { 
         status = "healthy",
         timestamp = DateTime.UtcNow.ToString("o"),
-        service = "SkuVault SaaS API"
+        service = "JUSTSKU API"
     });
 });
 
@@ -312,7 +312,7 @@ app.MapGet("/api/health/detailed", async (ApplicationDbContext dbContext) =>
             status = "healthy", 
             timestamp = DateTime.UtcNow.ToString("o"),
             version = "1.0.0",
-            service = "SkuVault SaaS API",
+            service = "JUSTSKU API",
             environment = app.Environment.EnvironmentName,
             database = "connected"
         });
@@ -323,7 +323,7 @@ app.MapGet("/api/health/detailed", async (ApplicationDbContext dbContext) =>
             status = "unhealthy",
             timestamp = DateTime.UtcNow.ToString("o"),
             version = "1.0.0", 
-            service = "SkuVault SaaS API",
+            service = "JUSTSKU API",
             environment = app.Environment.EnvironmentName,
             database = "disconnected",
             error = ex.Message

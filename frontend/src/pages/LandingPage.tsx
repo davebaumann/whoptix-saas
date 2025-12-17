@@ -156,12 +156,12 @@ export default function LandingPage() {
           <div className="text-center">
             <div className="flex justify-center items-center mb-6">
               <div className="bg-white p-4 rounded-lg shadow-md mr-4">
-                <Package className="w-12 h-12 text-blue-600" />
+                <img src="/JUSTSKU LOGO.png" alt="JUSTSKU" className="w-12 h-12 object-contain" />
               </div>
               <div className="text-4xl text-gray-400 mx-4">+</div>
               <div className="bg-white p-4 rounded-lg shadow-md ml-4">
                 <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center">
-                  <span className="text-xs font-bold text-gray-600">SKU</span>
+                  <span className="text-xs font-bold text-gray-600">SkuVault</span>
                 </div>
               </div>
             </div>
