@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
 import { apiClient } from '../api/client'
@@ -194,6 +194,47 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Top Performers */}
+      {summary?.summary && (
+        <div className="bg-white rounded-lg shadow">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-900">
+              Top Performers {dateRange === 'today' ? 'Today' : dateRange === 'yesterday' ? 'Yesterday' : dateRange === 'last7' ? '(Last 7 Days)' : '(Selected Period)'}
+            </h2>
+          </div>
+          <div className="p-6">
+            <div className="space-y-2">
+              {summary.summary
+                .reduce((acc, item) => {
+                  const existing = acc.find(p => p.user === item.user)
+                  if (existing) {
+                    existing.count += item.count
+                  } else {
+                    acc.push({ user: item.user || 'Unknown', count: item.count })
+                  }
+                  return acc
+                }, [] as { user: string; count: number }[])
+                .sort((a, b) => b.count - a.count)
+                .slice(0, 5)
+                .map((picker, idx) => {
+                  const daysInRange = dateRange === 'today' || dateRange === 'yesterday' ? 1 : dateRange === 'last7' ? 7 : dateParams?.from && dateParams?.to ? Math.ceil((new Date(dateParams.to).getTime() - new Date(dateParams.from).getTime()) / (1000 * 60 * 60 * 24)) + 1 : 1
+                  const hoursWorked = daysInRange * 8
+                  const picksPerHour = Math.round(picker.count / hoursWorked)
+                  return (
+                    <div key={idx} className="flex justify-between items-center bg-gray-50 p-3 rounded border">
+                      <span className="font-medium text-gray-900">{picker.user}</span>
+                      <div className="text-right">
+                        <div className="font-semibold text-green-600">{picksPerHour} picks/hr</div>
+                        <div className="text-xs text-gray-500">{picker.count} total picks</div>
+                      </div>
+                    </div>
+                  )
+                })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Summary by User/Type */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
@@ -217,7 +258,7 @@ export default function Dashboard() {
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white">
               {loadingSummary ? (
                 <tr>
                   <td colSpan={4} className="px-6 py-4 text-center text-sm text-gray-500">
@@ -231,29 +272,57 @@ export default function Dashboard() {
                   </td>
                 </tr>
               ) : (
-                summary?.summary.map((item, idx) => (
-                  <tr key={idx}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      <button
-                        onClick={() => setSelectedPicker(item.user || 'Unknown')}
-                        className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
-                      >
-                        {item.user || 'Unknown'}
-                      </button>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded">
-                        {item.transactionType || 'N/A'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {item.count.toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {Math.abs(item.totalQuantity).toLocaleString()}
-                    </td>
-                  </tr>
-                ))
+                Object.entries(
+                  (summary?.summary || []).reduce((acc, item) => {
+                    const user = item.user || 'Unknown'
+                    if (!acc[user]) acc[user] = []
+                    acc[user].push(item)
+                    return acc
+                  }, {} as Record<string, Array<{ user: string | null; transactionType: string | null; count: number; totalQuantity: number }>>)
+                ).map(([user, items], userIdx) => {
+                  const totalCount = items.reduce((sum, item) => sum + item.count, 0)
+                  const totalQty = items.reduce((sum, item) => sum + Math.abs(item.totalQuantity), 0)
+                  return (
+                    <React.Fragment key={userIdx}>
+                      <tr className="border-t-2 border-gray-300 bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                          <button
+                            onClick={() => setSelectedPicker(user)}
+                            className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                          >
+                            {user}
+                          </button>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-semibold">
+                          {items.length} type{items.length > 1 ? 's' : ''}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                          {totalCount.toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                          {totalQty.toLocaleString()}
+                        </td>
+                      </tr>
+                      {items.map((item, itemIdx) => (
+                        <tr key={`${userIdx}-${itemIdx}`} className="bg-white">
+                          <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-400 pl-12">
+                          </td>
+                          <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
+                            <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded">
+                              {item.transactionType || 'N/A'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-700">
+                            {item.count.toLocaleString()}
+                          </td>
+                          <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-700">
+                            {Math.abs(item.totalQuantity).toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </React.Fragment>
+                  )
+                })
               )}
             </tbody>
           </table>

@@ -127,28 +127,28 @@ export default function LandingPageAB() {
         </div>
       </header>
 
-      {/* Hero Section - Problem-Focused */}
-      <section className="bg-gradient-to-br from-red-50 to-orange-100 py-20">
+      {/* Hero Section */}
+      <section className="bg-gradient-to-br from-blue-50 to-indigo-100 py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <div className="bg-red-100 text-red-800 px-4 py-2 rounded-full text-sm font-medium inline-block mb-6">
+            <div className="bg-blue-100 text-blue-800 px-4 py-2 rounded-full text-sm font-medium inline-block mb-6">
               For SkuVault Users Only
             </div>
             <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
-              Tired of SkuVault's
-              <span className="text-red-600"> Limited Reporting?</span>
+              Need Better Visibility Into
+              <span className="text-blue-600"> Your SkuVault Data?</span>
             </h1>
             <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
-              You've invested in SkuVault, but you're still manually tracking picker performance, 
-              missing low stock alerts, and lacking the sales insights you need. 
-              <strong> JUSTSKU fills those gaps.</strong>
+              Enhance your SkuVault investment with advanced reporting, picker performance dashboards, 
+              proactive low stock alerts, and deeper sales insights. 
+              <strong> JUSTSKU complements SkuVault perfectly.</strong>
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link 
                 to="/signup" 
-                className="bg-red-600 text-white hover:bg-red-700 px-8 py-4 rounded-lg text-lg font-semibold transition-colors inline-flex items-center justify-center"
+                className="bg-blue-600 text-white hover:bg-blue-700 px-8 py-4 rounded-lg text-lg font-semibold transition-colors inline-flex items-center justify-center"
               >
-                Fix My Reporting Issues Now
+                Enhance My SkuVault
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Link>
               <a 
@@ -170,16 +170,16 @@ export default function LandingPageAB() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">
-              Sound Familiar? You're Not Alone.
+              Enhance Your SkuVault Experience
             </h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              These are the top complaints we hear from SkuVault users every day:
+              See how JUSTSKU adds powerful capabilities to your existing SkuVault system:
             </p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {painPoints.map((point, index) => (
-              <div key={index} className="bg-gray-50 rounded-lg p-6 border-l-4 border-red-400">
+              <div key={index} className="bg-gray-50 rounded-lg p-6 border-l-4 border-blue-400">
                 <div className="flex items-start">
                   <div className="flex-shrink-0 mr-4">
                     {point.icon}
@@ -200,11 +200,11 @@ export default function LandingPageAB() {
           <div className="text-center mt-12">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 max-w-3xl mx-auto">
               <h3 className="text-xl font-semibold text-blue-900 mb-3">
-                Stop Wasting Time on Manual Workarounds
+                Seamless Integration with SkuVault
               </h3>
               <p className="text-blue-800 mb-4">
                 JUSTSKU connects to your existing SkuVault system and automatically generates 
-                the reports and dashboards you've been requesting for years.
+                advanced reports and dashboards that complement SkuVault's core features.
               </p>
               <Link 
                 to="/signup" 
@@ -273,7 +273,7 @@ export default function LandingPageAB() {
               SkuVault + JUSTSKU: Better Together
             </h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              See how WhOptix enhances your SkuVault experience
+              See how JUSTSKU enhances your SkuVault experience
             </p>
           </div>
 
@@ -529,10 +529,10 @@ export default function LandingPageAB() {
           <div className="text-center mt-12">
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 max-w-3xl mx-auto mb-8">
               <h3 className="text-lg font-semibold text-yellow-800 mb-2">
-                💡 ROI Calculator: Is WhOptix Worth It?
+                💡 ROI Calculator: Is JUSTSKU Worth It?
               </h3>
               <p className="text-yellow-700 mb-4">
-                If WhOptix helps you avoid just <strong>one stockout per month</strong> or improves picker 
+                If JUSTSKU helps you avoid just <strong>one stockout per month</strong> or improves picker 
                 efficiency by <strong>just 5%</strong>, it pays for itself. Most customers see 10x ROI in the first 90 days.
               </p>
             </div>
@@ -543,25 +543,25 @@ export default function LandingPageAB() {
         </div>
       </section>
 
-      {/* Urgency CTA Section */}
-      <section className="py-20 bg-red-600">
+      {/* CTA Section */}
+      <section className="py-20 bg-blue-600">
         <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
           <h2 className="text-4xl font-bold text-white mb-4">
-            Ready to Unlock Your SkuVault's Full Potential?
+            Ready to Enhance Your SkuVault Experience?
           </h2>
-          <p className="text-xl text-red-100 mb-8">
-            Every day is an opportunity to optimize your operations. Join 847+ SkuVault users who've enhanced their system.
+          <p className="text-xl text-blue-100 mb-8">
+            Join 847+ SkuVault users who've added powerful reporting and analytics to their warehouse operations.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link 
               to="/signup" 
-              className="bg-white text-red-600 hover:bg-gray-50 px-8 py-4 rounded-lg text-lg font-semibold transition-colors inline-flex items-center justify-center"
+              className="bg-white text-blue-600 hover:bg-gray-50 px-8 py-4 rounded-lg text-lg font-semibold transition-colors inline-flex items-center justify-center"
             >
               Get Started Risk-Free Now
               <ArrowRight className="w-5 h-5 ml-2" />
             </Link>
           </div>
-          <p className="text-sm text-red-100 mt-4">
+          <p className="text-sm text-blue-100 mt-4">
             ⚡ Setup in 5 minutes ⚡ See results immediately ⚡ 30-day money-back guarantee
           </p>
         </div>
