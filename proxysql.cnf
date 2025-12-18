@@ -1,0 +1,86 @@
+datadir="/var/lib/proxysql"
+
+admin_variables=
+{
+    admin_credentials="admin:admin"
+    mysql_ifaces="0.0.0.0:6032"
+    refresh_interval=2000
+}
+
+mysql_variables=
+{
+    threads=4
+    max_connections=2048
+    default_query_delay=0
+    default_query_timeout=36000000
+    have_compress=true
+    poll_timeout=2000
+    interfaces="0.0.0.0:6033"
+    default_schema="information_schema"
+    stacksize=1048576
+    server_version="8.0.25"
+    connect_timeout_server=3000
+    monitor_username="monitor"
+    monitor_password="monitor"
+    monitor_history=600000
+    monitor_connect_interval=60000
+    monitor_ping_interval=10000
+    monitor_read_only_interval=1500
+    monitor_read_only_timeout=500
+    ping_interval_server_msec=120000
+    ping_timeout_server=500
+    commands_stats=true
+    sessions_sort=true
+    connect_retries_on_failure=10
+}
+
+# Define MySQL servers (replace with your actual database details)
+mysql_servers =
+(
+    {
+        address="ftp.davidbaumann.pro"
+        port=3306
+        hostgroup=0
+        weight=1000
+        max_connections=200
+        max_replication_lag=10
+        use_ssl=0
+        max_latency_ms=1000
+        comment="Primary MySQL Server"
+    }
+)
+
+# Define MySQL users (replace with your actual credentials)
+mysql_users:
+(
+    {
+        username = "uky8lbyktm7fp"
+        password = "iewcmu8vqo39"
+        default_hostgroup = 0
+        max_connections=50
+        default_schema="dbayd5xzdn55n8"
+        active = 1
+    }
+)
+
+# Query routing rules
+mysql_query_rules:
+(
+    {
+        rule_id=1
+        active=1
+        match_pattern="^SELECT.*FOR UPDATE$"
+        destination_hostgroup=0
+        apply=1
+    },
+    {
+        rule_id=2
+        active=1
+        match_pattern="^SELECT"
+        destination_hostgroup=0
+        apply=1
+    }
+)
+
+# Connection pooling settings
+mysql_connection_pool_reset_on_next_transaction = 1

@@ -18,23 +18,7 @@ const PickerPerformanceDetail: React.FC<PickerPerformanceDetailProps> = ({
 }) => {
   const [period, setPeriod] = useState<'day' | 'week' | 'month'>('day');
 
-  // Debug query to see available users
-  const { data: debugData } = useQuery({
-    queryKey: ['picker-debug', customerId],
-    queryFn: async () => {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/api/Picker/customer/${customerId}/debug`,
-        {
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' }
-        }
-      );
-      if (response.ok) {
-        return response.json();
-      }
-      return null;
-    }
-  });
+
 
   const { data: performanceData, isLoading, error } = useQuery({
     queryKey: ['picker-detail', customerId, pickerName, period, dateRange],
@@ -132,20 +116,7 @@ const PickerPerformanceDetail: React.FC<PickerPerformanceDetailProps> = ({
             </div>
           ) : (
             <>
-              {/* Debug Info */}
-              <div className="mb-4 p-4 bg-gray-100 rounded text-sm">
-                <p>Debug: Found {performanceData?.summary?.totalTransactions || 0} transactions</p>
-                <p>Date range: {dateRange?.from} to {dateRange?.to}</p>
-                <p>Period: {period}</p>
-                <p>Performance data length: {performanceData?.performanceData?.length || 0}</p>
-                <p>API URL: /api/Picker/customer/{customerId}/picker/{encodeURIComponent(pickerName)}</p>
-                {debugData && (
-                  <>
-                    <p>Available users: {debugData.pickerNames?.join(', ') || 'None'}</p>
-                    <p>Transaction types: {debugData.transactionTypes?.map((t: any) => `${t.TransactionType}(${t.Count})`).join(', ') || 'None'}</p>
-                  </>
-                )}
-              </div>
+
 
               {/* No Data Message */}
               {(!performanceData?.summary?.totalTransactions || performanceData.summary.totalTransactions === 0) && (

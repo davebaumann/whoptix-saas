@@ -35,6 +35,9 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 // User Context Service for tenant isolation
 builder.Services.AddScoped<UserContextService>();
 
+// Caching Service for reducing database connections
+builder.Services.AddScoped<SkuVaultSaaS.Api.Services.ICachingService, SkuVaultSaaS.Api.Services.CachingService>();
+
 // Report Access Service for membership-based report authorization
 builder.Services.AddScoped<SkuVaultSaaS.Core.Services.IReportAccessService, SkuVaultSaaS.Core.Services.ReportAccessService>();
 
@@ -100,9 +103,23 @@ if (!string.IsNullOrEmpty(allowedHosts) && allowedHosts.Contains("${ALLOWED_HOST
     builder.Configuration["AllowedHosts"] = allowedHosts.Replace("${ALLOWED_HOSTS}", Environment.GetEnvironmentVariable("ALLOWED_HOSTS"));
 }
 
-// Add DbContext
+// Add DbContext with optimized connection pooling
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+    options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString), mySqlOptions =>
+    {
+        // Connection resilience
+        mySqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 3,
+            maxRetryDelay: TimeSpan.FromSeconds(5),
+            errorNumbersToAdd: null);
+    }), ServiceLifetime.Scoped); // Explicit scoped lifetime
+
+// Add memory caching for frequent queries
+builder.Services.AddMemoryCache(options =>
+{
+    options.SizeLimit = 1000; // Limit cache entries
+    options.CompactionPercentage = 0.25; // Remove 25% when limit reached
+});
 
 // Add Identity with security settings
 builder.Services.AddDefaultIdentity<ApplicationUser>(options => {
@@ -178,6 +195,13 @@ if (!string.IsNullOrWhiteSpace(jwtKey))
         };
     });
 }
+
+// Add response caching
+builder.Services.AddResponseCaching(options =>
+{
+    options.MaximumBodySize = 1024 * 1024; // 1MB
+    options.UseCaseSensitivePaths = false;
+});
 
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
@@ -279,6 +303,9 @@ app.Use(async (context, next) =>
 });
 
 app.UseCors("FrontendDev");
+
+// Enable response caching
+app.UseResponseCaching();
 
 // Enable HTTPS redirection
 if (app.Environment.IsDevelopment())

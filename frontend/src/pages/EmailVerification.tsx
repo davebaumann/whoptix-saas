@@ -1,18 +1,52 @@
+import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Mail, CheckCircle, RefreshCw } from 'lucide-react';
+import { CheckCircle, RefreshCw } from 'lucide-react';
 
 export default function EmailVerification() {
   const [searchParams] = useSearchParams();
   const email = searchParams.get('email') || '';
+  const [isResending, setIsResending] = useState(false);
+  const [resendMessage, setResendMessage] = useState('');
+
+  const handleResendEmail = async () => {
+    if (!email) {
+      setResendMessage('Email address not found. Please try signing up again.');
+      return;
+    }
+
+    setIsResending(true);
+    setResendMessage('');
+
+    try {
+      const response = await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email })
+      });
+
+      if (response.ok) {
+        setResendMessage('Verification email sent! Please check your inbox.');
+      } else {
+        const errorText = await response.text();
+        setResendMessage(errorText || 'Failed to resend verification email.');
+      }
+    } catch (error) {
+      setResendMessage('Failed to resend verification email. Please try again.');
+    } finally {
+      setIsResending(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-blue-100 mb-6">
-            <Mail className="h-8 w-8 text-blue-600" />
+          <div className="flex justify-center mb-4">
+            <img src="/JUSTSKU LOGO Horizontal.png" alt="JUSTSKU" className="h-12" />
           </div>
-          <h1 className="text-center text-3xl font-bold text-blue-600 mb-2">Whoptix</h1>
+          <h1 className="text-center text-3xl font-bold text-blue-600 mb-2">JUSTSKU</h1>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
             Check Your Email
           </h2>
@@ -51,12 +85,19 @@ export default function EmailVerification() {
               </p>
               
               <button
-                onClick={() => window.location.reload()}
-                className="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100"
+                onClick={handleResendEmail}
+                disabled={isResending}
+                className="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Resend Verification Email
+                <RefreshCw className={`w-4 h-4 mr-2 ${isResending ? 'animate-spin' : ''}`} />
+                {isResending ? 'Sending...' : 'Resend Verification Email'}
               </button>
+              
+              {resendMessage && (
+                <p className={`mt-2 text-xs ${resendMessage.includes('sent') ? 'text-green-600' : 'text-red-600'}`}>
+                  {resendMessage}
+                </p>
+              )}
             </div>
           </div>
 

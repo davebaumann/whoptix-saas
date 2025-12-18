@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  proxysql:
+    image: proxysql/proxysql:latest
+    container_name: skuvault-proxysql
+    ports:
+      - "6033:6033"  # ProxySQL MySQL interface
+      - "6032:6032"  # ProxySQL Admin interface
+    volumes:
+      - ./proxysql.cnf:/etc/proxysql.cnf
+      - proxysql_data:/var/lib/proxysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=proxysql_admin
+    restart: unless-stopped
+    networks:
+      - skuvault-network
+
+  # Optional: Redis for distributed caching (when scaling to multiple instances)
+  redis:
+    image: redis:7-alpine
+    container_name: skuvault-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    restart: unless-stopped
+    networks:
+      - skuvault-network
+
+volumes:
+  proxysql_data:
+  redis_data:
+
+networks:
+  skuvault-network:
+    driver: bridge

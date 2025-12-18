@@ -52,7 +52,7 @@ export default function Layout({ children }: LayoutProps) {
           <div className="flex justify-between items-center py-2" style={{ minHeight: '56px' }}>
             <div className="flex">
               <div className="flex-shrink-0 flex items-center">
-                <img src="/JUSTSKU LOGO.png" alt="JUSTSKU" className="h-12 md:h-16 lg:h-20" style={{ maxHeight: '56px', width: 'auto' }} />
+                <img src="/JUSTSKU LOGO Horizontal.png" alt="JUSTSKU" className="h-12 md:h-16 lg:h-20" style={{ maxHeight: '56px', width: 'auto' }} />
               </div>
             </div>
             <div className="flex items-center space-x-4">

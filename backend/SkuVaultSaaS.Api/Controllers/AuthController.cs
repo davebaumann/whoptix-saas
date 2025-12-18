@@ -212,6 +212,46 @@ namespace SkuVaultSaaS.Api.Controllers
             return Redirect("/app/account-setup");
         }
 
+        [HttpPost("resend-verification")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ResendVerification([FromBody] ResendVerificationRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.Email))
+            {
+                return BadRequest("Email is required.");
+            }
+
+            var user = await _userManager.FindByEmailAsync(request.Email);
+            if (user == null)
+            {
+                return BadRequest("User not found.");
+            }
+
+            if (user.EmailConfirmed)
+            {
+                return BadRequest("Email is already verified.");
+            }
+
+            // Generate new email confirmation token
+            var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+            var confirmationLink = $"{Request.Scheme}://{Request.Host}/api/auth/confirm-email?userId={user.Id}&token={Uri.EscapeDataString(token)}";
+
+            // Send verification email (don't await to avoid blocking)
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _emailService.SendEmailVerificationAsync(request.Email, confirmationLink);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to resend verification email to {Email}", request.Email);
+                }
+            });
+
+            return Ok(new { message = "Verification email sent successfully." });
+        }
+
         [HttpGet("test")]
         [AllowAnonymous]
         public IActionResult Test() => Ok(new { message = "test works" });

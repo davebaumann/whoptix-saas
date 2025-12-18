@@ -88,9 +88,9 @@ export default function Signup() {
       return
     }
 
-    // Validate contract agreement
+    // Validate terms agreement
     if (!formData.agreeToContract) {
-      setError('You must agree to the contract terms to continue')
+      setError('You must agree to the terms and conditions and privacy policy to continue')
       setIsLoading(false)
       return
     }
@@ -275,7 +275,7 @@ export default function Signup() {
               className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
             />
             <label htmlFor="agreeToContract" className="ml-2 block text-sm text-gray-700">
-              I agree to the contract terms and conditions (contract terms to be determined) *
+              I agree to the website terms and conditions and privacy policy *
             </label>
           </div>
 
