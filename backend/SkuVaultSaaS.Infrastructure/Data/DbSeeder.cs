@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using SkuVaultSaaS.Core.Models;
+using SkuVaultSaaS.Core.Enums;
 
 namespace SkuVaultSaaS.Infrastructure.Data
 {
@@ -170,6 +171,15 @@ namespace SkuVaultSaaS.Infrastructure.Data
                 if (createResult.Succeeded)
                 {
                     await userManager.AddToRoleAsync(user, roleName);
+                    
+                    // Set kim.baumann@skuvault.com as account admin (Owner role)
+                    if (defaultUserEmail.Equals("Kim.baumann@skuvault.com", StringComparison.OrdinalIgnoreCase))
+                    {
+                        user.CustomerRole = CustomerRole.Owner;
+                        await userManager.UpdateAsync(user);
+                        logger?.LogInformation("Set CustomerRole.Owner for {Email}", defaultUserEmail);
+                    }
+                    
                     logger?.LogInformation("Created seeded user {Email} and added to role {Role}", defaultUserEmail, roleName);
 
                     // Associate user with customer
@@ -231,6 +241,27 @@ namespace SkuVaultSaaS.Infrastructure.Data
                 else
                 {
                     logger?.LogWarning("Failed to create seeded user {Email}: {Errors}", defaultUserEmail, string.Join(';', createResult.Errors));
+                }
+            }
+            else
+            {
+                // User exists, ensure kim.baumann@skuvault.com has account admin role
+                if (defaultUserEmail.Equals("Kim.baumann@skuvault.com", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (user.CustomerRole != CustomerRole.Owner)
+                    {
+                        user.CustomerRole = CustomerRole.Owner;
+                        await userManager.UpdateAsync(user);
+                        logger?.LogInformation("Updated CustomerRole.Owner for existing user {Email}", defaultUserEmail);
+                    }
+                    
+                    // Remove system Admin role if they have it
+                    var userRoles = await userManager.GetRolesAsync(user);
+                    if (userRoles.Contains(adminRole))
+                    {
+                        await userManager.RemoveFromRoleAsync(user, adminRole);
+                        logger?.LogInformation("Removed system Admin role from {Email}", defaultUserEmail);
+                    }
                 }
             }
 

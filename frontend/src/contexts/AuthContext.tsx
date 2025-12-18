@@ -6,6 +6,9 @@ interface User {
   customerId: number
   roles?: string[]
   isAdmin?: boolean
+  isSystemAdmin?: boolean
+  isAccountAdmin?: boolean
+  customerRole?: string
 }
 
 interface AuthContextType {
@@ -50,13 +53,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (response.ok) {
         const userData = await response.json()
         // Set user data
-        const isAdmin = userData.roles?.includes('Admin') || false
+        const isSystemAdmin = userData.roles?.includes('Admin') || false
+        const hasCustomerId = typeof userData.customerId === 'number'
+        // Account admin is someone with a customer association and admin-level customer role
+        const isAccountAdmin = hasCustomerId && (userData.customerRole === 'Owner' || userData.customerRole === 'Admin')
+        
+        // Debug logging
+        console.log('Auth data:', {
+          email: userData.email,
+          customerId: userData.customerId,
+          customerRole: userData.customerRole,
+          roles: userData.roles,
+          isSystemAdmin,
+          isAccountAdmin,
+          hasCustomerId
+        });
+        
         setUser({
           id: userData.id,
           email: userData.email,
-          customerId: userData.customerId, // Will be null for admin users
+          customerId: userData.customerId, // Will be null for system admin users
           roles: userData.roles,
-          isAdmin
+          isAdmin: isSystemAdmin, // Keep for backward compatibility
+          isSystemAdmin,
+          isAccountAdmin,
+          customerRole: userData.customerRole
         })
         
         if (typeof userData.customerId !== 'number') {

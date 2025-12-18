@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { CheckCircle, Users, AlertCircle, Clock } from 'lucide-react';
+import { Users, AlertCircle, Clock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 interface InvitationData {

@@ -7,6 +7,6 @@ namespace SkuVaultSaaS.Core.Models
     {
         public int? CustomerId { get; set; }
         public Customer? Customer { get; set; }
-        public CustomerRole CustomerRole { get; set; } = CustomerRole.Viewer;
+        public CustomerRole? CustomerRole { get; set; }
     }
 }

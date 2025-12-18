@@ -6,8 +6,6 @@ import { Elements, CardElement, useStripe, useElements } from '@stripe/react-str
 import { stripeService } from '../api/stripeService';
 import { useAuth } from '../contexts/AuthContext';
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
-
 const getTierInfo = (tier: string) => {
   const tierMap: Record<string, { name: string; price: string }> = {
     '2': { name: 'Standard', price: '$59/month' },
@@ -124,6 +122,8 @@ export default function StripeSetup() {
   
   const tier = searchParams.get('tier') || '2';
   const tierInfo = getTierInfo(tier);
+  
+  const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
 
 
 

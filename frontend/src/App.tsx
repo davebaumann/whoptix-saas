@@ -36,6 +36,7 @@ import Support from './pages/Support'
 import Status from './pages/Status'
 import About from './pages/About'
 import InvitationAccept from './pages/InvitationAccept'
+import AcceptInvitation from './pages/AcceptInvitation'
 
 function App() {
   return (
@@ -46,6 +47,7 @@ function App() {
           <Route path="/ab" element={<LandingPageAB />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/accept-invitation" element={<AcceptInvitation />} />
           <Route path="/terms" element={<TermsOfService />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/contact" element={<ContactUs />} />

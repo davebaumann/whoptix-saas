@@ -121,7 +121,8 @@ namespace SkuVaultSaaS.Api.Controllers
                 id = user.Id,
                 email = user.Email,
                 roles = roles,
-                customerId = user.CustomerId // Will be null for admin users
+                customerId = user.CustomerId, // Will be null for admin users
+                customerRole = user.CustomerRole.ToString()
             };
             
 

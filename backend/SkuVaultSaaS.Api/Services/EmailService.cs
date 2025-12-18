@@ -11,6 +11,7 @@ namespace SkuVaultSaaS.Api.Services
         Task SendPasswordResetEmailAsync(string email, string resetToken, string resetUrl);
         Task SendWelcomeEmailAsync(string email, string customerName, string temporaryPassword);
         Task SendEmailVerificationAsync(string email, string confirmationLink);
+        Task SendInvitationEmailAsync(string email, string invitedBy, string customerName, string inviteLink);
     }
 
     public class EmailService : IEmailService
@@ -280,6 +281,106 @@ namespace SkuVaultSaaS.Api.Services
             </p>
             <p style='color: #888; font-size: 12px; margin: 5px 0 0 0;'>
                 If you didn't request a password reset, you can safely ignore this email.
+            </p>
+        </div>
+    </div>
+</body>
+</html>";
+        }
+
+        public async Task SendInvitationEmailAsync(string email, string invitedBy, string customerName, string inviteLink)
+        {
+            _logger.LogInformation("Invitation email for: {Email} from {InvitedBy}", email, invitedBy);
+
+            try
+            {
+                var emailSettings = _configuration.GetSection("EmailSettings");
+                var smtpHost = emailSettings["SmtpHost"];
+                var smtpPort = int.Parse(emailSettings["SmtpPort"] ?? "587");
+                var username = emailSettings["Username"];
+                var password = emailSettings["Password"];
+                var fromEmail = emailSettings["FromEmail"];
+                var fromName = emailSettings["FromName"];
+                var useSsl = bool.Parse(emailSettings["UseSsl"] ?? "true");
+
+                var message = new MimeMessage();
+                message.From.Add(new MailboxAddress(fromName, fromEmail));
+                message.To.Add(new MailboxAddress("", email));
+                message.Subject = $"You're invited to join {customerName} on JUSTSKU";
+
+                var bodyBuilder = new BodyBuilder
+                {
+                    HtmlBody = GenerateInvitationEmailBody(invitedBy, customerName, inviteLink)
+                };
+                message.Body = bodyBuilder.ToMessageBody();
+
+                using var client = new SmtpClient();
+                
+                var secureSocketOptions = smtpPort switch
+                {
+                    465 => SecureSocketOptions.SslOnConnect,
+                    587 => SecureSocketOptions.StartTls,
+                    25 => SecureSocketOptions.Auto,
+                    _ => SecureSocketOptions.Auto
+                };
+
+                await client.ConnectAsync(smtpHost, smtpPort, secureSocketOptions);
+                await client.AuthenticateAsync(username, password);
+                await client.SendAsync(message);
+                await client.DisconnectAsync(true);
+                
+                _logger.LogInformation("Invitation email sent successfully to {Email}", email);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send invitation email to {Email}", email);
+                throw;
+            }
+        }
+
+        private string GenerateInvitationEmailBody(string invitedBy, string customerName, string inviteLink)
+        {
+            return $@"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <title>You're invited to join {customerName} on JUSTSKU</title>
+</head>
+<body style='font-family: Arial, sans-serif; line-height: 1.6; margin: 0; padding: 0; background-color: #f4f4f4;'>
+    <div style='max-width: 600px; margin: 0 auto; background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1);'>
+        <div style='text-align: center; margin-bottom: 30px; border-bottom: 3px solid #3B82F6; padding-bottom: 20px;'>
+            <h1 style='color: #3B82F6; margin: 0;'>You're Invited!</h1>
+            <p style='color: #666; margin: 5px 0 0 0;'>Join {customerName} on JUSTSKU</p>
+        </div>
+        
+        <div style='margin-bottom: 20px;'>
+            <p style='margin: 0 0 20px 0; color: #555;'>
+                {invitedBy} has invited you to join <strong>{customerName}</strong> on JUSTSKU, our inventory management platform.
+            </p>
+            <p style='margin: 0 0 20px 0; color: #555;'>
+                Click the button below to accept the invitation and create your account:
+            </p>
+        </div>
+
+        <div style='text-align: center; margin: 30px 0;'>
+            <a href='{inviteLink}' style='display: inline-block; background-color: #3B82F6; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;'>Accept Invitation</a>
+        </div>
+
+        <div style='background-color: #f8f9fa; border: 1px solid #dee2e6; color: #495057; padding: 15px; border-radius: 4px; margin: 20px 0;'>
+            <p style='margin: 0; font-size: 14px;'>
+                If the button doesn't work, you can copy and paste this link into your browser:<br>
+                <a href='{inviteLink}' style='color: #3B82F6; word-break: break-all;'>{inviteLink}</a>
+            </p>
+        </div>
+
+        <div style='text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;'>
+            <p style='color: #888; font-size: 12px; margin: 0;'>
+                This invitation will expire in 7 days.
+            </p>
+            <p style='color: #888; font-size: 12px; margin: 5px 0 0 0;'>
+                If you didn't expect this invitation, you can safely ignore this email.
             </p>
         </div>
     </div>

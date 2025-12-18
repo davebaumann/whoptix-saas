@@ -17,6 +17,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/app/admin', label: 'Admin Dashboard', icon: '⚙️' },
     { path: '/app/admin/customers', label: 'Customers', icon: '🏢' },
     { path: '/app/admin/tiers', label: 'Tier Configuration', icon: '👑' },
+    { path: '/app/user-management', label: 'User Management', icon: '👥' },
   ]
 
   const allNavItems = [
@@ -27,13 +28,18 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/app/financial-warehouse', label: 'Financial Report', icon: '💰', reportName: 'financial-warehouse' },
     { path: '/app/locations', label: 'Locations Report', icon: '📍', reportName: 'locations' },
     { path: '/app/performance', label: 'Performance Metrics', icon: '📈', reportName: 'performance' },
+    { path: '/app/user-management', label: 'User Management', icon: '👥', reportName: null, requiresAccountAdmin: true },
 
   ]
 
-  // Use admin navigation for admin users, customer navigation for regular users
-  const navItems = user?.isAdmin ? adminNavItems : allNavItems.filter(item => {
+  // Use admin navigation for system admin users, customer navigation for regular users
+  const navItems = user?.isSystemAdmin ? adminNavItems : allNavItems.filter(item => {
     // Hide Picker Dashboard for users without subscription or SkuVault association
     if (item.path === '/app/' && (!user?.customerId || !membershipInfo?.currentLevel)) {
+      return false
+    }
+    // Hide User Management for non-account admins
+    if (item.requiresAccountAdmin && !user?.isAccountAdmin) {
       return false
     }
     if (item.reportName && !canAccessReport(item.reportName)) return false
@@ -58,9 +64,13 @@ export default function Layout({ children }: LayoutProps) {
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-700">
                 {user?.email}
-                {user?.isAdmin ? (
+                {user?.isSystemAdmin ? (
                   <span className="ml-2 px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-semibold">
-                    Administrator
+                    System Admin
+                  </span>
+                ) : user?.isAccountAdmin ? (
+                  <span className="ml-2 px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs font-semibold">
+                    Account Admin
                   </span>
                 ) : membershipInfo?.currentLevelName && (
                   <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-semibold">
