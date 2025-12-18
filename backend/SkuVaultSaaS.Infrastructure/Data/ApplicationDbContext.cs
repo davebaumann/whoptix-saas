@@ -169,6 +169,11 @@ namespace SkuVaultSaaS.Infrastructure.Data
                 .WithMany()
                 .HasForeignKey(ui => ui.InvitedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
+            builder.Entity<UserInvitation>()
+                .HasOne(ui => ui.AcceptedBy)
+                .WithMany()
+                .HasForeignKey(ui => ui.AcceptedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
         }
     }
 }

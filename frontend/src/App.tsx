@@ -35,6 +35,7 @@ import ContactUs from './pages/ContactUs'
 import Support from './pages/Support'
 import Status from './pages/Status'
 import About from './pages/About'
+import InvitationAccept from './pages/InvitationAccept'
 
 function App() {
   return (
@@ -52,6 +53,7 @@ function App() {
           <Route path="/status" element={<Status />} />
           <Route path="/about" element={<About />} />
           <Route path="/email-verification" element={<EmailVerification />} />
+          <Route path="/invitation/:token" element={<InvitationAccept />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route

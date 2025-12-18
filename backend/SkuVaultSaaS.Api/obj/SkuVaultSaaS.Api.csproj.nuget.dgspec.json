@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\skuvaultsaas.api\\SkuVaultSaaS.Api.csproj": {}
+    "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\SkuVaultSaaS.Api\\SkuVaultSaaS.Api.csproj": {}
   },
   "projects": {
-    "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\skuvaultsaas.api\\SkuVaultSaaS.Api.csproj": {
+    "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\SkuVaultSaaS.Api\\SkuVaultSaaS.Api.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\skuvaultsaas.api\\SkuVaultSaaS.Api.csproj",
+        "projectUniqueName": "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\SkuVaultSaaS.Api\\SkuVaultSaaS.Api.csproj",
         "projectName": "SkuVaultSaaS.Api",
-        "projectPath": "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\skuvaultsaas.api\\SkuVaultSaaS.Api.csproj",
+        "projectPath": "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\SkuVaultSaaS.Api\\SkuVaultSaaS.Api.csproj",
         "packagesPath": "C:\\Users\\dcbau\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\skuvaultsaas.api\\obj\\",
+        "outputPath": "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\SkuVaultSaaS.Api\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\dcbau\\AppData\\Roaming\\NuGet\\NuGet.Config"
