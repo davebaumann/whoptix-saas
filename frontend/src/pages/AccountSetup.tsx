@@ -77,7 +77,7 @@ export default function AccountSetup() {
           <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
             <CheckCircle className="h-6 w-6 text-green-600" />
           </div>
-          <h1 className="text-center text-3xl font-bold text-blue-600 mb-2">Whoptix</h1>
+          <h1 className="text-center text-3xl font-bold text-blue-600 mb-2">JUSTSKU</h1>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
             Email Verified!
           </h2>
@@ -104,7 +104,7 @@ export default function AccountSetup() {
                     Start New Subscription
                   </h4>
                   <p className="text-sm text-gray-600">
-                    Choose a membership tier and start your own Whoptix subscription with full access to all features.
+                    Choose a membership tier and start your own JUSTSKU subscription with full access to all features.
                   </p>
                 </div>
               </div>
@@ -120,7 +120,7 @@ export default function AccountSetup() {
                     Join Existing Account
                   </h4>
                   <p className="text-sm text-gray-600">
-                    Associate your account with an existing Whoptix customer account as an additional user.
+                    Associate your account with an existing JUSTSKU customer account as an additional user.
                   </p>
                 </div>
               </div>
@@ -202,7 +202,7 @@ export default function AccountSetup() {
                 Join Existing Account
               </h3>
               <p className="text-gray-600 mb-6">
-                This feature is coming soon! You'll be able to associate your account with an existing Whoptix customer.
+                This feature is coming soon! You'll be able to associate your account with an existing JUSTSKU customer.
               </p>
               
               <div className="space-y-4">

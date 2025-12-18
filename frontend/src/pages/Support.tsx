@@ -26,7 +26,7 @@ export default function Support() {
     setIsSubmitting(true);
 
     try {
-      // TODO: Send to techsupport@whoptix.com
+      // TODO: Send to techsupport@justsku.com
       await new Promise(resolve => setTimeout(resolve, 1000));
       setIsSubmitted(true);
       setFormData({
@@ -91,7 +91,7 @@ export default function Support() {
           </Link>
           <h1 className="text-4xl font-bold text-gray-900 mb-2">Help Center</h1>
           <p className="text-gray-600">
-            Get technical support and find answers to common questions about WhOptix.
+            Get technical support and find answers to common questions about JUSTSKU.
           </p>
         </div>
 
@@ -126,7 +126,7 @@ export default function Support() {
                     <Mail className="w-4 h-4 text-purple-600 mr-2" />
                     <span className="font-medium text-purple-900">Email Support</span>
                   </div>
-                  <p className="text-sm text-purple-700">techsupport@whoptix.com</p>
+                  <p className="text-sm text-purple-700">techsupport@justsku.com</p>
                 </div>
               </div>
             </div>

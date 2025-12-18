@@ -14,7 +14,7 @@ export default function About() {
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Home
           </Link>
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">About WhOptix</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">About JUSTSKU</h1>
           <p className="text-gray-600">
             Empowering businesses with intelligent warehouse optimization solutions
           </p>
@@ -39,7 +39,7 @@ export default function About() {
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Our Story</h2>
           <div className="prose max-w-none text-gray-600">
             <p className="mb-4">
-              Founded in 2024, WhOptix emerged from a simple observation: while SkuVault provides excellent 
+              Founded in 2024, JUSTSKU emerged from a simple observation: while SkuVault provides excellent 
               warehouse management capabilities, businesses needed deeper insights and advanced analytics to 
               truly optimize their operations.
             </p>
@@ -50,7 +50,7 @@ export default function About() {
               designed to enhance SkuVault implementations.
             </p>
             <p>
-              Today, WhOptix serves businesses of all sizes, from growing startups to established enterprises, 
+              Today, JUSTSKU serves businesses of all sizes, from growing startups to established enterprises, 
               helping them unlock the full potential of their warehouse operations through data-driven insights 
               and intelligent optimization recommendations.
             </p>
@@ -128,7 +128,7 @@ export default function About() {
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Our Team</h2>
           <div className="text-gray-600">
             <p className="mb-4">
-              WhOptix is built by a diverse team of warehouse operations experts, data scientists, and software engineers 
+              JUSTSKU is built by a diverse team of warehouse operations experts, data scientists, and software engineers 
               who share a passion for solving complex logistics challenges through technology.
             </p>
             <p className="mb-4">
@@ -146,7 +146,7 @@ export default function About() {
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
           <h2 className="text-xl font-semibold text-blue-900 mb-4">SkuVault Integration</h2>
           <p className="text-blue-800 mb-4">
-            WhOptix is an independent software solution that integrates seamlessly with SkuVault systems. 
+            JUSTSKU is an independent software solution that integrates seamlessly with SkuVault systems. 
             We are not affiliated with or owned by SkuVault, but we specialize in maximizing the value of your SkuVault investment.
           </p>
           <p className="text-blue-800">
@@ -159,7 +159,7 @@ export default function About() {
         <div className="bg-white rounded-lg shadow p-8 text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Ready to Optimize Your Warehouse?</h2>
           <p className="text-gray-600 mb-6">
-            Join hundreds of businesses that trust WhOptix to enhance their SkuVault operations.
+            Join hundreds of businesses that trust JUSTSKU to enhance their SkuVault operations.
           </p>
           <div className="space-x-4">
             <Link 

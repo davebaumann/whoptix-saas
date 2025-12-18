@@ -46,7 +46,7 @@ export default function PrivacyPolicy() {
         <div className="bg-white shadow rounded-lg p-8 prose max-w-none">
           <h2>1. Introduction</h2>
           <p>
-            At Whoptix, we are committed to protecting your privacy and ensuring the security of your personal and business data. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our warehouse optimization and inventory analytics service that integrates with SkuVault systems.
+            At JUSTSKU, we are committed to protecting your privacy and ensuring the security of your personal and business data. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our warehouse optimization and inventory analytics service that integrates with SkuVault systems.
           </p>
           
           <div className="bg-green-50 border border-green-200 p-4 rounded-lg my-6">
@@ -59,7 +59,7 @@ export default function PrivacyPolicy() {
           <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg my-6">
             <h3 className="text-blue-800 font-semibold mb-2">SkuVault Integration</h3>
             <p className="text-blue-700 mb-0">
-              Whoptix integrates with SkuVault via API to enhance your warehouse operations. We are an independent company and are not affiliated with or owned by SkuVault. Your SkuVault data is processed according to this privacy policy when using our optimization tools.
+              JUSTSKU integrates with SkuVault via API to enhance your warehouse operations. We are an independent company and are not affiliated with or owned by SkuVault. Your SkuVault data is processed according to this privacy policy when using our optimization tools.
             </p>
           </div>
 
@@ -216,7 +216,7 @@ export default function PrivacyPolicy() {
           
           <div className="bg-gray-50 p-4 rounded-lg">
             <p className="mb-2"><strong>Privacy Officer</strong></p>
-            <p>Email: privacy@whoptix.com</p>
+            <p>Email: privacy@justsku.com</p>
             <p>Address: [Your Business Address]</p>
             <p>Phone: [Your Phone Number]</p>
           </div>

@@ -22,7 +22,7 @@ export default function TermsOfService() {
         <div className="bg-white shadow rounded-lg p-8 prose max-w-none">
           <h2>1. Acceptance of Terms</h2>
           <p>
-            By accessing and using the Whoptix website and general features, you accept and agree to be bound by these terms. However, <strong>a separate Service Agreement is required to access customer data and premium features</strong>. Basic website functionality and information are available without a contract.
+            By accessing and using the JUSTSKU website and general features, you accept and agree to be bound by these terms. However, <strong>a separate Service Agreement is required to access customer data and premium features</strong>. Basic website functionality and information are available without a contract.
           </p>
           
           <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg my-4">
@@ -35,7 +35,7 @@ export default function TermsOfService() {
 
           <h2>2. Description of Service</h2>
           <p>
-            Whoptix provides cloud-based warehouse optimization and inventory analytics software that integrates with SkuVault systems. Our solutions include advanced reporting, analytics, performance tracking, and warehouse management tools.
+            JUSTSKU provides cloud-based warehouse optimization and inventory analytics software that integrates with SkuVault systems. Our solutions include advanced reporting, analytics, performance tracking, and warehouse management tools.
           </p>
           <p>
             <strong>Service Tiers:</strong> Basic website access is available to all users. Premium features including customer data access, SkuVault integration, and advanced analytics require a separate Service Agreement and active subscription.
@@ -44,7 +44,7 @@ export default function TermsOfService() {
           <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg my-6">
             <h3 className="text-blue-800 font-semibold mb-2">SkuVault Integration</h3>
             <p className="text-blue-700 mb-0">
-              Whoptix is an independent software solution that integrates with SkuVault via API. We are not affiliated with or owned by SkuVault. Our service enhances your existing SkuVault investment with additional reporting and optimization capabilities.
+              JUSTSKU is an independent software solution that integrates with SkuVault via API. We are not affiliated with or owned by SkuVault. Our service enhances your existing SkuVault investment with additional reporting and optimization capabilities.
             </p>
           </div>
 
@@ -95,7 +95,7 @@ export default function TermsOfService() {
 
           <h2>7. Intellectual Property</h2>
           <p>
-            The Service and its original content, features, and functionality are and will remain the exclusive property of Whoptix and its licensors. The Service is protected by copyright, trademark, and other laws.
+            The Service and its original content, features, and functionality are and will remain the exclusive property of JUSTSKU and its licensors. The Service is protected by copyright, trademark, and other laws.
           </p>
 
           <h2>8. Service Availability</h2>
@@ -127,17 +127,17 @@ export default function TermsOfService() {
 
           <h2>11. Limitation of Liability</h2>
           <p>
-            IN NO EVENT SHALL WHOPTIX BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING BUT NOT LIMITED TO LOSS OF PROFITS, DATA, OR USE, ARISING OUT OF OR RELATING TO THESE TERMS OR THE SERVICE.
+            IN NO EVENT SHALL JUSTSKU BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING BUT NOT LIMITED TO LOSS OF PROFITS, DATA, OR USE, ARISING OUT OF OR RELATING TO THESE TERMS OR THE SERVICE.
           </p>
 
           <h2>12. Indemnification</h2>
           <p>
-            You agree to indemnify, defend, and hold harmless Whoptix and its officers, directors, employees, and agents from any claims, damages, losses, or expenses arising from your use of the Service or violation of these terms.
+            You agree to indemnify, defend, and hold harmless JUSTSKU and its officers, directors, employees, and agents from any claims, damages, losses, or expenses arising from your use of the Service or violation of these terms.
           </p>
 
           <h2>13. Governing Law</h2>
           <p>
-            These terms shall be interpreted and governed in accordance with the laws of the jurisdiction in which Whoptix is headquartered, without regard to conflict of law provisions.
+            These terms shall be interpreted and governed in accordance with the laws of the jurisdiction in which JUSTSKU is headquartered, without regard to conflict of law provisions.
           </p>
 
           <h2>14. Changes to Terms</h2>
@@ -155,7 +155,7 @@ export default function TermsOfService() {
             If you have any questions about these Terms of Service, please contact us at:
           </p>
           <p>
-            Email: legal@whoptix.com<br />
+            Email: legal@justsku.com<br />
             Address: [Your Business Address]<br />
             Phone: [Your Phone Number]
           </p>

@@ -134,7 +134,7 @@ export default function Status() {
             <div>
               <h1 className="text-4xl font-bold text-gray-900 mb-2">System Status</h1>
               <p className="text-gray-600">
-                Current status of WhOptix services and infrastructure
+                Current status of JUSTSKU services and infrastructure
               </p>
             </div>
             <button

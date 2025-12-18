@@ -138,7 +138,7 @@ export default function StripeSetup() {
           <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
             <CheckCircle className="h-6 w-6 text-green-600" />
           </div>
-          <h1 className="text-center text-3xl font-bold text-blue-600 mb-2">Whoptix</h1>
+          <h1 className="text-center text-3xl font-bold text-blue-600 mb-2">JUSTSKU</h1>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
             Email Verified!
           </h2>
@@ -152,7 +152,7 @@ export default function StripeSetup() {
             <CreditCard className="mx-auto h-12 w-12 text-blue-500 mb-4" />
             <h3 className="text-lg font-medium text-gray-900">Set Up Payment</h3>
             <p className="text-sm text-gray-600 mt-2">
-              Complete your {tierInfo.name} subscription setup ({tierInfo.price}) to start using Whoptix.
+              Complete your {tierInfo.name} subscription setup ({tierInfo.price}) to start using JUSTSKU.
             </p>
           </div>
 

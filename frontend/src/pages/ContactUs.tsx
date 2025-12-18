@@ -106,7 +106,7 @@ export default function ContactUs() {
                   <Mail className="w-5 h-5 text-blue-600 mt-1 mr-3" />
                   <div>
                     <p className="font-medium text-gray-900">Email</p>
-                    <p className="text-gray-600">support@whoptix.com</p>
+                    <p className="text-gray-600">support@justsku.com</p>
                   </div>
                 </div>
                 
