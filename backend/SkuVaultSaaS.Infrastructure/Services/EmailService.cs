@@ -120,7 +120,7 @@ namespace SkuVaultSaaS.Infrastructure.Services
 
         <div style='text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;'>
             <p style='color: #888; font-size: 12px; margin: 0;'>
-                This is an automated notification from your SkuVault SaaS inventory management system.
+                This is an automated notification from your JUSTSKU inventory management system.
             </p>
             <p style='color: #888; font-size: 12px; margin: 5px 0 0 0;'>
                 Generated on {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC
@@ -141,7 +141,7 @@ namespace SkuVaultSaaS.Infrastructure.Services
         public string Username { get; set; } = "";
         public string Password { get; set; } = "";
         public string FromEmail { get; set; } = "";
-        public string FromName { get; set; } = "SkuVault SaaS";
+        public string FromName { get; set; } = "JUSTSKU";
     }
 
     // Email item DTO
