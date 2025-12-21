@@ -301,7 +301,7 @@ namespace SkuVaultSaaS.Tools
                 transactions.Add(new Transaction
                 {
                     CustomerId = customerId,
-                    SkuVaultId = $"TXN-{date:yyyyMMdd}-{i:D4}",
+                    SkuVaultId = $"TXN-{customerId}-{date:yyyyMMdd}-{i:D4}",
                     ProductId = product.Id,
                     LocationId = location.Id,
                     Sku = product.Sku,

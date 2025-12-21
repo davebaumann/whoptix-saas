@@ -37,6 +37,8 @@ import Status from './pages/Status'
 import About from './pages/About'
 import InvitationAccept from './pages/InvitationAccept'
 import AcceptInvitation from './pages/AcceptInvitation'
+import Demo from './pages/Demo'
+import DemoDashboard from './pages/DemoDashboard'
 
 function App() {
   return (
@@ -45,6 +47,8 @@ function App() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/ab" element={<LandingPageAB />} />
+          <Route path="/demo" element={<Demo />} />
+          <Route path="/demo/dashboard" element={<DemoDashboard />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/accept-invitation" element={<AcceptInvitation />} />

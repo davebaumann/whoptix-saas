@@ -44,6 +44,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const checkAuthStatus = async () => {
     try {
+      // Skip auth check for demo routes - they don't need authentication
+      if (window.location.pathname.startsWith('/demo')) {
+        setIsLoading(false)
+        return
+      }
+
       // Make a request to a protected endpoint to verify authentication
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/auth/me`, {
         method: 'GET',

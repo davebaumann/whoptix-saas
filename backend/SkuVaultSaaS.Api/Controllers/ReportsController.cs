@@ -151,6 +151,107 @@ namespace SkuVaultSaaS.Api.Controllers
             return null!; // Access granted - null indicates success
         }
 
+        [HttpGet("dashboard")]
+        [AllowAnonymous] // Allow both authenticated users and demo requests
+        public async Task<IActionResult> GetDashboard()
+        {
+            // Get the customer ID from the claims (set by DemoAuthMiddleware or normal auth)
+            var customerIdClaim = User.FindFirst("CustomerId")?.Value;
+            if (!int.TryParse(customerIdClaim, out var customerId))
+            {
+                return BadRequest(new { message = "Invalid or missing CustomerId claim" });
+            }
+
+            // Check if user can access this customer (skip for demo users)
+            var isDemoUser = User.FindFirst("IsDemo")?.Value == "true";
+            if (!isDemoUser && !await CanAccessCustomerAsync(customerId))
+            {
+                return Forbid("Access denied to this customer's data");
+            }
+
+            try
+            {
+                var now = DateTime.UtcNow;
+                var last30Days = now.AddDays(-30);
+                var last7Days = now.AddDays(-7);
+
+                // Get KPI data
+                var transactions = await _context.Transactions
+                    .Where(t => t.CustomerId == customerId && t.TransactionDate >= last30Days)
+                    .ToListAsync();
+
+                var recentTransactions = await _context.Transactions
+                    .Where(t => t.CustomerId == customerId && t.TransactionDate >= last7Days)
+                    .OrderByDescending(t => t.TransactionDate)
+                    .Take(10)
+                    .Select(t => new
+                    {
+                        t.Id,
+                        t.Sku,
+                        t.TransactionType,
+                        t.Quantity,
+                        t.TransactionDate,
+                        t.PerformedBy
+                    })
+                    .ToListAsync();
+
+                var movements = await _context.InventoryMovements
+                    .Where(im => im.CustomerId == customerId && im.OccurredAtUtc >= last30Days)
+                    .ToListAsync();
+
+                var kpis = new[]
+                {
+                    new
+                    {
+                        label = "Total Transactions",
+                        value = transactions.Count,
+                        trend = "+5%"
+                    },
+                    new
+                    {
+                        label = "Total Quantity Moved",
+                        value = movements.Sum(m => Math.Abs(m.QuantityChange)),
+                        trend = "+3%"
+                    },
+                    new
+                    {
+                        label = "Active Users",
+                        value = movements.Select(m => m.PerformedBy).Distinct().Count(),
+                        trend = "No change"
+                    },
+                    new
+                    {
+                        label = "Picks",
+                        value = movements.Count(m => m.TransactionType == "Pick"),
+                        trend = "+2%"
+                    }
+                };
+
+                var activitySummary = new
+                {
+                    totalTransactions = transactions.Count,
+                    uniqueUsers = movements.Select(m => m.PerformedBy).Distinct().Count(),
+                    totalQuantity = movements.Sum(m => Math.Abs(m.QuantityChange)),
+                    byType = movements
+                        .GroupBy(m => m.TransactionType)
+                        .Select(g => new { type = g.Key, count = g.Count() })
+                        .ToList()
+                };
+
+                return Ok(new
+                {
+                    kpis,
+                    activitySummary,
+                    recentTransactions
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching dashboard data for customer {CustomerId}", customerId);
+                return StatusCode(500, new { message = "Error fetching dashboard data" });
+            }
+        }
+
         [HttpGet("customer/{customerId}/inventory")]
         [Authorize]
         public async Task<IActionResult> GetInventoryReport(int customerId)

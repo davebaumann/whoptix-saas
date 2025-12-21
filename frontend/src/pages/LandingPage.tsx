@@ -604,6 +604,7 @@ export default function LandingPage() {
               <ul className="space-y-2">
                 <li><a href="#" className="text-gray-400 hover:text-white text-sm">Features</a></li>
                 <li><a href="#pricing" className="text-gray-400 hover:text-white text-sm">Pricing</a></li>
+                <li><Link to="/demo" className="text-gray-400 hover:text-white text-sm">Live Demo</Link></li>
               </ul>
             </div>
             <div>
