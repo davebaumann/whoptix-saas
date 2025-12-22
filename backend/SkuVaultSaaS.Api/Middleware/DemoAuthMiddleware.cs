@@ -23,9 +23,15 @@ namespace SkuVaultSaaS.Api.Middleware
 
         public async Task InvokeAsync(HttpContext context)
         {
+            _logger.LogInformation("DemoAuthMiddleware: Processing request to {Path} with query string: {QueryString}", 
+                context.Request.Path, context.Request.QueryString);
+
             // Check if this is a demo request with demo=true query parameter
             var isDemoRequest = context.Request.Query.TryGetValue("demo", out var demoValue) 
                 && demoValue == "true";
+
+            _logger.LogInformation("DemoAuthMiddleware: isDemoRequest={IsDemoRequest}, demoValue={DemoValue}", 
+                isDemoRequest, demoValue.ToString());
 
             if (isDemoRequest)
             {
@@ -47,7 +53,8 @@ namespace SkuVaultSaaS.Api.Middleware
                     var principal = new ClaimsPrincipal(identity);
                     context.User = principal;
 
-                    _logger.LogInformation("Demo mode enabled for request to {Path}", context.Request.Path);
+                    _logger.LogInformation("DemoAuthMiddleware: Set demo user with CustomerId claim. Claims: {Claims}", 
+                        string.Join(", ", claims.Select(c => $"{c.Type}={c.Value}")));
                 }
             }
 

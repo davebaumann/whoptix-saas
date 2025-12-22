@@ -5,7 +5,7 @@ const membershipPlans = [
   {
     level: 2,
     name: 'Standard',
-    price: 59,
+    price: 99,
     icon: <Star className="w-8 h-8" />,
     color: 'text-blue-600',
     gradient: 'from-blue-500 to-blue-600',
@@ -13,32 +13,33 @@ const membershipPlans = [
       'SkuVault Integration',
       'Low Stock Alerts',
       'Email Notifications',
-      'Threshold Management',
-      'Basic Reports',
-      'Priority Support'
+      'Inventory Reports',
+      'Basic Dashboard',
+      'Email Support'
     ]
   },
   {
     level: 3,
     name: 'Premium',
-    price: 99,
+    price: 199,
     icon: <Crown className="w-8 h-8" />,
     color: 'text-yellow-600',
     gradient: 'from-yellow-500 to-yellow-600',
     features: [
       'All Standard Features',
-      'Aging Inventory Reports',
-      'Financial Analysis',
+      'Aging Inventory Analysis',
+      'Profitability Reports',
+      'Demand Forecasting',
+      'Financial Warehouse Insights',
       'Location Optimization',
-      'Advanced Analytics',
-      'Phone Support',
-      'Custom Integrations'
+      'Phone & Email Support',
+      'Advanced Analytics'
     ]
   },
   {
     level: 4,
     name: 'Enterprise',
-    price: 199,
+    price: 299,
     icon: <Zap className="w-8 h-8" />,
     color: 'text-purple-600',
     gradient: 'from-purple-500 to-purple-600',
@@ -48,7 +49,8 @@ const membershipPlans = [
       'Velocity Tracking',
       'Turnover Analysis',
       'Growth Trends',
-      'Top Performers',
+      'Predictive Analytics',
+      'Priority Support',
       'Dedicated Account Manager',
     ],
     popular: true
@@ -59,32 +61,32 @@ const features = [
   {
     icon: <Package className="w-12 h-12 text-blue-600" />,
     title: 'Inventory Management',
-    description: 'Track your inventory in real-time with powerful warehouse management tools that grow with your business.'
+    description: 'Real-time inventory tracking across multiple locations with seamless SkuVault integration.'
   },
   {
-    icon: <BarChart3 className="w-12 h-12 text-green-600" />,
-    title: 'Advanced Analytics',
-    description: 'Get detailed insights into your inventory performance with comprehensive reporting and analytics.'
+    icon: <TrendingUp className="w-12 h-12 text-green-600" />,
+    title: 'Demand Forecasting',
+    description: 'AI-powered demand predictions using historical sales patterns to optimize stock levels and prevent stockouts.'
+  },
+  {
+    icon: <BarChart3 className="w-12 h-12 text-purple-600" />,
+    title: 'Profitability Analysis',
+    description: 'Deep insights into product margins, revenue contribution, and profitability trends by SKU.'
   },
   {
     icon: <Bell className="w-12 h-12 text-yellow-600" />,
     title: 'Smart Alerts',
-    description: 'Never run out of stock again with intelligent threshold alerts and automated notifications.'
+    description: 'Intelligent low stock warnings and aging inventory alerts to minimize waste and obsolescence.'
   },
   {
-    icon: <MapPin className="w-12 h-12 text-purple-600" />,
-    title: 'Multi-Location',
-    description: 'Manage inventory across multiple warehouses and locations from a single, unified platform.'
-  },
-  {
-    icon: <TrendingUp className="w-12 h-12 text-red-600" />,
-    title: 'Performance Tracking',
-    description: 'Monitor team performance, track velocity, and optimize your warehouse operations.'
+    icon: <MapPin className="w-12 h-12 text-red-600" />,
+    title: 'Multi-Location Optimization',
+    description: 'Manage inventory across warehouses with location-based financial analysis and optimization insights.'
   },
   {
     icon: <ShieldIcon className="w-12 h-12 text-indigo-600" />,
-    title: 'Enterprise Security',
-    description: 'Bank-level security with role-based access control and data encryption.'
+    title: 'Performance Tracking',
+    description: 'Monitor team performance, analyze inventory turnover, and track warehouse velocity metrics.'
   }
 ]
 
@@ -121,12 +123,12 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
-              Powerful Inventory Management<hr></hr>
-              <span className="text-blue-600"> Made Simple</span>
+              Advanced Inventory Analytics<hr></hr>
+              <span className="text-blue-600"> for SkuVault</span>
             </h1>
             <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
-              Streamline your warehouse operations with real-time inventory tracking, 
-              smart alerts, and advanced analytics. Seamlessly integrates with your existing SkuVault system.
+              Unlock the full potential of your SkuVault data with predictive analytics, profitability insights, 
+              and demand forecasting. Make data-driven decisions to optimize inventory and maximize profits.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link 
@@ -144,7 +146,7 @@ export default function LandingPage() {
               </a>
             </div>
             <p className="text-sm text-gray-500 mt-4">
-              Professional warehouse optimization
+              Advanced analytics for warehouse optimization
             </p>
           </div>
         </div>
@@ -188,11 +190,11 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              Everything You Need to Optimize Your SkuVault Data
+              Powerful Reports & Analytics Built for SkuVault
             </h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              JUSTSKU enhances your existing SkuVault investment with advanced reporting, 
-              analytics, and warehouse optimization tools.
+              From demand forecasting to profitability analysis, get the advanced insights 
+              you need to optimize inventory and drive profitability.
             </p>
           </div>
           

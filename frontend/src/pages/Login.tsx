@@ -135,15 +135,6 @@ export default function Login() {
               'Sign in'
             )}
           </button>
-
-          <div className="text-center">
-            <p className="text-sm text-gray-600">
-              Test credentials: <br />
-              <span className="font-mono bg-gray-100 px-2 py-1 rounded text-xs">
-                Kim.baumann@skuvault.com / P@ssw0rd!
-              </span>
-            </p>
-          </div>
         </form>
       </div>
     </div>

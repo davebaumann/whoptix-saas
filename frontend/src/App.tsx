@@ -39,14 +39,16 @@ import InvitationAccept from './pages/InvitationAccept'
 import AcceptInvitation from './pages/AcceptInvitation'
 import Demo from './pages/Demo'
 import DemoDashboard from './pages/DemoDashboard'
+import ProfitabilityReport from './pages/ProfitabilityReport'
+import DemandForecast from './pages/DemandForecast'
 
 function App() {
   return (
     <AuthProvider>
       <MembershipProvider>
         <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/ab" element={<LandingPageAB />} />
+          <Route path="/" element={<LandingPageAB />} />
+          <Route path="/ab" element={<LandingPage />} />
           <Route path="/demo" element={<Demo />} />
           <Route path="/demo/dashboard" element={<DemoDashboard />} />
           <Route path="/login" element={<Login />} />
@@ -72,6 +74,8 @@ function App() {
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/inventory" element={<Inventory />} />
                   <Route path="/aging-inventory" element={<AgingInventoryReport />} />
+                  <Route path="/profitability" element={<ProfitabilityReport />} />
+                  <Route path="/demand-forecast" element={<DemandForecast />} />
                   <Route path="/financial-warehouse" element={<FinancialWarehouseReport />} />
                   <Route path="/locations" element={<Locations />} />
                   <Route path="/performance" element={<Performance />} />

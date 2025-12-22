@@ -127,7 +127,7 @@ namespace SkuVaultSaaS.Api.Controllers
             // First check tenant isolation
             if (!await CanAccessCustomerAsync(customerId))
             {
-                return Forbid("Access denied to this customer's data");
+                return Forbid();
             }
 
             // Then check membership level
@@ -155,10 +155,19 @@ namespace SkuVaultSaaS.Api.Controllers
         [AllowAnonymous] // Allow both authenticated users and demo requests
         public async Task<IActionResult> GetDashboard()
         {
+            // Log all claims received to debug middleware issue
+            var allClaims = User.Claims.ToList();
+            _logger.LogInformation("ReportsController.GetDashboard: Received {ClaimCount} claims: {Claims}", 
+                allClaims.Count, 
+                string.Join(", ", allClaims.Select(c => $"{c.Type}={c.Value}")));
+
             // Get the customer ID from the claims (set by DemoAuthMiddleware or normal auth)
             var customerIdClaim = User.FindFirst("CustomerId")?.Value;
+            _logger.LogInformation("ReportsController.GetDashboard: CustomerIdClaim={CustomerIdClaim}", customerIdClaim ?? "NULL");
+            
             if (!int.TryParse(customerIdClaim, out var customerId))
             {
+                _logger.LogWarning("ReportsController.GetDashboard: Failed to parse CustomerId claim. Value was: {CustomerIdClaim}", customerIdClaim ?? "NULL");
                 return BadRequest(new { message = "Invalid or missing CustomerId claim" });
             }
 
@@ -166,7 +175,7 @@ namespace SkuVaultSaaS.Api.Controllers
             var isDemoUser = User.FindFirst("IsDemo")?.Value == "true";
             if (!isDemoUser && !await CanAccessCustomerAsync(customerId))
             {
-                return Forbid("Access denied to this customer's data");
+                return Forbid();
             }
 
             try
@@ -457,7 +466,7 @@ namespace SkuVaultSaaS.Api.Controllers
             // Check tenant isolation
             if (!await CanAccessCustomerAsync(customerId))
             {
-                return Forbid("Access denied to this customer's data");
+                return Forbid();
             }
 
             try
@@ -861,6 +870,290 @@ namespace SkuVaultSaaS.Api.Controllers
             }
         }
 
+        [HttpGet("customer/{customerId}/profitability")]
+        [Authorize]
+        public async Task<IActionResult> GetProfitabilityReport(int customerId)
+        {
+            // Check tenant access and membership level
+            var accessCheck = await CheckReportAccessAsync(customerId, "profitability");
+            if (accessCheck != null) return accessCheck;
+
+            try
+            {
+                // Get all sales for this customer
+                var sales = await _context.Sales
+                    .Where(s => s.CustomerId == customerId)
+                    .ToListAsync();
+
+                // Get all products with their costs
+                var products = await _context.Products
+                    .Where(p => p.CustomerId == customerId)
+                    .ToListAsync();
+
+                // Get current inventory levels
+                var inventoryLevels = await _context.InventoryLevels
+                    .Where(il => il.CustomerId == customerId)
+                    .Include(il => il.Product)
+                    .ToListAsync();
+
+                // Build SKU → Product map
+                var productMap = products.ToDictionary(p => p.Sku, p => p);
+
+                // Group sales by SKU
+                var salesBySku = sales
+                    .GroupBy(s => s.Sku)
+                    .Select(g => new
+                    {
+                        Sku = g.Key,
+                        TotalQuantity = g.Sum(s => s.Quantity),
+                        TotalRevenue = g.Sum(s => s.Quantity * s.Price),
+                        AvgPrice = g.Average(s => s.Price)
+                    })
+                    .ToList();
+
+                // Build profitability items
+                var items = new List<ProfitabilityItem>();
+
+                foreach (var saleSku in salesBySku)
+                {
+                    if (productMap.TryGetValue(saleSku.Sku, out var product))
+                    {
+                        var cost = product.Cost ?? 0;
+                        var totalCost = saleSku.TotalQuantity * cost;
+                        var grossProfit = saleSku.TotalRevenue - totalCost;
+                        var profitMargin = saleSku.TotalRevenue > 0
+                            ? (grossProfit / saleSku.TotalRevenue) * 100
+                            : 0;
+
+                        var currentStock = inventoryLevels
+                            .Where(il => il.Product.Sku == saleSku.Sku)
+                            .Sum(il => il.QuantityAvailable);
+
+                        items.Add(new ProfitabilityItem
+                        {
+                            Sku = saleSku.Sku,
+                            ProductName = product.Name,
+                            UnitsSold = saleSku.TotalQuantity,
+                            Cost = cost,
+                            SalePrice = (decimal)saleSku.AvgPrice,
+                            TotalRevenue = (decimal)saleSku.TotalRevenue,
+                            TotalCost = (decimal)totalCost,
+                            GrossProfit = (decimal)grossProfit,
+                            ProfitMargin = (decimal)profitMargin,
+                            CurrentStock = currentStock,
+                            Category = product.Category ?? "Uncategorized"
+                        });
+                    }
+                }
+
+                // Sort by profit margin descending
+                items = items.OrderByDescending(i => i.ProfitMargin).ToList();
+
+                // Calculate summary metrics
+                var summary = new ProfitabilitySummary
+                {
+                    TotalSkus = items.Count,
+                    TotalUnitsSold = items.Sum(i => i.UnitsSold),
+                    TotalRevenue = items.Sum(i => i.TotalRevenue),
+                    TotalCost = items.Sum(i => i.TotalCost),
+                    TotalGrossProfit = items.Sum(i => i.GrossProfit),
+                    AverageProfitMargin = items.Any() ? items.Average(i => i.ProfitMargin) : 0,
+                    HighMarginSkus = items.Count(i => i.ProfitMargin > 30),
+                    MediumMarginSkus = items.Count(i => i.ProfitMargin >= 10 && i.ProfitMargin <= 30),
+                    LowMarginSkus = items.Count(i => i.ProfitMargin >= 0 && i.ProfitMargin < 10),
+                    UnprofitableSkus = items.Count(i => i.ProfitMargin < 0),
+                    Items = items
+                };
+
+                return Ok(new
+                {
+                    summary,
+                    topProfitable = items.Take(10),
+                    bottomProfitable = items.TakeLast(10)
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating profitability report for customer {CustomerId}", customerId);
+                return StatusCode(500, new { message = "Error generating profitability report" });
+            }
+        }
+
+        [HttpGet("customer/{customerId}/demand-forecast")]
+        [Authorize]
+        public async Task<IActionResult> GetDemandForecast(int customerId, [FromQuery] int forecastDays = 30)
+        {
+            // Check tenant access and membership level
+            var accessCheck = await CheckReportAccessAsync(customerId, "demand-forecast");
+            if (accessCheck != null) return accessCheck;
+
+            try
+            {
+                // Get sales data for the last 90 days
+                var cutoffDate = DateTime.UtcNow.AddDays(-90);
+                var sales = await _context.Sales
+                    .Where(s => s.CustomerId == customerId && s.SaleDate >= cutoffDate)
+                    .ToListAsync();
+
+                // Get all products
+                var products = await _context.Products
+                    .Where(p => p.CustomerId == customerId)
+                    .ToListAsync();
+
+                // Get current inventory levels
+                var inventoryLevels = await _context.InventoryLevels
+                    .Where(il => il.CustomerId == customerId)
+                    .Include(il => il.Product)
+                    .ToListAsync();
+
+                var productMap = products.ToDictionary(p => p.Sku, p => p);
+
+                // Group sales by SKU and date
+                var salesBySkuAndDate = sales
+                    .GroupBy(s => new { s.Sku, Date = s.SaleDate.Date })
+                    .Select(g => new
+                    {
+                        g.Key.Sku,
+                        g.Key.Date,
+                        Quantity = g.Sum(s => s.Quantity)
+                    })
+                    .OrderBy(x => x.Sku)
+                    .ThenBy(x => x.Date)
+                    .ToList();
+
+                var forecasts = new List<DemandForecastItem>();
+
+                foreach (var skuGroup in salesBySkuAndDate.GroupBy(x => x.Sku))
+                {
+                    var sku = skuGroup.Key;
+                    if (!productMap.TryGetValue(sku, out var product)) continue;
+
+                    var dailySales = skuGroup.Select(g => (double)g.Quantity).ToList();
+                    
+                    // Calculate historical average daily demand
+                    var avgDailyDemand = dailySales.Any() ? dailySales.Average() : 0;
+
+                    // Calculate demand trend (linear regression)
+                    var trend = CalculateSalesTrend(dailySales);
+
+                    // Calculate forecasted demand
+                    var forecastedDemand = avgDailyDemand * forecastDays * (1 + (trend / 100));
+
+                    // Calculate variance and confidence
+                    var variance = CalculateSalesVariance(dailySales);
+                    var confidenceScore = Math.Max(0, Math.Min(100, 100 - (variance * 10)));
+
+                    // Get current stock
+                    var currentStock = inventoryLevels
+                        .Where(il => il.Product.Sku == sku)
+                        .Sum(il => il.QuantityAvailable);
+
+                    // Calculate days of stock
+                    var daysOfStock = avgDailyDemand > 0 ? currentStock / avgDailyDemand : 0;
+
+                    // Determine risk level
+                    var riskLevel = CalculateStockRisk(daysOfStock);
+
+                    forecasts.Add(new DemandForecastItem
+                    {
+                        Sku = sku,
+                        ProductName = product.Name,
+                        Category = product.Category ?? "Uncategorized",
+                        HistoricalAvgDailyDemand = avgDailyDemand,
+                        ForecastedDemand = (int)forecastedDemand,
+                        DemandTrend = trend,
+                        CurrentStock = currentStock,
+                        DaysOfStockAvailable = daysOfStock,
+                        RecommendedSafetyStock = (int)(avgDailyDemand * 7),
+                        ConfidenceScore = (int)confidenceScore,
+                        RiskLevel = riskLevel
+                    });
+                }
+
+                // Sort by risk level
+                forecasts = forecasts
+                    .OrderByDescending(f => RiskLevelValue(f.RiskLevel))
+                    .ThenByDescending(f => f.ForecastedDemand)
+                    .ToList();
+
+                // Calculate summary
+                var summary = new DemandForecastSummary
+                {
+                    TotalSKUsAnalyzed = forecasts.Count,
+                    TotalForecastedDemand = (int)forecasts.Sum(f => f.ForecastedDemand),
+                    AvgDailyDemand = forecasts.Any() ? forecasts.Average(f => f.HistoricalAvgDailyDemand) : 0,
+                    CriticalRiskCount = forecasts.Count(f => f.RiskLevel == "Critical"),
+                    HighRiskCount = forecasts.Count(f => f.RiskLevel == "High"),
+                    MediumRiskCount = forecasts.Count(f => f.RiskLevel == "Medium"),
+                    LowRiskCount = forecasts.Count(f => f.RiskLevel == "Low"),
+                    ForecastPeriodDays = forecastDays
+                };
+
+                return Ok(new
+                {
+                    summary,
+                    topForecasts = forecasts.Take(10),
+                    allForecasts = forecasts
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating demand forecast for customer {CustomerId}", customerId);
+                return StatusCode(500, new { message = "Error generating demand forecast" });
+            }
+        }
+
+        private double CalculateSalesTrend(List<double> dailySales)
+        {
+            if (dailySales.Count < 2) return 0;
+
+            var n = dailySales.Count;
+            var xValues = Enumerable.Range(0, n).Select(i => (double)i).ToList();
+            var xMean = xValues.Average();
+            var yMean = dailySales.Average();
+
+            var numerator = xValues.Zip(dailySales, (x, y) => (x - xMean) * (y - yMean)).Sum();
+            var denominator = xValues.Sum(x => Math.Pow(x - xMean, 2));
+
+            if (denominator == 0) return 0;
+
+            var slope = numerator / denominator;
+            var trendPercent = (slope / yMean) * 100;
+            return Math.Min(50, Math.Max(-50, trendPercent));
+        }
+
+        private double CalculateSalesVariance(List<double> dailySales)
+        {
+            if (dailySales.Count < 2) return 0.5;
+
+            var mean = dailySales.Average();
+            var variance = dailySales.Sum(x => Math.Pow(x - mean, 2)) / dailySales.Count;
+            var stdDev = Math.Sqrt(variance);
+            var coeffVar = mean > 0 ? (stdDev / mean) : 0.5;
+
+            return Math.Min(1.0, coeffVar);
+        }
+
+        private string CalculateStockRisk(double daysOfStock)
+        {
+            if (daysOfStock < 7) return "Critical";
+            if (daysOfStock < 14) return "High";
+            if (daysOfStock < 30) return "Medium";
+            return "Low";
+        }
+
+        private int RiskLevelValue(string riskLevel)
+        {
+            return riskLevel switch
+            {
+                "Critical" => 4,
+                "High" => 3,
+                "Medium" => 2,
+                "Low" => 1,
+                _ => 0
+            };
+        }
+
         private decimal CalculateUtilizationScore(List<InventoryLevel> locationItems)
         {
             if (!locationItems.Any()) return 0;
@@ -1126,6 +1419,63 @@ namespace SkuVaultSaaS.Api.Controllers
         public int? DaysOnHand { get; set; } // Frontend expects this
         public DateTime? LastSaleDate { get; set; }
         public decimal? Velocity { get; set; }
+    }
+
+    public class ProfitabilityItem
+    {
+        public string Sku { get; set; } = string.Empty;
+        public string ProductName { get; set; } = string.Empty;
+        public int UnitsSold { get; set; }
+        public decimal Cost { get; set; }
+        public decimal SalePrice { get; set; }
+        public decimal TotalRevenue { get; set; }
+        public decimal TotalCost { get; set; }
+        public decimal GrossProfit { get; set; }
+        public decimal ProfitMargin { get; set; } // Percentage
+        public int CurrentStock { get; set; }
+        public string Category { get; set; } = string.Empty;
+    }
+
+    public class ProfitabilitySummary
+    {
+        public int TotalSkus { get; set; }
+        public int TotalUnitsSold { get; set; }
+        public decimal TotalRevenue { get; set; }
+        public decimal TotalCost { get; set; }
+        public decimal TotalGrossProfit { get; set; }
+        public decimal AverageProfitMargin { get; set; }
+        public int HighMarginSkus { get; set; } // > 30%
+        public int MediumMarginSkus { get; set; } // 10-30%
+        public int LowMarginSkus { get; set; } // 0-10%
+        public int UnprofitableSkus { get; set; } // < 0%
+        public List<ProfitabilityItem> Items { get; set; } = new List<ProfitabilityItem>();
+    }
+
+    public class DemandForecastItem
+    {
+        public string Sku { get; set; } = string.Empty;
+        public string ProductName { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public double HistoricalAvgDailyDemand { get; set; }
+        public int ForecastedDemand { get; set; }
+        public double DemandTrend { get; set; }
+        public int CurrentStock { get; set; }
+        public double DaysOfStockAvailable { get; set; }
+        public int RecommendedSafetyStock { get; set; }
+        public int ConfidenceScore { get; set; }
+        public string RiskLevel { get; set; } = string.Empty;
+    }
+
+    public class DemandForecastSummary
+    {
+        public int TotalSKUsAnalyzed { get; set; }
+        public int TotalForecastedDemand { get; set; }
+        public double AvgDailyDemand { get; set; }
+        public int CriticalRiskCount { get; set; }
+        public int HighRiskCount { get; set; }
+        public int MediumRiskCount { get; set; }
+        public int LowRiskCount { get; set; }
+        public int ForecastPeriodDays { get; set; }
     }
 
     public class PerformanceReportSummary

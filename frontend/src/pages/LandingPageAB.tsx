@@ -5,7 +5,7 @@ const membershipPlans = [
   {
     level: 2,
     name: 'Standard',
-    price: 59,
+    price: 99,
     icon: <Star className="w-8 h-8" />,
     color: 'text-blue-600',
     gradient: 'from-blue-500 to-blue-600',
@@ -14,31 +14,32 @@ const membershipPlans = [
       'Low Stock Alerts',
       'Email Notifications',
       'Threshold Management',
-      'Basic Reports',
+      'Inventory Reports',
       'Priority Support'
     ]
   },
   {
     level: 3,
     name: 'Premium',
-    price: 99,
+    price: 199,
     icon: <Crown className="w-8 h-8" />,
     color: 'text-yellow-600',
     gradient: 'from-yellow-500 to-yellow-600',
     features: [
       'All Standard Features',
       'Aging Inventory Reports',
-      'Financial Analysis',
+      'Profitability Analysis',
+      'Demand Forecasting',
+      'Financial Warehouse Reports',
       'Location Optimization',
       'Advanced Analytics',
-      'Phone Support',
-      'Custom Integrations'
+      'Phone Support'
     ]
   },
   {
     level: 4,
     name: 'Enterprise',
-    price: 199,
+    price: 299,
     icon: <Zap className="w-8 h-8" />,
     color: 'text-purple-600',
     gradient: 'from-purple-500 to-purple-600',
@@ -46,9 +47,10 @@ const membershipPlans = [
       'All Premium Features',
       'Performance Analytics',
       'Velocity Tracking',
-      'Turnover Analysis',
+      'Inventory Turnover Reports',
       'Growth Trends',
-      'Top Performers',
+      'Top/Bottom Performers',
+      'Custom Integrations',
       'Dedicated Account Manager',
     ],
     popular: true
@@ -159,7 +161,7 @@ export default function LandingPageAB() {
               </a>
             </div>
             <p className="text-sm text-gray-500 mt-4">
-              ✓ 5-minute setup ✓ Works with your existing SkuVault ✓ 30-day money back guarantee
+              ✓ Works with your existing SkuVault ✓ 30-day money back guarantee
             </p>
           </div>
         </div>
@@ -218,8 +220,8 @@ export default function LandingPageAB() {
         </div>
       </section>
 
-      {/* Social Proof Section */}
-      <section id="proof" className="py-16 bg-gray-50">
+      {/* Social Proof Section - HIDDEN */}
+      <section id="proof" className="py-16 bg-gray-50 hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">
@@ -300,13 +302,13 @@ export default function LandingPageAB() {
                   <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center mr-3 mt-0.5">
                     <span className="text-white text-xs">✗</span>
                   </div>
-                  <span className="text-gray-700">Basic reports that don't help decision making</span>
+                  <span className="text-gray-700">Basic reporting that requires Excel formulas to get vital info</span>
                 </li>
                 <li className="flex items-start">
                   <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center mr-3 mt-0.5">
                     <span className="text-white text-xs">✗</span>
                   </div>
-                  <span className="text-gray-700">Constant stockouts and overstock situations</span>
+                  <span className="text-gray-700">Limited visibility on stockouts, overstock, and aged inventory situations</span>
                 </li>
                 <li className="flex items-start">
                   <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center mr-3 mt-0.5">
@@ -446,7 +448,7 @@ export default function LandingPageAB() {
               <strong>This is just one example.</strong> JUSTSKU provides 15+ advanced reports that perfectly complement your SkuVault system.
             </p>
             <Link 
-              to="/signup" 
+              to="/demo" 
               className="bg-blue-600 text-white hover:bg-blue-700 px-8 py-4 rounded-lg text-lg font-semibold transition-colors inline-flex items-center"
             >
               See All Reports in Action
@@ -537,7 +539,7 @@ export default function LandingPageAB() {
               </p>
             </div>
             <p className="text-gray-600 mb-4">
-              ✓ 30-day money back guarantee ✓ No setup fees ✓ Cancel anytime ✓ 5-minute setup
+              ✓ 30-day money back guarantee ✓ Cancel anytime
             </p>
           </div>
         </div>

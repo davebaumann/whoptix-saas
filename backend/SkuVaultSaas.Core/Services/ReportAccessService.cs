@@ -40,6 +40,8 @@ namespace SkuVaultSaaS.Core.Services
                 { "aging-inventory", 3 },
                 { "financial-warehouse", 3 },
                 { "locations", 3 },
+                { "profitability", 3 },
+                { "demand-forecast", 3 },
                 { "performance", 4 }
             };
         }

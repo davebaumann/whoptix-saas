@@ -141,6 +141,8 @@ export const membershipService = {
       'inventory': MEMBERSHIP_LEVELS.BASIC,
       'low-stock': MEMBERSHIP_LEVELS.STANDARD,
       'aging-inventory': MEMBERSHIP_LEVELS.PREMIUM,
+      'profitability': MEMBERSHIP_LEVELS.PREMIUM,
+      'demand-forecast': MEMBERSHIP_LEVELS.PREMIUM,
       'financial-warehouse': MEMBERSHIP_LEVELS.PREMIUM,
       'locations': MEMBERSHIP_LEVELS.PREMIUM,
       'performance': MEMBERSHIP_LEVELS.ENTERPRISE
@@ -155,6 +157,8 @@ export const membershipService = {
       'inventory': MEMBERSHIP_LEVELS.BASIC,
       'low-stock': MEMBERSHIP_LEVELS.STANDARD,
       'aging-inventory': MEMBERSHIP_LEVELS.PREMIUM,
+      'profitability': MEMBERSHIP_LEVELS.PREMIUM,
+      'demand-forecast': MEMBERSHIP_LEVELS.PREMIUM,
       'financial-warehouse': MEMBERSHIP_LEVELS.PREMIUM,
       'locations': MEMBERSHIP_LEVELS.PREMIUM,
       'performance': MEMBERSHIP_LEVELS.ENTERPRISE

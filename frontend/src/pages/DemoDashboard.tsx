@@ -108,7 +108,7 @@ const SAMPLE_AGING_INVENTORY = {
 
 export default function DemoDashboard() {
   const navigate = useNavigate()
-  const [currentReport, setCurrentReport] = useState<'dashboard' | 'inventory' | 'low-stock' | 'aging-inventory'>('dashboard')
+  const [currentReport, setCurrentReport] = useState<'dashboard' | 'inventory' | 'low-stock' | 'aging-inventory' | 'profitability'>('dashboard')
   const [data, setData] = useState<typeof SAMPLE_DATA | null>(null)
   const [inventoryData] = useState<typeof SAMPLE_INVENTORY>(SAMPLE_INVENTORY)
   const [lowStockData] = useState<typeof SAMPLE_LOW_STOCK>(SAMPLE_LOW_STOCK)
@@ -125,6 +125,8 @@ export default function DemoDashboard() {
     'inventory': { label: 'Inventory Report', icon: '📦' },
     'low-stock': { label: 'Low Stock Report', icon: '⚠️' },
     'aging-inventory': { label: 'Aging Inventory', icon: '📅' },
+    'profitability': { label: 'Profitability Report', icon: '💹' },
+    'demand-forecast': { label: 'Demand Forecast', icon: '🔮' },
     'financial-warehouse': { label: 'Financial Reports', icon: '💰' },
     'locations': { label: 'Location Analysis', icon: '📍' },
     'performance': { label: 'Performance Analytics', icon: '📈' }
@@ -158,55 +160,30 @@ export default function DemoDashboard() {
 
   // Function to check if a report is available at the current tier level
   const isReportAvailable = (reportKey: string): boolean => {
-    return reportAccess[reportKey] ? planTier >= reportAccess[reportKey] : false
+    const requiredLevel = reportAccess[reportKey]
+    const available = requiredLevel ? planTier >= requiredLevel : false
+    console.log(`Report: ${reportKey}, Required: ${requiredLevel}, Current Tier: ${planTier}, Available: ${available}`)
+    return available
   }
 
   // Load tier configuration and report access from backend
   useEffect(() => {
-    const loadConfig = async () => {
-      try {
-        const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '') || 'http://localhost:5239'
-        
-        // Fetch tiers
-        const tiersResponse = await fetch(`${baseUrl}/api/membership/tiers`)
-        if (tiersResponse.ok) {
-          const tierData = await tiersResponse.json()
-          // Extract level from each tier object (has .level property from MembershipLevel enum)
-          const tierMapping = tierData.map((tier: any) => ({
-            level: tier.level, // Use the level property from the API response
-            name: tier.name || tier.Name
-          }))
-          setTiers(tierMapping)
-        }
-
-        // Fetch report access configuration
-        const accessResponse = await fetch(`${baseUrl}/api/membership/admin/report-access-config`)
-        if (accessResponse.ok) {
-          const accessData = await accessResponse.json()
-          setReportAccess(accessData)
-        }
-      } catch (err) {
-        console.error('Failed to load config:', err)
-        // Use defaults if API fails
-        setTiers([
-          { level: 0, name: 'Basic' },
-          { level: 1, name: 'Basic' },
-          { level: 2, name: 'Standard' },
-          { level: 3, name: 'Premium' },
-          { level: 4, name: 'Enterprise' }
-        ])
-        setReportAccess({
-          'inventory': 2,
-          'low-stock': 3,
-          'aging-inventory': 4,
-          'financial-warehouse': 4,
-          'locations': 4,
-          'performance': 4
-        })
-      }
-    }
-
-    loadConfig()
+    // For demo, use hardcoded defaults (demo users aren't authenticated)
+    setTiers([
+      { level: 2, name: 'Standard' },
+      { level: 3, name: 'Premium' },
+      { level: 4, name: 'Enterprise' }
+    ])
+    setReportAccess({
+      'inventory': 2,
+      'low-stock': 3,
+      'aging-inventory': 3,
+      'profitability': 3,
+      'demand-forecast': 3,
+      'financial-warehouse': 4,
+      'locations': 4,
+      'performance': 4
+    })
   }, [])
 
   useEffect(() => {
@@ -220,8 +197,17 @@ export default function DemoDashboard() {
         })
 
         if (response.ok) {
-          const dashboardData = await response.json()
-          setData(dashboardData)
+          const apiData = await response.json()
+          // API returns kpis, activitySummary, and recentTransactions
+          // Create a merged object that combines API data with sample data for missing properties
+          const mergedData = {
+            kpis: apiData.kpis && Array.isArray(apiData.kpis) ? apiData.kpis : SAMPLE_DATA.kpis,
+            activitySummary: apiData.activitySummary || SAMPLE_DATA.activitySummary,
+            recentTransactions: apiData.recentTransactions && Array.isArray(apiData.recentTransactions) ? apiData.recentTransactions : SAMPLE_DATA.recentTransactions,
+            topPerformers: SAMPLE_DATA.topPerformers, // Always use sample for demo
+            performanceMetrics: SAMPLE_DATA.performanceMetrics // Always use sample for demo
+          }
+          setData(mergedData)
           setError(null)
         } else {
           throw new Error(`API returned ${response.status}`)
@@ -269,7 +255,11 @@ export default function DemoDashboard() {
         <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg shadow p-4 border border-blue-200">
           <p className="text-sm font-medium text-gray-700 mb-3">Try Different Plan Tiers:</p>
           <div className="flex flex-wrap gap-3">
-            {tiers.filter(t => t.level >= 2 && t.level <= 4).map((tier) => {
+            {(tiers.length > 0 ? tiers : [
+              { level: 2, name: 'Standard' },
+              { level: 3, name: 'Premium' },
+              { level: 4, name: 'Enterprise' }
+            ]).map((tier) => {
               const colors: Record<number, string> = { 2: 'bg-blue-600', 3: 'bg-purple-600', 4: 'bg-amber-600' }
               const lightColors: Record<number, string> = { 2: 'bg-blue-100', 3: 'bg-purple-100', 4: 'bg-amber-100' }
               const textColors: Record<number, string> = { 2: 'text-blue-800', 3: 'text-purple-800', 4: 'text-amber-800' }
@@ -314,7 +304,7 @@ export default function DemoDashboard() {
               return (
                 <button
                   key={key}
-                  onClick={() => available && setCurrentReport(key as 'dashboard' | 'inventory' | 'low-stock' | 'aging-inventory')}
+                  onClick={() => available && setCurrentReport(key as 'dashboard' | 'inventory' | 'low-stock' | 'aging-inventory' | 'profitability')}
                   disabled={!available}
                   className={`px-3 py-2 rounded-md text-sm font-medium transition-all ${
                     available
@@ -335,7 +325,7 @@ export default function DemoDashboard() {
         {/* Header - Dashboard Title */}
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">
-            {currentReport === 'dashboard' ? 'Demo Picker Dashboard' : currentReport === 'inventory' ? 'Inventory Report' : currentReport === 'low-stock' ? 'Low Stock Report' : 'Aging Inventory Report'}
+            {currentReport === 'dashboard' ? 'Demo Picker Dashboard' : currentReport === 'inventory' ? 'Inventory Report' : currentReport === 'low-stock' ? 'Low Stock Report' : currentReport === 'aging-inventory' ? 'Aging Inventory Report' : 'Profitability Report'}
           </h1>
           <p className="mt-1 text-sm text-gray-600">
             {currentReport === 'dashboard' 
@@ -344,7 +334,9 @@ export default function DemoDashboard() {
               ? 'Complete inventory levels and valuations'
               : currentReport === 'low-stock'
               ? 'Items below threshold quantities'
-              : 'Slow-moving and aged inventory analysis'}
+              : currentReport === 'aging-inventory'
+              ? 'Slow-moving and aged inventory analysis'
+              : 'Product-level profit analysis and margins'}
           </p>
         </div>
 
@@ -869,6 +861,109 @@ export default function DemoDashboard() {
         ) : currentReport === 'aging-inventory' ? (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
             <p className="text-sm text-yellow-800">Unable to load aging inventory data. Please try again later.</p>
+          </div>
+        ) : currentReport === 'profitability' ? (
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="space-y-6">
+              {/* KPI Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <p className="text-sm font-medium text-gray-600 mb-2">Total Revenue</p>
+                  <p className="text-2xl font-bold text-blue-900">$157,284</p>
+                </div>
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <p className="text-sm font-medium text-gray-600 mb-2">Total Cost</p>
+                  <p className="text-2xl font-bold text-blue-900">$89,563</p>
+                </div>
+                <div className="bg-green-50 rounded-lg p-4">
+                  <p className="text-sm font-medium text-gray-600 mb-2">Gross Profit</p>
+                  <p className="text-2xl font-bold text-green-900">$67,721</p>
+                </div>
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <p className="text-sm font-medium text-gray-600 mb-2">Avg Margin</p>
+                  <p className="text-2xl font-bold text-blue-900">43.1%</p>
+                </div>
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <p className="text-sm font-medium text-gray-600 mb-2">Units Sold</p>
+                  <p className="text-2xl font-bold text-blue-900">8,247</p>
+                </div>
+              </div>
+
+              {/* Margin Distribution */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="bg-green-50 rounded-lg border border-green-200 p-4">
+                  <p className="text-sm font-medium text-gray-600">High Margin (&gt;30%)</p>
+                  <p className="text-2xl font-bold text-green-700 mt-2">142</p>
+                </div>
+                <div className="bg-blue-50 rounded-lg border border-blue-200 p-4">
+                  <p className="text-sm font-medium text-gray-600">Medium Margin (10-30%)</p>
+                  <p className="text-2xl font-bold text-blue-700 mt-2">287</p>
+                </div>
+                <div className="bg-yellow-50 rounded-lg border border-yellow-200 p-4">
+                  <p className="text-sm font-medium text-gray-600">Low Margin (0-10%)</p>
+                  <p className="text-2xl font-bold text-yellow-700 mt-2">165</p>
+                </div>
+                <div className="bg-red-50 rounded-lg border border-red-200 p-4">
+                  <p className="text-sm font-medium text-gray-600">Unprofitable (&lt;0%)</p>
+                  <p className="text-2xl font-bold text-red-700 mt-2">23</p>
+                </div>
+              </div>
+
+              {/* Products Table */}
+              <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                <div className="px-6 py-4 bg-gray-50 border-b">
+                  <h3 className="font-semibold text-gray-900">Top Profitable Products</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 border-b">
+                      <tr>
+                        <th className="px-6 py-3 text-left font-medium text-gray-700">SKU</th>
+                        <th className="px-6 py-3 text-left font-medium text-gray-700">Product</th>
+                        <th className="px-6 py-3 text-right font-medium text-gray-700">Units Sold</th>
+                        <th className="px-6 py-3 text-right font-medium text-gray-700">Revenue</th>
+                        <th className="px-6 py-3 text-right font-medium text-gray-700">Gross Profit</th>
+                        <th className="px-6 py-3 text-right font-medium text-gray-700">Margin %</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {[
+                        { sku: '2023-DD-Harness-Black-Small', name: 'Dog Harness - Black Small', units: 284, revenue: 7148, profit: 4112, margin: 57.5 },
+                        { sku: '2023-DD-Bed-Orthopedic-Large', name: 'Orthopedic Dog Bed - Large', units: 128, revenue: 11519, profit: 4387, margin: 38.1 },
+                        { sku: '2023-DD-Harness-Black-Medium', name: 'Dog Harness - Black Medium', units: 156, revenue: 4210, profit: 2368, margin: 56.2 },
+                        { sku: '2023-DD-Leash-Black-Standard', name: 'Dog Leash - Black Standard', units: 298, revenue: 2967, profit: 1742, margin: 58.7 },
+                        { sku: '2023-DD-Collar-Blue-Small', name: 'Dog Collar - Blue Small', units: 142, revenue: 1843, profit: 1124, margin: 61.0 }
+                      ].map((item) => (
+                        <tr key={item.sku} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 font-mono text-xs text-gray-900">{item.sku}</td>
+                          <td className="px-6 py-4 text-gray-700">{item.name}</td>
+                          <td className="px-6 py-4 text-right text-gray-900">{item.units}</td>
+                          <td className="px-6 py-4 text-right text-gray-900">${item.revenue.toLocaleString()}</td>
+                          <td className="px-6 py-4 text-right font-medium text-green-600">${item.profit.toLocaleString()}</td>
+                          <td className="px-6 py-4 text-right">
+                            <span className="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              {item.margin.toFixed(1)}%
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Info Banner */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start">
+                  <AlertCircle className="w-5 h-5 text-blue-600 mr-3 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm text-blue-800">
+                      <strong>Premium Feature:</strong> This demo shows profit analysis by product, identifying your most profitable SKUs and those with margin opportunities. Get real-time insights into revenue, cost structure, and profitability metrics to optimize product mix and pricing.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">

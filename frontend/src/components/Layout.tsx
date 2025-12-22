@@ -17,29 +17,24 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/app/admin', label: 'Admin Dashboard', icon: '⚙️' },
     { path: '/app/admin/customers', label: 'Customers', icon: '🏢' },
     { path: '/app/admin/tiers', label: 'Tier Configuration', icon: '👑' },
-    { path: '/app/user-management', label: 'User Management', icon: '👥' },
   ]
 
   const allNavItems = [
     { path: '/app/', label: 'Picker Dashboard', icon: '📦', reportName: null },
-    { path: '/app/inventory', label: 'Inventory Report', icon: '📊', reportName: 'inventory' },
-    { path: '/app/low-stock', label: 'Low Stock Report', icon: '⚠️', reportName: 'low-stock' },
     { path: '/app/aging-inventory', label: 'Aging Inventory', icon: '⏰', reportName: 'aging-inventory' },
+    { path: '/app/demand-forecast', label: 'Demand Forecast', icon: '🔮', reportName: 'demand-forecast' },
     { path: '/app/financial-warehouse', label: 'Financial Report', icon: '💰', reportName: 'financial-warehouse' },
+    { path: '/app/inventory', label: 'Inventory Report', icon: '📊', reportName: 'inventory' },
     { path: '/app/locations', label: 'Locations Report', icon: '📍', reportName: 'locations' },
+    { path: '/app/low-stock', label: 'Low Stock Report', icon: '⚠️', reportName: 'low-stock' },
     { path: '/app/performance', label: 'Performance Metrics', icon: '📈', reportName: 'performance' },
-    { path: '/app/user-management', label: 'User Management', icon: '👥', reportName: null, requiresAccountAdmin: true },
-
+    { path: '/app/profitability', label: 'Profitability Report', icon: '💹', reportName: 'profitability' },
   ]
 
   // Use admin navigation for system admin users, customer navigation for regular users
   const navItems = user?.isSystemAdmin ? adminNavItems : allNavItems.filter(item => {
     // Hide Picker Dashboard for users without subscription or SkuVault association
     if (item.path === '/app/' && (!user?.customerId || !membershipInfo?.currentLevel)) {
-      return false
-    }
-    // Hide User Management for non-account admins
-    if (item.requiresAccountAdmin && !user?.isAccountAdmin) {
       return false
     }
     if (item.reportName && !canAccessReport(item.reportName)) return false

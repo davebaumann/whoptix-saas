@@ -193,3 +193,4 @@ C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\bin\Release\net8.0\pub
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\bin\Release\net8.0\publish\publish\publish\publish\publish\publish\SkuVaultSaaS.Api.deps.json
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\bin\Release\net8.0\publish\publish\publish\publish\publish\publish\SkuVaultSaaS.Api.runtimeconfig.json
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\bin\Release\net8.0\publish\publish\publish\reportAccessConfig.json
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\bin\Release\net8.0\appsettings.ProxySQL.json

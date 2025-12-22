@@ -1565,6 +1565,9 @@
         }
       },
       "SkuVaultSaaS.Core/1.0.0": {
+        "dependencies": {
+          "Microsoft.AspNetCore.Identity.EntityFrameworkCore": "8.0.8"
+        },
         "runtime": {
           "SkuVaultSaaS.Core.dll": {
             "assemblyVersion": "1.0.0",

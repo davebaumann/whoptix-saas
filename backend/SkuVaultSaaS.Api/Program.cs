@@ -308,15 +308,17 @@ app.UseCors("FrontendDev");
 // Enable response caching
 app.UseResponseCaching();
 
-// Add demo auth middleware - allows anonymous access when demo=true query param is present
-app.UseMiddleware<SkuVaultSaaS.Api.Middleware.DemoAuthMiddleware>();
-
 // Enable HTTPS redirection
 if (app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();
 }
 app.UseAuthentication();
+
+// Add demo auth middleware AFTER UseAuthentication so it can override the authenticated user
+// when demo=true query param is present
+app.UseMiddleware<SkuVaultSaaS.Api.Middleware.DemoAuthMiddleware>();
+
 app.UseAuthorization();
 
 app.MapControllers();

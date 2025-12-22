@@ -2,6 +2,8 @@
   "inventory": 1,
   "low-stock": 3,
   "aging-inventory": 3,
+  "profitability": 3,
+  "demand-forecast": 3,
   "financial-warehouse": 4,
   "locations": 3,
   "performance": 4

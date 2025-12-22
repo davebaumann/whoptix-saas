@@ -339,15 +339,28 @@ namespace SkuVaultSaaS.Tools
 
         private async Task GenerateDailySalesAsync(int customerId, List<Product> products, DateTime date, int baseCount)
         {
-            var salesCount = Math.Max(1, baseCount / 4); // Fewer sales than transactions
+            // Generate 5-25 sales per day for better profitability data
+            var salesCount = _random.Next(5, 26);
             var sales = new List<Sale>();
+            
+            // Pre-select popular products for this day to ensure good coverage
+            var popularProducts = products.OrderBy(x => _random.Next()).Take(Math.Min(10, products.Count)).ToList();
             
             for (int i = 0; i < salesCount; i++)
             {
-                var product = products[_random.Next(products.Count)];
+                // 70% chance to use a "popular" product, 30% random
+                var product = _random.NextDouble() < 0.7 
+                    ? popularProducts[_random.Next(popularProducts.Count)]
+                    : products[_random.Next(products.Count)];
+                
                 var channel = _channels[_random.Next(_channels.Length)];
-                var quantity = _random.Next(1, 5);
+                // Realistic quantity distribution: most orders 1-3 units, some 4-8
+                var quantity = _random.NextDouble() < 0.7 ? _random.Next(1, 4) : _random.Next(4, 9);
                 var saleTime = date.AddHours(_random.Next(0, 24)).AddMinutes(_random.Next(0, 60));
+                
+                // Add slight price variation (±5% of base price) for realistic pricing
+                var basePrice = product.Price ?? 0;
+                var priceVariation = basePrice * (0.95m + (decimal)(_random.NextDouble() * 0.1));
                 
                 sales.Add(new Sale
                 {
@@ -358,7 +371,7 @@ namespace SkuVaultSaaS.Tools
                     SaleDate = saleTime,
                     Channel = channel,
                     OrderNumber = $"ORD-{_random.Next(100000, 999999)}",
-                    Price = product.Price ?? 0,
+                    Price = priceVariation,
                     CustomerName = GenerateCustomerName(),
                     CustomerEmail = GenerateCustomerEmail()
                 });
