@@ -103,6 +103,64 @@ namespace SkuVaultSaaS.Api.Controllers
                 })
                 .FirstOrDefaultAsync();
 
+            // Get out-of-stock items with revenue impact
+            var cutoffDate = DateTime.UtcNow.AddDays(-30);
+            var outOfStockItems = await _context.InventoryLevels
+                .Include(il => il.Product)
+                .Where(il => il.CustomerId == customerId && il.QuantityOnHand == 0)
+                .Select(il => new
+                {
+                    il.Product.Sku,
+                    il.Product.Name,
+                    il.Product.Category,
+                    il.Product.Price,
+                    il.UpdatedAtUtc
+                })
+                .Distinct()
+                .ToListAsync();
+
+            // Calculate OOS metrics with sales velocity
+            var oosData = new List<object>();
+            foreach (var oos in outOfStockItems)
+            {
+                var last30DaySales = await _context.Sales
+                    .Where(s => s.CustomerId == customerId && s.Sku == oos.Sku && s.SaleDate >= cutoffDate)
+                    .ToListAsync();
+
+                var velocity = last30DaySales.Any() ? (double)last30DaySales.Sum(s => s.Quantity) / 30 : 0;
+                var daysOos = (int)(DateTime.UtcNow - oos.UpdatedAtUtc).TotalDays;
+                var estimatedLostRevenue = velocity * daysOos * (double)(oos.Price ?? 0);
+                var topChannel = last30DaySales
+                    .GroupBy(s => s.Channel)
+                    .OrderByDescending(g => g.Count())
+                    .FirstOrDefault()?.Key ?? "Unknown";
+
+                oosData.Add(new
+                {
+                    Sku = oos.Sku,
+                    ProductName = oos.Name,
+                    Category = oos.Category,
+                    LastMovementDate = oos.UpdatedAtUtc,
+                    DaysOutOfStock = daysOos,
+                    Last30DayVelocity = Math.Round(velocity, 2),
+                    LastKnownPrice = oos.Price ?? 0,
+                    EstimatedLostRevenue = Math.Round((decimal)estimatedLostRevenue, 2),
+                    TopChannel = topChannel
+                });
+            }
+
+            var oosItems = oosData.OrderByDescending(x => ((dynamic)x).DaysOutOfStock).ToList();
+            var oosSummary = new
+            {
+                TotalOutOfStockSkus = oosItems.Count,
+                LongestOutOfStockDays = oosItems.Any() ? (int)oosItems.Max(x => ((dynamic)x).DaysOutOfStock) : 0,
+                TotalEstimatedLostRevenue = oosItems.Cast<dynamic>().Sum(x => (decimal)x.EstimatedLostRevenue),
+                AverageOutOfStockDays = oosItems.Any() ? oosItems.Average(x => ((dynamic)x).DaysOutOfStock) : 0,
+                CriticalOosDays = oosItems.Count(x => ((dynamic)x).DaysOutOfStock > 30),
+                UrgentOosDays = oosItems.Count(x => ((dynamic)x).DaysOutOfStock >= 14 && ((dynamic)x).DaysOutOfStock <= 30),
+                RecentOosDays = oosItems.Count(x => ((dynamic)x).DaysOutOfStock < 14)
+            };
+
             return Ok(new
             {
                 summary = summary ?? new
@@ -116,6 +174,8 @@ namespace SkuVaultSaaS.Api.Controllers
                     AverageStockLevel = 0.0
                 },
                 items = lowStockItems,
+                outOfStockSummary = oosSummary,
+                outOfStockItems = oosItems,
                 pagination = new
                 {
                     currentPage = page,

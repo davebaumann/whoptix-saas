@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
-import AutoRefreshControls from '../components/AutoRefreshControls'
 import WithMembershipCheck from '../components/WithMembershipCheck'
 import { TrendingUp, TrendingDown, Package, AlertTriangle } from 'lucide-react'
 
@@ -183,13 +182,6 @@ const InventoryTurnoverContent = () => {
         </div>
         
         <div className="flex items-center gap-4">
-          {/* Auto-refresh controls */}
-          <AutoRefreshControls 
-            queryKey={['inventoryTurnoverReport', customerId.toString(), days.toString()]} 
-            defaultInterval={300000} // 5 minutes default
-            className="bg-white px-3 py-2 rounded-md border border-gray-300"
-          />
-          
           {/* Days Selector */}
           <select
             value={days}

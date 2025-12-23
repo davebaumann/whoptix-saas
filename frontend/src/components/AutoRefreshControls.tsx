@@ -8,11 +8,6 @@ interface AutoRefreshControlsProps {
 
 const INTERVAL_OPTIONS = [
   { value: DEFAULT_REFRESH_INTERVALS.OFF, label: 'Off' },
-  { value: DEFAULT_REFRESH_INTERVALS.THIRTY_SECONDS, label: '30 seconds' },
-  { value: DEFAULT_REFRESH_INTERVALS.ONE_MINUTE, label: '1 minute' },
-  { value: DEFAULT_REFRESH_INTERVALS.TWO_MINUTES, label: '2 minutes' },
-  { value: DEFAULT_REFRESH_INTERVALS.FIVE_MINUTES, label: '5 minutes' },
-  { value: DEFAULT_REFRESH_INTERVALS.TEN_MINUTES, label: '10 minutes' },
   { value: DEFAULT_REFRESH_INTERVALS.FIFTEEN_MINUTES, label: '15 minutes' },
   { value: DEFAULT_REFRESH_INTERVALS.THIRTY_MINUTES, label: '30 minutes' }
 ]

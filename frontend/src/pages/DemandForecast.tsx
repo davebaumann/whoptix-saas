@@ -1,7 +1,56 @@
 import { useState, useEffect } from 'react'
-import { AlertCircle, TrendingUp, Package, Calendar, Shield } from 'lucide-react'
+import { AlertCircle, TrendingUp, Package, Calendar, Shield, Info } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import WithMembershipCheck from '../components/WithMembershipCheck'
+
+// InfoTooltip component
+const InfoTooltip = ({ text, children }: { text: string; children?: React.ReactNode }) => {
+  const [showTooltip, setShowTooltip] = useState(false)
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
+
+  const handleMouseEnter = (e: React.MouseEvent) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    setTooltipPos({
+      x: rect.left + rect.width / 2,
+      y: rect.top
+    })
+    setShowTooltip(true)
+  }
+
+  const handleMouseLeave = () => {
+    setShowTooltip(false)
+  }
+
+  return (
+    <div className="relative inline-flex items-center gap-1 group">
+      {children}
+      <button
+        type="button"
+        className="text-gray-400 hover:text-gray-600 cursor-help"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        onClick={(e) => {
+          handleMouseEnter(e)
+          setShowTooltip(!showTooltip)
+        }}
+      >
+        <Info className="w-4 h-4" />
+      </button>
+      {showTooltip && (
+        <div className="fixed bg-gray-900 text-white text-xs rounded p-3 w-64 shadow-lg z-[9999]" 
+             style={{
+               left: `${tooltipPos.x}px`,
+               top: `${tooltipPos.y}px`,
+               transform: 'translateX(-50%) translateY(-100%)',
+               marginTop: '-8px'
+             }}>
+          {text}
+          <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full border-4 border-transparent border-t-gray-900"></div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 interface DemandForecastItem {
   sku: string
@@ -48,7 +97,15 @@ export default function DemandForecast() {
         setError('')
         const response = await fetch(
           `${import.meta.env.VITE_API_BASE_URL}/api/reports/customer/${customerId}/demand-forecast?forecastDays=${forecastDays}`,
-          { credentials: 'include' }
+          { 
+            credentials: 'include',
+            // Prevent caching to ensure fresh data when forecast period changes
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache',
+              'Expires': '0'
+            }
+          }
         )
 
         if (!response.ok) throw new Error(`Error: ${response.statusText}`)
@@ -283,11 +340,31 @@ export default function DemandForecast() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Category</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">Avg Daily</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">Forecast</th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">Trend</th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">
+                  <div className="flex justify-center items-center gap-1">
+                    Trend
+                    <InfoTooltip text="Linear regression of daily sales over 90 days. Positive % indicates increasing demand, negative indicates decreasing demand." />
+                  </div>
+                </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">Current Stock</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">Days Left</th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">Confidence</th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">Risk</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
+                  <div className="flex justify-end items-center gap-1">
+                    Days Left
+                    <InfoTooltip text="Current stock ÷ average daily demand. Shows how many days until stockout at current consumption rate." />
+                  </div>
+                </th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">
+                  <div className="flex justify-center items-center gap-1">
+                    Confidence
+                    <InfoTooltip text="Based on demand variance (0-100%). Higher = more predictable demand. Lower variance in sales = higher confidence in forecast." />
+                  </div>
+                </th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">
+                  <div className="flex justify-center items-center gap-1">
+                    Risk
+                    <InfoTooltip text="Critical: &lt;7 days stock | High: 7-13 days | Medium: 14-29 days | Low: 30+ days" />
+                  </div>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">

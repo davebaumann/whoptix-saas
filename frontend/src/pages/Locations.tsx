@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
-import AutoRefreshControls from '../components/AutoRefreshControls'
 
 interface LocationAnalytic {
   locationId: number
@@ -168,11 +167,6 @@ export default function Locations() {
         </div>
         
         {/* Auto-refresh controls */}
-        <AutoRefreshControls 
-          queryKey={['locationsReport', customerId.toString()]} 
-          defaultInterval={600000} // 10 minutes default
-          className="bg-white px-4 py-2 rounded-lg shadow"
-        />
       </div>
 
       {/* Summary Cards */}

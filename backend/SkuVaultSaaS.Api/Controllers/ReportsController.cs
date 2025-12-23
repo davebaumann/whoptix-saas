@@ -124,7 +124,21 @@ namespace SkuVaultSaaS.Api.Controllers
 
         private async Task<IActionResult> CheckReportAccessAsync(int customerId, string reportName)
         {
-            // First check tenant isolation
+            // Check if user is a demo user
+            var isDemoUser = User.FindFirst("IsDemo")?.Value == "true";
+            
+            // For demo users, ONLY allow access to customer 2 (demo customer)
+            if (isDemoUser)
+            {
+                if (customerId != 2)
+                {
+                    _logger.LogWarning("Demo user attempted to access customer {CustomerId} instead of customer 2", customerId);
+                    return Forbid();
+                }
+                return null!; // Access granted to customer 2 for demo
+            }
+            
+            // First check tenant isolation (real users only)
             if (!await CanAccessCustomerAsync(customerId))
             {
                 return Forbid();
@@ -747,7 +761,8 @@ namespace SkuVaultSaaS.Api.Controllers
 
         [HttpGet("customer/{customerId}/performance")]
         [Authorize]
-        public async Task<IActionResult> GetPerformanceReport(int customerId)
+        [ResponseCache(NoStore = true, Duration = 0)]
+        public async Task<IActionResult> GetPerformanceReport(int customerId, [FromQuery] string timeframe = "30days")
         {
             // Check tenant access and membership level
             var accessCheck = await CheckReportAccessAsync(customerId, "performance");
@@ -756,8 +771,27 @@ namespace SkuVaultSaaS.Api.Controllers
             try
             {
                 var endDate = DateTime.UtcNow;
-                var startDate = endDate.AddDays(-7); // Changed from -30 to -7 days for testing
-                var previousPeriodStart = startDate.AddDays(-7);
+                int daysBack = 30; // Default
+                
+                // Parse timeframe parameter
+                switch (timeframe)
+                {
+                    case "7days":
+                        daysBack = 7;
+                        break;
+                    case "30days":
+                        daysBack = 30;
+                        break;
+                    case "90days":
+                        daysBack = 90;
+                        break;
+                    default:
+                        daysBack = 30;
+                        break;
+                }
+                
+                var startDate = endDate.AddDays(-daysBack);
+                var previousPeriodStart = startDate.AddDays(-daysBack);
 
                 // Get inventory movements for current and previous periods
                 var currentPeriodMovements = await _context.InventoryMovements
@@ -784,10 +818,10 @@ namespace SkuVaultSaaS.Api.Controllers
                     .ToListAsync();
 
                 // Calculate velocity metrics
-                var velocityMetrics = CalculateVelocityMetrics(currentPeriodMovements, inventoryLevels);
+                var velocityMetrics = CalculateVelocityMetrics(currentPeriodMovements, inventoryLevels, daysBack);
                 
                 // Calculate turnover metrics
-                var turnoverMetrics = CalculateTurnoverMetrics(currentPeriodMovements, inventoryLevels);
+                var turnoverMetrics = CalculateTurnoverMetrics(currentPeriodMovements, inventoryLevels, daysBack);
                 
                 // Calculate performance trends
                 var performanceTrends = CalculatePerformanceTrends(currentPeriodMovements, previousPeriodMovements);
@@ -828,7 +862,8 @@ namespace SkuVaultSaaS.Api.Controllers
                         fastMovingCount = velocityMetrics.Count(v => v.Velocity >= 10),
                         mediumMovingCount = velocityMetrics.Count(v => v.Velocity >= 5 && v.Velocity < 10),
                         slowMovingCount = velocityMetrics.Count(v => v.Velocity >= 1 && v.Velocity < 5),
-                        deadStockCount = velocityMetrics.Count(v => v.Velocity < 1)
+                        deadStockCount = velocityMetrics.Count(v => v.Velocity < 1),
+                        timeframeDays = daysBack
                     },
                     turnoverMetrics = new {
                         averageTurnover = turnoverMetrics.Any() ? turnoverMetrics.Average(t => t.TurnoverRate) : 0
@@ -981,6 +1016,7 @@ namespace SkuVaultSaaS.Api.Controllers
 
         [HttpGet("customer/{customerId}/demand-forecast")]
         [Authorize]
+        [ResponseCache(NoStore = true, Duration = 0)]
         public async Task<IActionResult> GetDemandForecast(int customerId, [FromQuery] int forecastDays = 30)
         {
             // Check tenant access and membership level
@@ -1033,8 +1069,14 @@ namespace SkuVaultSaaS.Api.Controllers
                     // Calculate historical average daily demand
                     var avgDailyDemand = dailySales.Any() ? dailySales.Average() : 0;
 
-                    // Calculate demand trend (linear regression)
-                    var trend = CalculateSalesTrend(dailySales);
+                    // Calculate demand trend using recent data that matches the forecast period
+                    // Use 2x the forecast period to get a meaningful trend, but cap at 60 days
+                    var trendLookbackDays = Math.Min(60, Math.Max(forecastDays * 2, 14));
+                    var recentSales = dailySales.TakeLast(trendLookbackDays).ToList();
+                    var trend = CalculateSalesTrend(recentSales);
+                    
+                    _logger.LogInformation("SKU: {Sku}, ForecastDays: {ForecastDays}, TrendLookbackDays: {TrendLookbackDays}, RecentSalesCount: {RecentSalesCount}, Trend: {Trend}%", 
+                        sku, forecastDays, trendLookbackDays, recentSales.Count, trend);
 
                     // Calculate forecasted demand
                     var forecastedDemand = avgDailyDemand * forecastDays * (1 + (trend / 100));
@@ -1174,7 +1216,7 @@ namespace SkuVaultSaaS.Api.Controllers
             return diversityScore + quantityScore + valueScore;
         }
 
-        private List<VelocityMetric> CalculateVelocityMetrics(List<InventoryMovement> movements, List<InventoryLevel> inventory)
+        private List<VelocityMetric> CalculateVelocityMetrics(List<InventoryMovement> movements, List<InventoryLevel> inventory, int daysInPeriod = 30)
         {
             var velocityMetrics = new List<VelocityMetric>();
             
@@ -1187,7 +1229,7 @@ namespace SkuVaultSaaS.Api.Controllers
                     .Sum(m => Math.Abs(m.QuantityChange));
                 
                 var averageStock = product.Sum(p => p.QuantityAvailable);
-                var velocity = outboundQuantity / 30.0; // Daily velocity over 30 days
+                var velocity = outboundQuantity / (double)daysInPeriod; // Daily velocity over the selected period
                 
                 velocityMetrics.Add(new VelocityMetric
                 {
@@ -1203,7 +1245,7 @@ namespace SkuVaultSaaS.Api.Controllers
             return velocityMetrics;
         }
 
-        private List<TurnoverMetric> CalculateTurnoverMetrics(List<InventoryMovement> movements, List<InventoryLevel> inventory)
+        private List<TurnoverMetric> CalculateTurnoverMetrics(List<InventoryMovement> movements, List<InventoryLevel> inventory, int daysInPeriod = 30)
         {
             var turnoverMetrics = new List<TurnoverMetric>();
             
@@ -1494,5 +1536,29 @@ namespace SkuVaultSaaS.Api.Controllers
         public int ActiveSKUs { get; set; }
         public int ZeroStockSKUs { get; set; }
         public int TotalTransactions { get; set; }
+    }
+
+    public class OutOfStockItem
+    {
+        public string Sku { get; set; } = string.Empty;
+        public string ProductName { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public DateTime LastMovementDate { get; set; }
+        public int DaysOutOfStock { get; set; }
+        public double Last30DayVelocity { get; set; }
+        public decimal LastKnownPrice { get; set; }
+        public decimal EstimatedLostRevenue { get; set; }
+        public string TopChannel { get; set; } = string.Empty;
+    }
+
+    public class OutOfStockSummary
+    {
+        public int TotalOutOfStockSkus { get; set; }
+        public int LongestOutOfStockDays { get; set; }
+        public decimal TotalEstimatedLostRevenue { get; set; }
+        public double AverageOutOfStockDays { get; set; }
+        public int CriticalOosDays { get; set; } // >30 days OOS
+        public int UrgentOosDays { get; set; } // 14-30 days OOS
+        public int RecentOosDays { get; set; } // <14 days OOS
     }
 }

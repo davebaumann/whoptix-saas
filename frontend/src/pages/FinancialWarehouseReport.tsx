@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
-import AutoRefreshControls from '../components/AutoRefreshControls'
 
 interface FinancialWarehouseItem {
   sku: string
@@ -44,7 +43,6 @@ interface FinancialWarehouseResponse {
 export default function FinancialWarehouseReport() {
   const { user, isLoading: authLoading } = useAuth()
   const [currentPage, setCurrentPage] = useState(1)
-  const [period, setPeriod] = useState('current')
   const [sortField, setSortField] = useState<keyof FinancialWarehouseItem>('totalCostValue')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const pageSize = 25
@@ -78,9 +76,9 @@ export default function FinancialWarehouseReport() {
   const customerId = user.customerId || 1
 
   const { data: financialData, isLoading } = useQuery<FinancialWarehouseResponse>({
-    queryKey: ['financialWarehouseReport', customerId, period],
+    queryKey: ['financialWarehouseReport', customerId],
     queryFn: async () => {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/reports/customer/${customerId}/financial-warehouse?period=${period}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/reports/customer/${customerId}/financial-warehouse`, {
         credentials: 'include'
       })
       if (!response.ok) {
@@ -97,11 +95,6 @@ export default function FinancialWarehouseReport() {
       setSortField(field)
       setSortDirection('desc')
     }
-    setCurrentPage(1)
-  }
-
-  const handlePeriodChange = (newPeriod: string) => {
-    setPeriod(newPeriod)
     setCurrentPage(1)
   }
 
@@ -167,27 +160,6 @@ export default function FinancialWarehouseReport() {
           <p className="mt-1 text-sm text-gray-600">
             Comprehensive financial valuation of warehouse inventory
           </p>
-        </div>
-        
-        <div className="flex items-center gap-4">
-          {/* Auto-refresh controls */}
-          <AutoRefreshControls 
-            queryKey={['financialWarehouseReport', customerId.toString(), period]} 
-            defaultInterval={600000} // 10 minutes default for financial data
-            className="bg-white px-3 py-2 rounded-md border border-gray-300"
-          />
-          
-          {/* Period Selector */}
-          <select
-            value={period}
-            onChange={(e) => handlePeriodChange(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="current">Current Snapshot</option>
-            <option value="monthly">Monthly</option>
-            <option value="quarterly">Quarterly</option>
-            <option value="annual">Annual</option>
-          </select>
         </div>
       </div>
 

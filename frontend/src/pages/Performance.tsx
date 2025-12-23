@@ -4,7 +4,6 @@ import { TrendingUp, TrendingDown, Activity, Package, BarChart3, AlertTriangle, 
 import { useQuery } from '@tanstack/react-query';
 import WithMembershipCheck from '../components/WithMembershipCheck';
 import { useAuth } from '../contexts/AuthContext';
-import AutoRefreshControls from '../components/AutoRefreshControls';
 
 const PerformanceContent: React.FC = () => {
   const { user } = useAuth()
@@ -22,6 +21,9 @@ const PerformanceContent: React.FC = () => {
           credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'Expires': '0'
           },
         }
       );
@@ -129,11 +131,6 @@ const PerformanceContent: React.FC = () => {
           </p>
         </div>
         <div className="mt-4 flex md:ml-4 md:mt-0 space-x-3">
-          <AutoRefreshControls 
-            queryKey={['performance-report', customerId.toString(), selectedTimeframe]} 
-            defaultInterval={300000}
-            className="bg-white px-3 py-2 rounded-md border border-gray-300"
-          />
           <select
             value={selectedTimeframe}
             onChange={(e) => setSelectedTimeframe(e.target.value)}
@@ -245,54 +242,81 @@ const PerformanceContent: React.FC = () => {
           <div className="space-y-4">
             {velocityMetrics && (
               <>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Fast Moving (≥10/day)</span>
-                  <div className="flex items-center">
-                    <span className="text-sm font-semibold text-green-600 mr-2">
-                      {velocityMetrics.fastMovingCount || 0}
-                    </span>
-                    <div className="w-16 bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-green-500 h-2 rounded-full" 
-                        style={{ 
-                          width: `${Math.min(100, (velocityMetrics.fastMovingCount || 0) / Math.max(1, (velocityMetrics.fastMovingCount || 0) + (velocityMetrics.mediumMovingCount || 0) + (velocityMetrics.slowMovingCount || 0)) * 100)}%` 
-                        }}
-                      ></div>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Medium Moving (5-10/day)</span>
-                  <div className="flex items-center">
-                    <span className="text-sm font-semibold text-blue-600 mr-2">
-                      {velocityMetrics.mediumMovingCount || 0}
-                    </span>
-                    <div className="w-16 bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-blue-500 h-2 rounded-full" 
-                        style={{ 
-                          width: `${Math.min(100, (velocityMetrics.mediumMovingCount || 0) / Math.max(1, (velocityMetrics.fastMovingCount || 0) + (velocityMetrics.mediumMovingCount || 0) + (velocityMetrics.slowMovingCount || 0)) * 100)}%` 
-                        }}
-                      ></div>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Slow Moving (1-5/day)</span>
-                  <div className="flex items-center">
-                    <span className="text-sm font-semibold text-yellow-600 mr-2">
-                      {velocityMetrics.slowMovingCount || 0}
-                    </span>
-                    <div className="w-16 bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-yellow-500 h-2 rounded-full" 
-                        style={{ 
-                          width: `${Math.min(100, (velocityMetrics.slowMovingCount || 0) / Math.max(1, (velocityMetrics.fastMovingCount || 0) + (velocityMetrics.mediumMovingCount || 0) + (velocityMetrics.slowMovingCount || 0)) * 100)}%` 
-                        }}
-                      ></div>
-                    </div>
-                  </div>
-                </div>
+                {(() => {
+                  const fast = velocityMetrics.fastMovingCount || 0;
+                  const medium = velocityMetrics.mediumMovingCount || 0;
+                  const slow = velocityMetrics.slowMovingCount || 0;
+                  const total = fast + medium + slow;
+                  
+                  return (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Fast Moving (≥10/day)</span>
+                        <div className="flex items-center">
+                          <span className="text-sm font-semibold text-green-600 mr-2">
+                            {fast}
+                          </span>
+                          <div className="w-16 bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="bg-green-500 h-2 rounded-full" 
+                              style={{ 
+                                width: `${total > 0 ? (fast / total * 100) : 0}%` 
+                              }}
+                            ></div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Medium Moving (5-10/day)</span>
+                        <div className="flex items-center">
+                          <span className="text-sm font-semibold text-blue-600 mr-2">
+                            {medium}
+                          </span>
+                          <div className="w-16 bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="bg-blue-500 h-2 rounded-full" 
+                              style={{ 
+                                width: `${total > 0 ? (medium / total * 100) : 0}%` 
+                              }}
+                            ></div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Slow Moving (1-5/day)</span>
+                        <div className="flex items-center">
+                          <span className="text-sm font-semibold text-yellow-600 mr-2">
+                            {slow}
+                          </span>
+                          <div className="w-16 bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="bg-yellow-500 h-2 rounded-full" 
+                              style={{ 
+                                width: `${total > 0 ? (slow / total * 100) : 0}%` 
+                              }}
+                            ></div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Dead Stock (&lt;1/day)</span>
+                        <div className="flex items-center">
+                          <span className="text-sm font-semibold text-red-600 mr-2">
+                            {velocityMetrics?.deadStockCount || 0}
+                          </span>
+                          <div className="w-16 bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="bg-red-500 h-2 rounded-full" 
+                              style={{ 
+                                width: `${total > 0 ? ((velocityMetrics?.deadStockCount || 0) / total * 100) : 0}%` 
+                              }}
+                            ></div>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
               </>
             )}
           </div>

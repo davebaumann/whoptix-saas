@@ -1,9 +1,10 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
 import { apiClient } from '../api/client'
-import { format, startOfToday, endOfToday, subDays } from 'date-fns'
+import { format, startOfToday, endOfToday, subDays, startOfDay, endOfDay } from 'date-fns'
 import PickerPerformanceDetail from '../components/PickerPerformanceDetail'
+import PickerPerformanceChart from '../components/PickerPerformanceChart'
 
 export default function Dashboard() {
   const { user } = useAuth()
@@ -21,69 +22,70 @@ export default function Dashboard() {
   const [toDate, setToDate] = useState('')
   const [selectedPicker, setSelectedPicker] = useState<string | null>(null)
 
-  const getDateParams = () => {
+  const dateParams = useMemo(() => {
     const now = new Date()
     switch (dateRange) {
       case 'today':
         return {
-          from: format(startOfToday(), 'yyyy-MM-dd'),
-          to: format(endOfToday(), 'yyyy-MM-dd')
+          from: format(startOfToday(), "yyyy-MM-dd'T'HH:mm:ss") + 'Z',
+          to: format(endOfToday(), "yyyy-MM-dd'T'HH:mm:ss") + 'Z'
         }
       case 'yesterday':
         const yesterday = subDays(now, 1)
         return {
-          from: format(yesterday, 'yyyy-MM-dd'),
-          to: format(yesterday, 'yyyy-MM-dd')
+          from: format(startOfDay(yesterday), "yyyy-MM-dd'T'HH:mm:ss") + 'Z',
+          to: format(endOfDay(yesterday), "yyyy-MM-dd'T'HH:mm:ss") + 'Z'
         }
       case 'last7':
         return {
-          from: format(subDays(now, 7), 'yyyy-MM-dd'),
-          to: format(now, 'yyyy-MM-dd')
+          from: format(subDays(now, 7), "yyyy-MM-dd'T'HH:mm:ss") + 'Z',
+          to: format(endOfToday(), "yyyy-MM-dd'T'HH:mm:ss") + 'Z'
         }
       case 'custom':
         if (fromDate && !toDate) {
-          return { from: fromDate, to: format(now, 'yyyy-MM-dd') }
-        }
-        return fromDate && toDate ? { from: fromDate, to: toDate } : undefined
-      default:
-        return undefined
-    }
-  }
-
-  // Get date params for picker detail modal (includes end of day)
-  const getPickerDateParams = () => {
-    const now = new Date()
-    switch (dateRange) {
-      case 'today':
-        return {
-          from: format(startOfToday(), 'yyyy-MM-dd'),
-          to: format(endOfToday(), 'yyyy-MM-dd HH:mm:ss')
-        }
-      case 'yesterday':
-        const yesterday = subDays(now, 1)
-        return {
-          from: format(yesterday, 'yyyy-MM-dd'),
-          to: format(new Date(yesterday.getTime() + 24 * 60 * 60 * 1000 - 1), 'yyyy-MM-dd HH:mm:ss')
-        }
-      case 'last7':
-        return {
-          from: format(subDays(now, 7), 'yyyy-MM-dd'),
-          to: format(endOfToday(), 'yyyy-MM-dd HH:mm:ss')
-        }
-      case 'custom':
-        if (fromDate && !toDate) {
-          return { from: fromDate, to: format(endOfToday(), 'yyyy-MM-dd HH:mm:ss') }
+          return { from: fromDate + 'T00:00:00Z', to: format(endOfToday(), "yyyy-MM-dd'T'HH:mm:ss") + 'Z' }
         }
         return fromDate && toDate ? { 
-          from: fromDate, 
-          to: format(new Date(toDate + ' 23:59:59'), 'yyyy-MM-dd HH:mm:ss')
+          from: fromDate + 'T00:00:00Z', 
+          to: toDate + 'T23:59:59Z'
         } : undefined
       default:
         return undefined
     }
-  }
+  }, [dateRange, fromDate, toDate])
 
-  const dateParams = getDateParams()
+  // Get date params for picker detail modal (includes end of day)
+  const pickerDateParams = useMemo(() => {
+    const now = new Date()
+    switch (dateRange) {
+      case 'today':
+        return {
+          from: format(startOfToday(), 'yyyy-MM-dd'),
+          to: format(endOfToday(), "yyyy-MM-dd'T'HH:mm:ss")
+        }
+      case 'yesterday':
+        const yesterday = subDays(now, 1)
+        return {
+          from: format(yesterday, 'yyyy-MM-dd'),
+          to: format(new Date(yesterday.getTime() + 24 * 60 * 60 * 1000 - 1), "yyyy-MM-dd'T'HH:mm:ss")
+        }
+      case 'last7':
+        return {
+          from: format(subDays(now, 7), 'yyyy-MM-dd'),
+          to: format(endOfToday(), "yyyy-MM-dd'T'HH:mm:ss")
+        }
+      case 'custom':
+        if (fromDate && !toDate) {
+          return { from: fromDate, to: format(endOfToday(), "yyyy-MM-dd'T'HH:mm:ss") }
+        }
+        return fromDate && toDate ? { 
+          from: fromDate, 
+          to: format(new Date(toDate + 'T23:59:59'), "yyyy-MM-dd'T'HH:mm:ss")
+        } : undefined
+      default:
+        return undefined
+    }
+  }, [dateRange, fromDate, toDate])
 
   const { data: transactions, isLoading: loadingTransactions } = useQuery({
     queryKey: ['transactions', customerId, dateParams],
@@ -362,6 +364,62 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Picker Performance Chart */}
+      {(() => {
+        const { data: performanceData } = useQuery({
+          queryKey: ['pickerPerformance', customerId, dateParams],
+          queryFn: () => apiClient.getPickerPerformance(customerId, dateParams?.from, dateParams?.to),
+          enabled: !!dateParams,
+        });
+
+        if (!performanceData?.performance) {
+          return null;
+        }
+
+        // Convert performance data to chart format
+        // Handle both hourly (Hour field) and daily (Date field) responses
+        const chartData = performanceData.performance.map((item: any) => {
+          if ('hour' in item || item.Hour !== undefined) {
+            // Hourly data - construct timestamp with the hour
+            const hour = item.hour !== undefined ? item.hour : item.Hour;
+            // Get the actual date from dateRange context
+            let baseDate = new Date();
+            if (dateRange === 'yesterday') {
+              baseDate = new Date(new Date().getTime() - 24 * 60 * 60 * 1000);
+            }
+            baseDate.setHours(hour, 0, 0, 0);
+            return {
+              timestamp: baseDate.toISOString(),
+              user: item.picker,
+              count: item.count
+            };
+          } else {
+            // Daily data
+            return {
+              timestamp: new Date(item.date).toISOString(),
+              user: item.picker,
+              count: item.count
+            };
+          }
+        });
+
+        const uniqueDates = new Set<string>();
+        chartData.forEach(item => {
+          const dt = new Date(item.timestamp);
+          uniqueDates.add(dt.toISOString().split('T')[0]);
+        });
+        console.log(`Dashboard: ${chartData.length} aggregated performance items, dates: ${Array.from(uniqueDates).sort().join(', ')}, params from=${dateParams?.from} to=${dateParams?.to}`);
+
+        return (
+          <PickerPerformanceChart
+            data={chartData}
+            dateRange={dateRange}
+            fromDate={dateParams?.from}
+            toDate={dateParams?.to}
+          />
+        );
+      })()}
+
       {/* Transactions Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
@@ -443,7 +501,7 @@ export default function Dashboard() {
           customerId={customerId}
           pickerName={selectedPicker}
           onClose={() => setSelectedPicker(null)}
-          dateRange={getPickerDateParams()}
+          dateRange={pickerDateParams}
         />
       )}
     </div>

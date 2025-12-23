@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
-import AutoRefreshControls from '../components/AutoRefreshControls'
 
 interface AgingInventoryItem {
   sku: string
@@ -135,6 +134,41 @@ export default function AgingInventoryReport() {
     return total > 0 ? ((value / total) * 100).toFixed(1) + '%' : '0%'
   }
 
+  const exportToCSV = () => {
+    if (!agingData) return
+
+    const headers = ['SKU', 'Current Qty', '0-30 Days', '31-60 Days', '61-90 Days', '90+ Days', 'Avg Age (Days)', 'Oldest Add Date']
+    const rows = agingData.details.map(item => [
+      item.sku,
+      item.currentQuantity,
+      item.days0_30,
+      item.days31_60,
+      item.days61_90,
+      item.days90Plus,
+      item.averageDaysOld,
+      formatDate(item.oldestReceiveDate)
+    ])
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => {
+        const stringCell = String(cell)
+        return stringCell.includes(',') || stringCell.includes('"') ? `"${stringCell.replace(/"/g, '""')}"` : stringCell
+      }).join(','))
+    ].join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    const timestamp = new Date().toISOString().split('T')[0]
+    link.setAttribute('href', url)
+    link.setAttribute('download', `aging-inventory-${timestamp}.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -146,12 +180,16 @@ export default function AgingInventoryReport() {
           </p>
         </div>
         
-        {/* Auto-refresh controls */}
-        <AutoRefreshControls 
-          queryKey={['agingInventoryReport', customerId.toString()]} 
-          defaultInterval={900000} // 15 minutes default for aging data
-          className="bg-white px-4 py-2 rounded-lg shadow"
-        />
+        {/* Auto-refresh and Export controls */}
+        <div className="flex gap-3">
+          <button
+            onClick={exportToCSV}
+            disabled={isLoading || !agingData}
+            className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg shadow font-medium text-sm transition-colors"
+          >
+            📥 Export CSV
+          </button>
+        </div>
       </div>
 
       {isLoading ? (

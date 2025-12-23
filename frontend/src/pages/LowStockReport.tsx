@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
 import { apiClient } from '../api/client'
-import AutoRefreshControls from '../components/AutoRefreshControls'
 
 export default function LowStockReport() {
   const { user, isLoading: authLoading } = useAuth()
@@ -135,13 +134,6 @@ export default function LowStockReport() {
             </a>
           </div>
         </div>
-        
-        {/* Auto-refresh controls */}
-        <AutoRefreshControls 
-          queryKey={['lowStock', customerId.toString(), threshold.toString()]} 
-          defaultInterval={300000} // 5 minutes default for stock monitoring
-          className="bg-white px-4 py-2 rounded-lg shadow"
-        />
       </div>
 
       {/* Controls */}
@@ -350,6 +342,162 @@ export default function LowStockReport() {
           </div>
         </div>
       </div>
+
+      {/* Out of Stock Section */}
+      {(lowStockData?.outOfStockSummary?.totalOutOfStockSkus ?? 0) > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-2xl font-bold text-gray-900">Out of Stock Items</h2>
+          
+          {/* OOS Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white p-6 rounded-lg shadow border-l-4 border-red-600">
+              <p className="text-sm font-medium text-gray-600">Total Out of Stock</p>
+              <p className="mt-2 text-3xl font-semibold text-red-600">
+                {lowStockData?.outOfStockSummary?.totalOutOfStockSkus || 0}
+              </p>
+              <p className="mt-1 text-xs text-gray-500">SKUs at zero quantity</p>
+            </div>
+
+            <div className="bg-white p-6 rounded-lg shadow border-l-4 border-orange-600">
+              <p className="text-sm font-medium text-gray-600">Longest Out of Stock</p>
+              <p className="mt-2 text-3xl font-semibold text-orange-600">
+                {lowStockData?.outOfStockSummary?.longestOutOfStockDays || 0} days
+              </p>
+              <p className="mt-1 text-xs text-gray-500">Maximum duration</p>
+            </div>
+
+            <div className="bg-white p-6 rounded-lg shadow border-l-4 border-amber-600">
+              <p className="text-sm font-medium text-gray-600">Est. Lost Revenue</p>
+              <p className="mt-2 text-3xl font-semibold text-amber-600">
+                ${(lowStockData?.outOfStockSummary?.totalEstimatedLostRevenue || 0).toLocaleString('en-US', {
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 0
+                })}
+              </p>
+              <p className="mt-1 text-xs text-gray-500">Based on historical velocity</p>
+            </div>
+          </div>
+
+          {/* OOS Risk Distribution */}
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Risk Distribution</h3>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="text-center p-4 bg-red-50 rounded-lg border border-red-200">
+                <p className="text-2xl font-bold text-red-600">
+                  {lowStockData?.outOfStockSummary?.criticalOosDays || 0}
+                </p>
+                <p className="text-sm text-red-600">Critical ({'>'}30 days)</p>
+              </div>
+              <div className="text-center p-4 bg-orange-50 rounded-lg border border-orange-200">
+                <p className="text-2xl font-bold text-orange-600">
+                  {lowStockData?.outOfStockSummary?.urgentOosDays || 0}
+                </p>
+                <p className="text-sm text-orange-600">Urgent (14-30 days)</p>
+              </div>
+              <div className="text-center p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                <p className="text-2xl font-bold text-yellow-600">
+                  {lowStockData?.outOfStockSummary?.recentOosDays || 0}
+                </p>
+                <p className="text-sm text-yellow-600">Recent ({'<'}14 days)</p>
+              </div>
+            </div>
+          </div>
+
+          {/* OOS Items Table */}
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Out of Stock Details
+              </h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                      SKU
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                      Product Name
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                      Category
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
+                      Days OOS
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
+                      Daily Sales Rate
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
+                      Est. Lost Revenue
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                      Top Channel
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {isLoading ? (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-4 text-center text-sm text-gray-500">
+                        Loading...
+                      </td>
+                    </tr>
+                  ) : (lowStockData?.outOfStockItems?.length || 0) === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-4 text-center text-sm text-gray-500">
+                        No out of stock items
+                      </td>
+                    </tr>
+                  ) : (
+                    lowStockData?.outOfStockItems?.map((item: any) => {
+                      const getRiskColor = (days: number) => {
+                        if (days > 30) return 'bg-red-100 text-red-800'
+                        if (days >= 14) return 'bg-orange-100 text-orange-800'
+                        return 'bg-yellow-100 text-yellow-800'
+                      }
+
+                      return (
+                        <tr key={item.sku} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {item.sku}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {item.productName}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                            {item.category || 'Uncategorized'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
+                            <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${getRiskColor(item.daysOutOfStock)}`}>
+                              {item.daysOutOfStock} days
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900">
+                            {item.last30DayVelocity.toFixed(1)} units/day
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-red-600">
+                            ${item.estimatedLostRevenue.toLocaleString('en-US', {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2
+                            })}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                            <span className="inline-block px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">
+                              {item.topChannel}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

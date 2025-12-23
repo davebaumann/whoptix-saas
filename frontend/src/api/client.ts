@@ -38,6 +38,17 @@ export interface TransactionSummaryResponse {
   summary: TransactionSummaryItem[]
 }
 
+export interface PickerPerformanceItem {
+  date: string;
+  picker: string;
+  count: number;
+  transactionTypes: string[];
+}
+
+export interface PickerPerformanceResponse {
+  performance: PickerPerformanceItem[];
+}
+
 export interface PerformanceMetrics {
   averageItemsPerHour: number
   totalHours: number
@@ -133,9 +144,33 @@ export interface LowStockSummary {
   averageStockLevel: number
 }
 
+export interface OutOfStockSummary {
+  totalOutOfStockSkus: number
+  longestOutOfStockDays: number
+  totalEstimatedLostRevenue: number
+  averageOutOfStockDays: number
+  criticalOosDays: number
+  urgentOosDays: number
+  recentOosDays: number
+}
+
+export interface OutOfStockItem {
+  sku: string
+  productName: string
+  category: string
+  lastMovementDate: string
+  daysOutOfStock: number
+  last30DayVelocity: number
+  lastKnownPrice: number
+  estimatedLostRevenue: number
+  topChannel: string
+}
+
 export interface LowStockReportResponse {
   summary: LowStockSummary
   items: LowStockItem[]
+  outOfStockSummary: OutOfStockSummary
+  outOfStockItems: OutOfStockItem[]
   pagination: {
     currentPage: number
     pageSize: number
@@ -269,7 +304,7 @@ class ApiClient {
     from?: string,
     to?: string,
     page: number = 1,
-    pageSize: number = 50
+    pageSize: number = 500
   ): Promise<TransactionListResponse> {
     const params = new URLSearchParams({
       page: page.toString(),
@@ -311,6 +346,21 @@ class ApiClient {
     );
   }
 
+  async getPickerPerformance(
+    customerId: number,
+    from?: string,
+    to?: string
+  ): Promise<PickerPerformanceResponse> {
+    const params = new URLSearchParams();
+    if (from) params.append('from', from);
+    if (to) params.append('to', to);
+
+    const queryString = params.toString();
+    return this.fetch<PickerPerformanceResponse>(
+      `/api/transactions/customer/${customerId}/picker-performance${queryString ? `?${queryString}` : ''}`
+    );
+  }
+
   async login(email: string, password: string): Promise<{ email: string; expires: string; message: string }> {
     return this.fetch<{ email: string; expires: string; message: string }>('/api/auth/login', {
       method: 'POST',
@@ -347,15 +397,6 @@ class ApiClient {
     const queryString = params.toString();
     return this.fetch<PerformanceMetrics>(
       `/api/transactions/customer/${customerId}/performance${queryString ? `?${queryString}` : ''}`
-    );
-  }
-
-  async getPickerPerformance(customerId: number, period: string = 'today'): Promise<PickerPerformanceResponse> {
-    const params = new URLSearchParams();
-    params.append('period', period);
-
-    return this.fetch<PickerPerformanceResponse>(
-      `/api/Picker/customer/${customerId}/summary?${params.toString()}`
     );
   }
 

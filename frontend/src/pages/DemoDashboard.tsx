@@ -1,118 +1,15 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, TrendingUp, Users, Package, AlertCircle, Activity } from 'lucide-react'
-
-// Enhanced sample data matching Picker Dashboard structure
-const SAMPLE_DATA = {
-  kpis: [
-    { label: 'Total Transactions', value: 1247, trend: '+5%' },
-    { label: 'Total Quantity Moved', value: 8394, trend: '+3%' },
-    { label: 'Active Users', value: 12, trend: 'No change' },
-    { label: 'Picks', value: 523, trend: '+2%' }
-  ],
-  activitySummary: {
-    totalTransactions: 1247,
-    uniqueUsers: 12,
-    totalQuantity: 8394,
-    byType: [
-      { type: 'Pick', count: 523 },
-      { type: 'Pack', count: 398 },
-      { type: 'Receive', count: 326 }
-    ]
-  },
-  recentTransactions: [
-    { id: 1, sku: '2023-DD-Harness-Black-Small', transactionType: 'Pick', quantity: -5, transactionDate: new Date(), performedBy: 'John Smith' },
-    { id: 2, sku: '2023-DD-Harness-Black-Medium', transactionType: 'Pack', quantity: -3, transactionDate: new Date(Date.now() - 300000), performedBy: 'Jane Doe' },
-    { id: 3, sku: '2023-DD-Harness-Black-Large', transactionType: 'Receive', quantity: 50, transactionDate: new Date(Date.now() - 600000), performedBy: 'Mike Johnson' },
-    { id: 4, sku: '2023-DD-Harness-Black-XL', transactionType: 'Pick', quantity: -8, transactionDate: new Date(Date.now() - 900000), performedBy: 'Sarah Wilson' },
-    { id: 5, sku: '2023-DD-Collar-Blue-Small', transactionType: 'Pack', quantity: -2, transactionDate: new Date(Date.now() - 1200000), performedBy: 'Tom Brown' }
-  ],
-  topPerformers: [
-    { rank: 1, name: 'John Smith', picks: 156, velocity: 18.2, rating: 'Excellent', trend: '+12%' },
-    { rank: 2, name: 'Sarah Wilson', picks: 142, velocity: 16.5, rating: 'Excellent', trend: '+8%' },
-    { rank: 3, name: 'Jane Doe', picks: 128, velocity: 14.9, rating: 'Good', trend: '+3%' },
-    { rank: 4, name: 'Mike Johnson', picks: 98, velocity: 11.4, rating: 'Good', trend: '-2%' },
-    { rank: 5, name: 'Tom Brown', picks: 87, velocity: 10.1, rating: 'Average', trend: '+5%' }
-  ],
-  performanceMetrics: {
-    avgPicksPerHour: 15.2,
-    avgPacksPerHour: 12.8,
-    avgErrorRate: 0.8,
-    topSKU: { sku: '2023-DD-Harness-Black-Small', picks: 284, velocity: 28.4 }
-  }
-}
-
-// Sample inventory data for the Inventory Report
-const SAMPLE_INVENTORY = {
-  totalSkus: 1247,
-  totalQuantity: 45820,
-  totalCostValue: 287650.00,
-  totalRetailValue: 625490.00,
-  lowStockCount: 42,
-  outOfStockCount: 8,
-  items: [
-    { sku: '2023-DD-Harness-Black-Small', productName: 'Dog Harness - Black Small', locationCode: 'A-01-01', locationName: 'Shelf A1', warehouse: 'Main', quantity: 145, cost: 8.50, retailPrice: 24.99, totalCostValue: 1232.50, totalRetailValue: 3623.55, category: 'Harnesses', isLowStock: false, thresholdQuantity: 20 },
-    { sku: '2023-DD-Harness-Black-Medium', productName: 'Dog Harness - Black Medium', locationCode: 'A-01-02', locationName: 'Shelf A1', warehouse: 'Main', quantity: 89, cost: 9.20, retailPrice: 26.99, totalCostValue: 819.80, totalRetailValue: 2402.11, category: 'Harnesses', isLowStock: true, thresholdQuantity: 30 },
-    { sku: '2023-DD-Harness-Red-Small', productName: 'Dog Harness - Red Small', locationCode: 'A-02-01', locationName: 'Shelf A2', warehouse: 'Main', quantity: 12, cost: 8.50, retailPrice: 24.99, totalCostValue: 102.00, totalRetailValue: 299.88, category: 'Harnesses', isLowStock: true, thresholdQuantity: 20 },
-    { sku: '2023-DD-Leash-Black-Standard', productName: 'Dog Leash - Black Standard', locationCode: 'B-01-01', locationName: 'Shelf B1', warehouse: 'Main', quantity: 267, cost: 3.50, retailPrice: 9.99, totalCostValue: 934.50, totalRetailValue: 2667.33, category: 'Leashes', isLowStock: false, thresholdQuantity: 50 },
-    { sku: '2023-DD-Collar-Blue-Small', productName: 'Dog Collar - Blue Small', locationCode: 'C-01-01', locationName: 'Shelf C1', warehouse: 'Main', quantity: 5, cost: 4.20, retailPrice: 12.99, totalCostValue: 21.00, totalRetailValue: 64.95, category: 'Collars', isLowStock: true, thresholdQuantity: 15 },
-    { sku: '2023-DD-Collar-Red-Medium', productName: 'Dog Collar - Red Medium', locationCode: 'C-01-02', locationName: 'Shelf C1', warehouse: 'Main', quantity: 0, cost: 4.50, retailPrice: 13.99, totalCostValue: 0.00, totalRetailValue: 0.00, category: 'Collars', isLowStock: true, thresholdQuantity: 15 },
-    { sku: '2023-DD-Bed-Orthopedic-Large', productName: 'Orthopedic Dog Bed - Large', locationCode: 'D-01-01', locationName: 'Bin D1', warehouse: 'Main', quantity: 28, cost: 35.00, retailPrice: 89.99, totalCostValue: 980.00, totalRetailValue: 2519.72, category: 'Beds', isLowStock: false, thresholdQuantity: 10 },
-    { sku: '2023-DD-Toy-Rubber-Ball', productName: 'Rubber Ball Toy', locationCode: 'E-01-01', locationName: 'Shelf E1', warehouse: 'Main', quantity: 3, cost: 1.50, retailPrice: 4.99, totalCostValue: 4.50, totalRetailValue: 14.97, category: 'Toys', isLowStock: true, thresholdQuantity: 25 }
-  ]
-}
-
-// Sample low stock data
-const SAMPLE_LOW_STOCK = {
-  totalLowStockItems: 42,
-  criticalItems: 5,
-  urgentItems: 18,
-  warningItems: 19,
-  items: [
-    { sku: '2023-DD-Harness-Black-Medium', productName: 'Dog Harness - Black Medium', currentQty: 28, threshold: 30, variance: -2, location: 'Shelf A1', category: 'Harnesses', status: 'critical', daysOfSupply: 2 },
-    { sku: '2023-DD-Harness-Red-Small', productName: 'Dog Harness - Red Small', currentQty: 12, threshold: 20, variance: -8, location: 'Shelf A2', category: 'Harnesses', status: 'urgent', daysOfSupply: 4 },
-    { sku: '2023-DD-Collar-Blue-Small', productName: 'Dog Collar - Blue Small', currentQty: 5, threshold: 15, variance: -10, location: 'Shelf C1', category: 'Collars', status: 'critical', daysOfSupply: 1 },
-    { sku: '2023-DD-Collar-Red-Medium', productName: 'Dog Collar - Red Medium', currentQty: 0, threshold: 15, variance: -15, location: 'Shelf C1', category: 'Collars', status: 'critical', daysOfSupply: 0 },
-    { sku: '2023-DD-Toy-Rubber-Ball', productName: 'Rubber Ball Toy', currentQty: 3, threshold: 25, variance: -22, location: 'Shelf E1', category: 'Toys', status: 'critical', daysOfSupply: 1 },
-    { sku: '2023-DD-Collar-Green-Large', productName: 'Dog Collar - Green Large', currentQty: 8, threshold: 20, variance: -12, location: 'Shelf C2', category: 'Collars', status: 'urgent', daysOfSupply: 3 },
-    { sku: '2023-DD-Harness-Blue-Medium', productName: 'Dog Harness - Blue Medium', currentQty: 18, threshold: 30, variance: -12, location: 'Shelf A3', category: 'Harnesses', status: 'urgent', daysOfSupply: 6 },
-    { sku: '2023-DD-Leash-Red-Extended', productName: 'Dog Leash - Red Extended', currentQty: 22, threshold: 40, variance: -18, location: 'Shelf B2', category: 'Leashes', status: 'urgent', daysOfSupply: 7 },
-    { sku: '2023-DD-Toy-Chew-Large', productName: 'Large Chew Toy', currentQty: 14, threshold: 25, variance: -11, location: 'Shelf E2', category: 'Toys', status: 'warning', daysOfSupply: 5 },
-    { sku: '2023-DD-Bed-Memory-Foam-Small', productName: 'Memory Foam Bed - Small', currentQty: 6, threshold: 15, variance: -9, location: 'Bin D2', category: 'Beds', status: 'urgent', daysOfSupply: 2 }
-  ]
-}
-
-// Sample aging inventory data
-const SAMPLE_AGING_INVENTORY = {
-  totalItems: 1247,
-  totalValue: 287650.00,
-  averageAge: 128,
-  oldestItem: 487,
-  itemsOver30Days: 234,
-  itemsOver60Days: 89,
-  itemsOver90Days: 34,
-  itemsOver180Days: 12,
-  items: [
-    { sku: '2021-DD-Harness-Black-Small', productName: 'Dog Harness - Black Small (Old Stock)', daysInInventory: 487, quantity: 12, costValue: 102.00, location: 'Shelf A1', lastSaleDate: '2023-01-15', category: 'Harnesses', ageGroup: 'Over 180 days' },
-    { sku: '2021-DD-Leash-Retractable-Large', productName: 'Retractable Leash - Large (Obsolete)', daysInInventory: 412, quantity: 5, costValue: 67.50, location: 'Shelf B3', lastSaleDate: '2023-02-20', category: 'Leashes', ageGroup: 'Over 180 days' },
-    { sku: '2022-DD-Collar-Flea-Small', productName: 'Flea Collar - Small (Discontinued)', daysInInventory: 356, quantity: 28, costValue: 392.00, location: 'Shelf C2', lastSaleDate: '2023-04-10', category: 'Collars', ageGroup: 'Over 90 days' },
-    { sku: '2022-DD-Bed-Heated-Medium', productName: 'Heated Dog Bed - Medium', daysInInventory: 298, quantity: 3, costValue: 210.00, location: 'Bin D3', lastSaleDate: '2023-06-05', category: 'Beds', ageGroup: 'Over 90 days' },
-    { sku: '2022-DD-Toy-Kong-Medium', productName: 'Kong Toy - Medium (Slow Moving)', daysInInventory: 267, quantity: 45, costValue: 405.00, location: 'Shelf E1', lastSaleDate: '2023-07-12', category: 'Toys', ageGroup: 'Over 90 days' },
-    { sku: '2023-DD-Harness-Yellow-Large', productName: 'Dog Harness - Yellow Large', daysInInventory: 145, quantity: 32, costValue: 384.00, location: 'Shelf A4', lastSaleDate: '2024-08-15', category: 'Harnesses', ageGroup: 'Over 90 days' },
-    { sku: '2023-DD-Collar-Pink-Medium', productName: 'Dog Collar - Pink Medium', daysInInventory: 87, quantity: 56, costValue: 235.20, location: 'Shelf C3', lastSaleDate: '2024-09-20', category: 'Collars', ageGroup: '60-90 days' },
-    { sku: '2023-DD-Leash-Blue-Standard', productName: 'Dog Leash - Blue Standard', daysInInventory: 62, quantity: 89, costValue: 311.50, location: 'Shelf B1', lastSaleDate: '2024-10-22', category: 'Leashes', ageGroup: '30-60 days' },
-    { sku: '2023-DD-Bed-Memory-Small', productName: 'Memory Foam Bed - Small', daysInInventory: 45, quantity: 18, costValue: 486.00, location: 'Bin D1', lastSaleDate: '2024-11-10', category: 'Beds', ageGroup: '30-60 days' },
-    { sku: '2024-DD-Toy-Tennis-Ball', productName: 'Tennis Ball Toy - Pack', daysInInventory: 12, quantity: 124, costValue: 186.00, location: 'Shelf E2', lastSaleDate: '2024-12-15', category: 'Toys', ageGroup: '0-30 days' }
-  ]
-}
 
 export default function DemoDashboard() {
   const navigate = useNavigate()
   const [currentReport, setCurrentReport] = useState<'dashboard' | 'inventory' | 'low-stock' | 'aging-inventory' | 'profitability'>('dashboard')
-  const [data, setData] = useState<typeof SAMPLE_DATA | null>(null)
-  const [inventoryData] = useState<typeof SAMPLE_INVENTORY>(SAMPLE_INVENTORY)
-  const [lowStockData] = useState<typeof SAMPLE_LOW_STOCK>(SAMPLE_LOW_STOCK)
-  const [agingInventoryData] = useState<typeof SAMPLE_AGING_INVENTORY>(SAMPLE_AGING_INVENTORY)
+  const [data, setData] = useState<any | null>(null)
+  const [inventoryData, setInventoryData] = useState<any | null>(null)
+  const [lowStockData, setLowStockData] = useState<any | null>(null)
+  const [agingInventoryData, setAgingInventoryData] = useState<any | null>(null)
+  const [profitabilityData, setProfitabilityData] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [dateRange, setDateRange] = useState('today')
@@ -132,39 +29,64 @@ export default function DemoDashboard() {
     'performance': { label: 'Performance Analytics', icon: '📈' }
   }
 
-  // Function to adjust sample data based on date range only
-  const getAdjustedData = (baseData: typeof SAMPLE_DATA, range: string) => {
-    const dateMultiplier = range === 'today' ? 1 : range === 'yesterday' ? 0.9 : 2.8
-    
-    return {
-      ...baseData,
-      kpis: baseData.kpis.map(kpi => ({
-        ...kpi,
-        value: Math.round(typeof kpi.value === 'number' ? kpi.value * dateMultiplier : kpi.value),
-        trend: range === 'today' ? '+5%' : range === 'yesterday' ? '+3%' : '+8%'
-      })),
-      activitySummary: {
-        ...baseData.activitySummary,
-        totalTransactions: Math.round(baseData.activitySummary.totalTransactions * dateMultiplier),
-        totalQuantity: Math.round(baseData.activitySummary.totalQuantity * dateMultiplier),
-        byType: baseData.activitySummary.byType.map(t => ({
-          ...t,
-          count: Math.round(t.count * dateMultiplier)
-        }))
-      },
-      recentTransactions: baseData.recentTransactions,
-      topPerformers: baseData.topPerformers,
-      performanceMetrics: baseData.performanceMetrics
-    }
-  }
+  useEffect(() => {
+    const fetchAllDemoData = async () => {
+      try {
+        setLoading(true)
+        const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '') || 'http://localhost:5239'
+        
+        // Fetch from demo-specific endpoints (no authentication needed)
+        const dashboardResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/dashboard`, {
+          headers: { 'Content-Type': 'application/json' }
+        })
+        if (dashboardResponse.ok) {
+          const dashboardData = await dashboardResponse.json()
+          setData(dashboardData)
+        }
 
-  // Function to check if a report is available at the current tier level
-  const isReportAvailable = (reportKey: string): boolean => {
-    const requiredLevel = reportAccess[reportKey]
-    const available = requiredLevel ? planTier >= requiredLevel : false
-    console.log(`Report: ${reportKey}, Required: ${requiredLevel}, Current Tier: ${planTier}, Available: ${available}`)
-    return available
-  }
+        const inventoryResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/inventory`, {
+          headers: { 'Content-Type': 'application/json' }
+        })
+        if (inventoryResponse.ok) {
+          const invData = await inventoryResponse.json()
+          setInventoryData(invData)
+        }
+
+        const lowStockResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/low-stock`, {
+          headers: { 'Content-Type': 'application/json' }
+        })
+        if (lowStockResponse.ok) {
+          const lsData = await lowStockResponse.json()
+          setLowStockData(lsData)
+        }
+
+        const agingResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/aging-inventory`, {
+          headers: { 'Content-Type': 'application/json' }
+        })
+        if (agingResponse.ok) {
+          const agingData = await agingResponse.json()
+          setAgingInventoryData(agingData)
+        }
+
+        const profitabilityResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/profitability`, {
+          headers: { 'Content-Type': 'application/json' }
+        })
+        if (profitabilityResponse.ok) {
+          const profData = await profitabilityResponse.json()
+          setProfitabilityData(profData)
+        }
+
+        setError(null)
+      } catch (err) {
+        console.error('Failed to fetch demo data:', err)
+        setError('Unable to load demo data')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchAllDemoData()
+  }, [])
 
   // Load tier configuration and report access from backend
   useEffect(() => {
@@ -186,50 +108,16 @@ export default function DemoDashboard() {
     })
   }, [])
 
-  useEffect(() => {
-    const fetchDemoData = async () => {
-      try {
-        const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '') || 'http://localhost:5239'
-        const response = await fetch(`${baseUrl}/api/reports/dashboard?demo=true&customerId=2`, {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        })
+  // Function to check if a report is available at the current tier level
+  const isReportAvailable = (reportKey: string): boolean => {
+    const requiredLevel = reportAccess[reportKey]
+    const available = requiredLevel ? planTier >= requiredLevel : false
+    console.log(`Report: ${reportKey}, Required: ${requiredLevel}, Current Tier: ${planTier}, Available: ${available}`)
+    return available
+  }
 
-        if (response.ok) {
-          const apiData = await response.json()
-          // API returns kpis, activitySummary, and recentTransactions
-          // Create a merged object that combines API data with sample data for missing properties
-          const mergedData = {
-            kpis: apiData.kpis && Array.isArray(apiData.kpis) ? apiData.kpis : SAMPLE_DATA.kpis,
-            activitySummary: apiData.activitySummary || SAMPLE_DATA.activitySummary,
-            recentTransactions: apiData.recentTransactions && Array.isArray(apiData.recentTransactions) ? apiData.recentTransactions : SAMPLE_DATA.recentTransactions,
-            topPerformers: SAMPLE_DATA.topPerformers, // Always use sample for demo
-            performanceMetrics: SAMPLE_DATA.performanceMetrics // Always use sample for demo
-          }
-          setData(mergedData)
-          setError(null)
-        } else {
-          throw new Error(`API returned ${response.status}`)
-        }
-      } catch (err) {
-        console.error('Failed to fetch demo data:', err)
-        // Fall back to sample data
-        setData(SAMPLE_DATA)
-        setError('Using sample data - live API not available')
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchDemoData()
-  }, [])
-
-  // Get the data to display, adjusted for the selected date range
-  const displayData = useMemo(() => {
-    if (!data) return null
-    return getAdjustedData(data, dateRange)
-  }, [data, dateRange])
+  // Get the data to display (dashboard section uses real API data)
+  const displayData = data
 
   if (loading) {
     return (
@@ -350,7 +238,6 @@ export default function DemoDashboard() {
 
         {displayData && currentReport === 'dashboard' ? (
           <div className="space-y-6">
-            {/* Date Range Controls */}
             <div className="bg-white p-4 rounded-lg shadow">
               <div className="flex items-center gap-4">
                 <label className="text-sm font-medium text-gray-700">Date Range:</label>
@@ -374,7 +261,7 @@ export default function DemoDashboard() {
 
             {/* KPI Stats */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              {displayData.kpis.map((kpi, idx) => (
+              {displayData.kpis.map((kpi: any, idx: number) => (
                 <div key={idx} className="bg-white rounded-lg shadow p-6">
                   <h3 className="text-sm font-medium text-gray-500 mb-2">{kpi.label}</h3>
                   <p className="text-3xl font-bold text-gray-900 mb-2">
@@ -399,7 +286,7 @@ export default function DemoDashboard() {
                 </div>
                 <div className="p-6">
                   <div className="space-y-4">
-                    {displayData.topPerformers.map((performer) => (
+                    {displayData.topPerformers.map((performer: any) => (
                       <div 
                         key={performer.rank} 
                         className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-blue-50 cursor-pointer transition-colors"
@@ -501,7 +388,7 @@ export default function DemoDashboard() {
                 <div className="mt-6 pt-6 border-t">
                   <p className="text-sm font-medium text-gray-700 mb-4">Transaction Types</p>
                   <div className="space-y-3">
-                    {displayData.activitySummary.byType.map((type) => (
+                    {displayData.activitySummary.byType.map((type: any) => (
                       <div key={type.type} className="flex items-center justify-between">
                         <span className="text-sm text-gray-600">{type.type}</span>
                         <span className="text-sm font-semibold text-gray-900">{type.count.toLocaleString()}</span>
@@ -532,7 +419,7 @@ export default function DemoDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {displayData.recentTransactions.slice(0, 10).map((transaction) => (
+                    {displayData.recentTransactions.slice(0, 10).map((transaction: any) => (
                       <tr key={transaction.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 font-mono text-xs text-gray-900">{transaction.sku}</td>
                         <td className="px-6 py-4">
@@ -626,7 +513,7 @@ export default function DemoDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {inventoryData.items.map((item, idx) => (
+                    {inventoryData.items.map((item: any, idx: number) => (
                       <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                         <td className="px-6 py-4 text-sm font-medium text-gray-900">{item.sku}</td>
                         <td className="px-6 py-4 text-sm text-gray-700">{item.productName}</td>
@@ -705,7 +592,7 @@ export default function DemoDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {lowStockData.items.map((item, idx) => (
+                    {lowStockData.items.map((item: any, idx: number) => (
                       <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                         <td className="px-6 py-4 text-sm font-medium text-gray-900">{item.sku}</td>
                         <td className="px-6 py-4 text-sm text-gray-700">{item.productName}</td>
@@ -772,23 +659,23 @@ export default function DemoDashboard() {
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <div className="bg-green-50 p-3 rounded-lg text-center">
                 <p className="text-xs text-green-700 font-semibold">0-30 Days</p>
-                <p className="text-lg font-bold text-green-900 mt-1">{agingInventoryData.items.filter(i => i.daysInInventory <= 30).length}</p>
+                <p className="text-lg font-bold text-green-900 mt-1">{agingInventoryData.items.filter((i: any) => i.daysInInventory <= 30).length}</p>
               </div>
               <div className="bg-blue-50 p-3 rounded-lg text-center">
                 <p className="text-xs text-blue-700 font-semibold">30-60 Days</p>
-                <p className="text-lg font-bold text-blue-900 mt-1">{agingInventoryData.items.filter(i => i.daysInInventory > 30 && i.daysInInventory <= 60).length}</p>
+                <p className="text-lg font-bold text-blue-900 mt-1">{agingInventoryData.items.filter((i: any) => i.daysInInventory > 30 && i.daysInInventory <= 60).length}</p>
               </div>
               <div className="bg-yellow-50 p-3 rounded-lg text-center">
                 <p className="text-xs text-yellow-700 font-semibold">60-90 Days</p>
-                <p className="text-lg font-bold text-yellow-900 mt-1">{agingInventoryData.items.filter(i => i.daysInInventory > 60 && i.daysInInventory <= 90).length}</p>
+                <p className="text-lg font-bold text-yellow-900 mt-1">{agingInventoryData.items.filter((i: any) => i.daysInInventory > 60 && i.daysInInventory <= 90).length}</p>
               </div>
               <div className="bg-orange-50 p-3 rounded-lg text-center">
                 <p className="text-xs text-orange-700 font-semibold">90-180 Days</p>
-                <p className="text-lg font-bold text-orange-900 mt-1">{agingInventoryData.items.filter(i => i.daysInInventory > 90 && i.daysInInventory <= 180).length}</p>
+                <p className="text-lg font-bold text-orange-900 mt-1">{agingInventoryData.items.filter((i: any) => i.daysInInventory > 90 && i.daysInInventory <= 180).length}</p>
               </div>
               <div className="bg-red-50 p-3 rounded-lg text-center">
                 <p className="text-xs text-red-700 font-semibold">180+ Days</p>
-                <p className="text-lg font-bold text-red-900 mt-1">{agingInventoryData.items.filter(i => i.daysInInventory > 180).length}</p>
+                <p className="text-lg font-bold text-red-900 mt-1">{agingInventoryData.items.filter((i: any) => i.daysInInventory > 180).length}</p>
               </div>
             </div>
 
@@ -809,7 +696,7 @@ export default function DemoDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {agingInventoryData.items.map((item, idx) => (
+                    {agingInventoryData.items.map((item: any, idx: number) => (
                       <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                         <td className="px-6 py-4 text-sm font-medium text-gray-900">{item.sku}</td>
                         <td className="px-6 py-4 text-sm text-gray-700">{item.productName}</td>
@@ -864,106 +751,106 @@ export default function DemoDashboard() {
           </div>
         ) : currentReport === 'profitability' ? (
           <div className="bg-white rounded-lg shadow p-6">
-            <div className="space-y-6">
-              {/* KPI Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-                <div className="bg-blue-50 rounded-lg p-4">
-                  <p className="text-sm font-medium text-gray-600 mb-2">Total Revenue</p>
-                  <p className="text-2xl font-bold text-blue-900">$157,284</p>
+            {profitabilityData ? (
+              <div className="space-y-6">
+                {/* KPI Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+                  <div className="bg-blue-50 rounded-lg p-4">
+                    <p className="text-sm font-medium text-gray-600 mb-2">Total Revenue</p>
+                    <p className="text-2xl font-bold text-blue-900">${(profitabilityData.totalRevenue || 0).toLocaleString(undefined, {maximumFractionDigits: 0})}</p>
+                  </div>
+                  <div className="bg-blue-50 rounded-lg p-4">
+                    <p className="text-sm font-medium text-gray-600 mb-2">Total Cost</p>
+                    <p className="text-2xl font-bold text-blue-900">${(profitabilityData.totalCost || 0).toLocaleString(undefined, {maximumFractionDigits: 0})}</p>
+                  </div>
+                  <div className="bg-green-50 rounded-lg p-4">
+                    <p className="text-sm font-medium text-gray-600 mb-2">Gross Profit</p>
+                    <p className="text-2xl font-bold text-green-900">${(profitabilityData.totalGrossProfit || 0).toLocaleString(undefined, {maximumFractionDigits: 0})}</p>
+                  </div>
+                  <div className="bg-blue-50 rounded-lg p-4">
+                    <p className="text-sm font-medium text-gray-600 mb-2">Avg Margin</p>
+                    <p className="text-2xl font-bold text-blue-900">{(profitabilityData.avgMarginPercent || 0).toFixed(1)}%</p>
+                  </div>
+                  <div className="bg-blue-50 rounded-lg p-4">
+                    <p className="text-sm font-medium text-gray-600 mb-2">Units Sold</p>
+                    <p className="text-2xl font-bold text-blue-900">{(profitabilityData.totalUnitsSold || 0).toLocaleString()}</p>
+                  </div>
                 </div>
-                <div className="bg-blue-50 rounded-lg p-4">
-                  <p className="text-sm font-medium text-gray-600 mb-2">Total Cost</p>
-                  <p className="text-2xl font-bold text-blue-900">$89,563</p>
-                </div>
-                <div className="bg-green-50 rounded-lg p-4">
-                  <p className="text-sm font-medium text-gray-600 mb-2">Gross Profit</p>
-                  <p className="text-2xl font-bold text-green-900">$67,721</p>
-                </div>
-                <div className="bg-blue-50 rounded-lg p-4">
-                  <p className="text-sm font-medium text-gray-600 mb-2">Avg Margin</p>
-                  <p className="text-2xl font-bold text-blue-900">43.1%</p>
-                </div>
-                <div className="bg-blue-50 rounded-lg p-4">
-                  <p className="text-sm font-medium text-gray-600 mb-2">Units Sold</p>
-                  <p className="text-2xl font-bold text-blue-900">8,247</p>
-                </div>
-              </div>
 
-              {/* Margin Distribution */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="bg-green-50 rounded-lg border border-green-200 p-4">
-                  <p className="text-sm font-medium text-gray-600">High Margin (&gt;30%)</p>
-                  <p className="text-2xl font-bold text-green-700 mt-2">142</p>
+                {/* Margin Distribution */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="bg-green-50 rounded-lg border border-green-200 p-4">
+                    <p className="text-sm font-medium text-gray-600">High Margin (&gt;30%)</p>
+                    <p className="text-2xl font-bold text-green-700 mt-2">{profitabilityData.highMarginCount || 0}</p>
+                  </div>
+                  <div className="bg-blue-50 rounded-lg border border-blue-200 p-4">
+                    <p className="text-sm font-medium text-gray-600">Medium Margin (10-30%)</p>
+                    <p className="text-2xl font-bold text-blue-700 mt-2">{profitabilityData.mediumMarginCount || 0}</p>
+                  </div>
+                  <div className="bg-yellow-50 rounded-lg border border-yellow-200 p-4">
+                    <p className="text-sm font-medium text-gray-600">Low Margin (0-10%)</p>
+                    <p className="text-2xl font-bold text-yellow-700 mt-2">{profitabilityData.lowMarginCount || 0}</p>
+                  </div>
+                  <div className="bg-red-50 rounded-lg border border-red-200 p-4">
+                    <p className="text-sm font-medium text-gray-600">Unprofitable (&lt;0%)</p>
+                    <p className="text-2xl font-bold text-red-700 mt-2">{profitabilityData.unprofitableCount || 0}</p>
+                  </div>
                 </div>
-                <div className="bg-blue-50 rounded-lg border border-blue-200 p-4">
-                  <p className="text-sm font-medium text-gray-600">Medium Margin (10-30%)</p>
-                  <p className="text-2xl font-bold text-blue-700 mt-2">287</p>
-                </div>
-                <div className="bg-yellow-50 rounded-lg border border-yellow-200 p-4">
-                  <p className="text-sm font-medium text-gray-600">Low Margin (0-10%)</p>
-                  <p className="text-2xl font-bold text-yellow-700 mt-2">165</p>
-                </div>
-                <div className="bg-red-50 rounded-lg border border-red-200 p-4">
-                  <p className="text-sm font-medium text-gray-600">Unprofitable (&lt;0%)</p>
-                  <p className="text-2xl font-bold text-red-700 mt-2">23</p>
-                </div>
-              </div>
 
-              {/* Products Table */}
-              <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                <div className="px-6 py-4 bg-gray-50 border-b">
-                  <h3 className="font-semibold text-gray-900">Top Profitable Products</h3>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50 border-b">
-                      <tr>
-                        <th className="px-6 py-3 text-left font-medium text-gray-700">SKU</th>
-                        <th className="px-6 py-3 text-left font-medium text-gray-700">Product</th>
-                        <th className="px-6 py-3 text-right font-medium text-gray-700">Units Sold</th>
-                        <th className="px-6 py-3 text-right font-medium text-gray-700">Revenue</th>
-                        <th className="px-6 py-3 text-right font-medium text-gray-700">Gross Profit</th>
-                        <th className="px-6 py-3 text-right font-medium text-gray-700">Margin %</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {[
-                        { sku: '2023-DD-Harness-Black-Small', name: 'Dog Harness - Black Small', units: 284, revenue: 7148, profit: 4112, margin: 57.5 },
-                        { sku: '2023-DD-Bed-Orthopedic-Large', name: 'Orthopedic Dog Bed - Large', units: 128, revenue: 11519, profit: 4387, margin: 38.1 },
-                        { sku: '2023-DD-Harness-Black-Medium', name: 'Dog Harness - Black Medium', units: 156, revenue: 4210, profit: 2368, margin: 56.2 },
-                        { sku: '2023-DD-Leash-Black-Standard', name: 'Dog Leash - Black Standard', units: 298, revenue: 2967, profit: 1742, margin: 58.7 },
-                        { sku: '2023-DD-Collar-Blue-Small', name: 'Dog Collar - Blue Small', units: 142, revenue: 1843, profit: 1124, margin: 61.0 }
-                      ].map((item) => (
-                        <tr key={item.sku} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 font-mono text-xs text-gray-900">{item.sku}</td>
-                          <td className="px-6 py-4 text-gray-700">{item.name}</td>
-                          <td className="px-6 py-4 text-right text-gray-900">{item.units}</td>
-                          <td className="px-6 py-4 text-right text-gray-900">${item.revenue.toLocaleString()}</td>
-                          <td className="px-6 py-4 text-right font-medium text-green-600">${item.profit.toLocaleString()}</td>
-                          <td className="px-6 py-4 text-right">
-                            <span className="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              {item.margin.toFixed(1)}%
-                            </span>
-                          </td>
+                {/* Products Table */}
+                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="px-6 py-4 bg-gray-50 border-b">
+                    <h3 className="font-semibold text-gray-900">Top Profitable Products</h3>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 border-b">
+                        <tr>
+                          <th className="px-6 py-3 text-left font-medium text-gray-700">SKU</th>
+                          <th className="px-6 py-3 text-left font-medium text-gray-700">Product</th>
+                          <th className="px-6 py-3 text-right font-medium text-gray-700">Units Sold</th>
+                          <th className="px-6 py-3 text-right font-medium text-gray-700">Revenue</th>
+                          <th className="px-6 py-3 text-right font-medium text-gray-700">Gross Profit</th>
+                          <th className="px-6 py-3 text-right font-medium text-gray-700">Margin %</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y">
+                        {(profitabilityData.items || []).slice(0, 5).map((item: any) => (
+                          <tr key={item.sku} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 font-mono text-xs text-gray-900">{item.sku}</td>
+                            <td className="px-6 py-4 text-gray-700">{item.productName}</td>
+                            <td className="px-6 py-4 text-right text-gray-900">{item.unitsSold}</td>
+                            <td className="px-6 py-4 text-right text-gray-900">${item.revenue.toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
+                            <td className="px-6 py-4 text-right font-medium text-green-600">${item.grossProfit.toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
+                            <td className="px-6 py-4 text-right">
+                              <span className="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                {item.marginPercent.toFixed(1)}%
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
 
-              {/* Info Banner */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-start">
-                  <AlertCircle className="w-5 h-5 text-blue-600 mr-3 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm text-blue-800">
-                      <strong>Premium Feature:</strong> This demo shows profit analysis by product, identifying your most profitable SKUs and those with margin opportunities. Get real-time insights into revenue, cost structure, and profitability metrics to optimize product mix and pricing.
-                    </p>
+                {/* Info Banner */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-start">
+                    <AlertCircle className="w-5 h-5 text-blue-600 mr-3 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm text-blue-800">
+                        <strong>Premium Feature:</strong> This demo shows profit analysis by product, identifying your most profitable SKUs and those with margin opportunities. Get real-time insights into revenue, cost structure, and profitability metrics to optimize product mix and pricing.
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-gray-600">Loading profitability data...</p>
+              </div>
+            )}
           </div>
         ) : (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
