@@ -1,8 +1,25 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, DollarSign, AlertCircle } from 'lucide-react'
+import { ArrowLeft, DollarSign, AlertCircle, Info } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import WithMembershipCheck from '../components/WithMembershipCheck'
+import { format, subDays } from 'date-fns'
+
+interface Tooltip {
+  [key: string]: string
+}
+
+const METRIC_TOOLTIPS: Tooltip = {
+  totalRevenue: 'Sum of all sales revenue (Units Sold × Sale Price)',
+  totalCost: 'Sum of all product costs (Units Sold × Cost per Unit)',
+  grossProfit: 'Total Revenue minus Total Cost',
+  avgMargin: 'Average profit margin across all products sold = (Gross Profit / Total Revenue) × 100%',
+  unitsSold: 'Total number of units sold across all SKUs',
+  highMargin: 'Products with profit margin greater than 30%',
+  mediumMargin: 'Products with profit margin between 10% and 30%',
+  lowMargin: 'Products with profit margin between 0% and 10%',
+  unprofitable: 'Products with negative profit margin (cost exceeds sale price)'
+}
 
 interface ProfitabilityItem {
   sku: string
@@ -85,12 +102,54 @@ export default function ProfitabilityReport() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [sortBy, setSortBy] = useState<'margin' | 'profit' | 'revenue'>('margin')
+  const [dateRange, setDateRange] = useState<'month' | '90day' | 'all'>('month')
+  const [hoveredTooltip, setHoveredTooltip] = useState<string | null>(null)
+
+  const renderTooltip = (key: string) => (
+    <div className="relative group inline-block">
+      <Info 
+        className="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help"
+        onMouseEnter={() => setHoveredTooltip(key)}
+        onMouseLeave={() => setHoveredTooltip(null)}
+      />
+      {hoveredTooltip === key && (
+        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-xs rounded p-2 z-10 pointer-events-none">
+          {METRIC_TOOLTIPS[key]}
+          <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+        </div>
+      )}
+    </div>
+  )
 
   useEffect(() => {
     const fetchProfitabilityData = async () => {
       try {
         const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '') || 'http://localhost:5239'
-        const response = await fetch(`${baseUrl}/api/reports/customer/${customerId}/profitability`, {
+        
+        // Calculate date range
+        let from: string | undefined
+        let to: string | undefined
+        
+        const now = new Date()
+        switch (dateRange) {
+          case 'month':
+            from = format(subDays(now, 30), 'yyyy-MM-dd') + 'T00:00:00Z'
+            to = format(now, 'yyyy-MM-dd') + 'T23:59:59Z'
+            break
+          case '90day':
+            from = format(subDays(now, 90), 'yyyy-MM-dd') + 'T00:00:00Z'
+            to = format(now, 'yyyy-MM-dd') + 'T23:59:59Z'
+            break
+          case 'all':
+            // No date params for all-time
+            break
+        }
+        
+        const url = new URL(`${baseUrl}/api/reports/customer/${customerId}/profitability`)
+        if (from) url.searchParams.append('from', from)
+        if (to) url.searchParams.append('to', to)
+        
+        const response = await fetch(url.toString(), {
           credentials: 'include'
         })
 
@@ -118,9 +177,10 @@ export default function ProfitabilityReport() {
     }
 
     if (customerId) {
+      setLoading(true)
       fetchProfitabilityData()
     }
-  }, [customerId])
+  }, [customerId, dateRange])
 
   const getSortedItems = () => {
     if (!data?.summary.items) return []
@@ -216,38 +276,87 @@ export default function ProfitabilityReport() {
             </p>
           </div>
 
+          {/* Date Range Selector */}
+          <div className="mb-8 flex gap-2">
+            <button
+              onClick={() => setDateRange('month')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                dateRange === 'month'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              Last 30 Days
+            </button>
+            <button
+              onClick={() => setDateRange('90day')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                dateRange === '90day'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              Last 90 Days
+            </button>
+            <button
+              onClick={() => setDateRange('all')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                dateRange === 'all'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              All Time
+            </button>
+          </div>
+
           {/* KPI Cards */}
           <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
             <div className="bg-white rounded-lg shadow p-6">
-              <p className="text-sm font-medium text-gray-500 mb-2">Total Revenue</p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-gray-500">Total Revenue</p>
+                {renderTooltip('totalRevenue')}
+              </div>
               <p className="text-3xl font-bold text-gray-900">
                 ${summary.totalRevenue.toLocaleString('en-US', { maximumFractionDigits: 0 })}
               </p>
             </div>
 
             <div className="bg-white rounded-lg shadow p-6">
-              <p className="text-sm font-medium text-gray-500 mb-2">Total Cost</p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-gray-500">Total Cost</p>
+                {renderTooltip('totalCost')}
+              </div>
               <p className="text-3xl font-bold text-gray-900">
                 ${summary.totalCost.toLocaleString('en-US', { maximumFractionDigits: 0 })}
               </p>
             </div>
 
             <div className="bg-white rounded-lg shadow p-6">
-              <p className="text-sm font-medium text-gray-500 mb-2">Gross Profit</p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-gray-500">Gross Profit</p>
+                {renderTooltip('grossProfit')}
+              </div>
               <p className="text-3xl font-bold text-green-600">
                 ${summary.totalGrossProfit.toLocaleString('en-US', { maximumFractionDigits: 0 })}
               </p>
             </div>
 
             <div className="bg-white rounded-lg shadow p-6">
-              <p className="text-sm font-medium text-gray-500 mb-2">Avg Margin</p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-gray-500">Avg Margin</p>
+                {renderTooltip('avgMargin')}
+              </div>
               <p className="text-3xl font-bold text-blue-600">
                 {summary.averageProfitMargin.toFixed(1)}%
               </p>
             </div>
 
             <div className="bg-white rounded-lg shadow p-6">
-              <p className="text-sm font-medium text-gray-500 mb-2">Units Sold</p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-gray-500">Units Sold</p>
+                {renderTooltip('unitsSold')}
+              </div>
               <p className="text-3xl font-bold text-gray-900">
                 {summary.totalUnitsSold.toLocaleString()}
               </p>
@@ -257,25 +366,37 @@ export default function ProfitabilityReport() {
           {/* Margin Distribution */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <div className="bg-green-50 rounded-lg border border-green-200 p-6">
-              <p className="text-sm font-medium text-gray-600">High Margin</p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-gray-600">High Margin</p>
+                {renderTooltip('highMargin')}
+              </div>
               <p className="text-2xl font-bold text-green-700 mt-2">{summary.highMarginSkus}</p>
               <p className="text-xs text-gray-500 mt-1">&gt; 30% margin</p>
             </div>
 
             <div className="bg-blue-50 rounded-lg border border-blue-200 p-6">
-              <p className="text-sm font-medium text-gray-600">Medium Margin</p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-gray-600">Medium Margin</p>
+                {renderTooltip('mediumMargin')}
+              </div>
               <p className="text-2xl font-bold text-blue-700 mt-2">{summary.mediumMarginSkus}</p>
               <p className="text-xs text-gray-500 mt-1">10-30% margin</p>
             </div>
 
             <div className="bg-yellow-50 rounded-lg border border-yellow-200 p-6">
-              <p className="text-sm font-medium text-gray-600">Low Margin</p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-gray-600">Low Margin</p>
+                {renderTooltip('lowMargin')}
+              </div>
               <p className="text-2xl font-bold text-yellow-700 mt-2">{summary.lowMarginSkus}</p>
               <p className="text-xs text-gray-500 mt-1">0-10% margin</p>
             </div>
 
             <div className="bg-red-50 rounded-lg border border-red-200 p-6">
-              <p className="text-sm font-medium text-gray-600">Unprofitable</p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-gray-600">Unprofitable</p>
+                {renderTooltip('unprofitable')}
+              </div>
               <p className="text-2xl font-bold text-red-700 mt-2">{summary.unprofitableSkus}</p>
               <p className="text-xs text-gray-500 mt-1">&lt; 0% margin</p>
             </div>

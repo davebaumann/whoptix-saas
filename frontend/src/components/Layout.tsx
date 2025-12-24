@@ -22,6 +22,7 @@ export default function Layout({ children }: LayoutProps) {
   const allNavItems = [
     { path: '/app/', label: 'Picker Dashboard', icon: '📦', reportName: null },
     { path: '/app/aging-inventory', label: 'Aging Inventory', icon: '⏰', reportName: 'aging-inventory' },
+    { path: '/app/channel-performance', label: 'Channel Performance', icon: '🌐', reportName: 'channel-performance' },
     { path: '/app/demand-forecast', label: 'Demand Forecast', icon: '🔮', reportName: 'demand-forecast' },
     { path: '/app/financial-warehouse', label: 'Financial Report', icon: '💰', reportName: 'financial-warehouse' },
     { path: '/app/inventory', label: 'Inventory Report', icon: '📊', reportName: 'inventory' },

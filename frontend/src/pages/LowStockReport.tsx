@@ -124,7 +124,7 @@ export default function LowStockReport() {
           </p>
           <div className="mt-2">
             <a 
-              href="/low-stock-admin" 
+              href="/app/low-stock-admin" 
               className="inline-flex items-center text-sm text-blue-600 hover:text-blue-700 font-medium"
             >
               ⚙️ Manage Low Stock Thresholds

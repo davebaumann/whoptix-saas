@@ -32,6 +32,9 @@ builder.Services.AddScoped<SkuVaultSaaS.Infrastructure.Services.ISkuVaultSyncSer
 // Email Service
 builder.Services.AddScoped<IEmailService, EmailService>();
 
+// Two-Factor Authentication Service
+builder.Services.AddScoped<ITwoFactorService, TwoFactorService>();
+
 // User Context Service for tenant isolation
 builder.Services.AddScoped<UserContextService>();
 

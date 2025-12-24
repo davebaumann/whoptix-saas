@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { useState } from 'react';
+import { Download } from 'lucide-react';
 
 interface InventoryItem {
   sku: string;
@@ -95,8 +96,38 @@ export default function Inventory() {
 
   const warehouses = [...new Set(inventoryData.items.map(item => item.warehouse))].filter(Boolean);
   
-  const formatCurrency = (value: number) => 
+  const formatCurrency = (value: number) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+
+  const exportToCSV = () => {
+    if (!inventoryData) return
+
+    const rows: string[] = []
+    
+    // Header row
+    rows.push('SKU,Product Name,Warehouse,Location,Quantity,Unit Cost,Unit Retail Price,Total Cost Value,Total Retail Value')
+    
+    // Data rows - use filtered items if filters are applied
+    filteredItems.forEach((item: InventoryItem) => {
+      rows.push(
+        `"${item.sku}","${item.productName}","${item.warehouse}","${item.locationName}",${item.quantity},${(item.cost || 0).toFixed(2)},${(item.retailPrice || 0).toFixed(2)},${item.totalCostValue.toFixed(2)},${item.totalRetailValue.toFixed(2)}`
+      )
+    })
+    
+    // Create blob and download
+    const csv = rows.join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    
+    link.setAttribute('href', url)
+    link.setAttribute('download', `inventory-report-${new Date().toISOString().split('T')[0]}.csv`)
+    link.style.visibility = 'hidden'
+    
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
 
   return (
     <div className="space-y-6">
@@ -207,6 +238,17 @@ export default function Inventory() {
 
       {/* Inventory Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+          <h2 className="text-lg font-semibold text-gray-900">Inventory Details</h2>
+          <button
+            onClick={exportToCSV}
+            disabled={!inventoryData || inventoryData.items.length === 0}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </button>
+        </div>
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>

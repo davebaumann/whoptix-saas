@@ -1,7 +1,8 @@
 {
   "inventory": 1,
-  "low-stock": 3,
+  "low-stock": 1,
   "aging-inventory": 3,
+  "channel-performance": 1,
   "profitability": 3,
   "demand-forecast": 3,
   "financial-warehouse": 4,

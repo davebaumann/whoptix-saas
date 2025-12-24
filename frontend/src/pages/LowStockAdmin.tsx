@@ -36,8 +36,10 @@ interface CreateThresholdData {
 }
 
 const LowStockAdmin: React.FC = () => {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
+  console.log('🔍 LowStockAdmin component is rendering!', { user, authLoading });
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -60,62 +62,124 @@ const LowStockAdmin: React.FC = () => {
 
   // Get customer ID from user context (assuming it's available)
   const customerId = user?.customerId || 1;
+  console.log('🔍 LowStockAdmin customerId:', customerId);
+
+  // Early loading state
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <svg className="animate-spin h-8 w-8 text-blue-600 mx-auto" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <p className="mt-2 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Check authentication and customer ID
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600">Authentication required.</p>
+        </div>
+      </div>
+    )
+  }
 
   // Queries
-  const { data: thresholds = [], isLoading: loadingThresholds } = useQuery({
+  const { data: thresholds = [], isLoading: loadingThresholds, error: thresholdsError } = useQuery({
     queryKey: ['lowStockThresholds', customerId],
+    retry: false,
     queryFn: async () => {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/lowstock/thresholds/${customerId}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      const url = `${import.meta.env.VITE_API_BASE_URL}/api/lowstock/thresholds/${customerId}`;
+      console.log('🔍 Fetching thresholds from:', url);
+      const response = await fetch(url, {
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
       });
       if (!response.ok) throw new Error('Failed to fetch thresholds');
-      return response.json();
+      const data = await response.json();
+      console.log('🔍 Thresholds fetched:', data);
+      return data;
     }
   });
+  
+  console.log('🔍 Thresholds state:', { thresholds, loadingThresholds, thresholdsError });
 
-  const { data: products = [], isLoading: loadingProducts } = useQuery({
+  const { data: products = [], isLoading: loadingProducts, error: productsError } = useQuery({
     queryKey: ['products', customerId],
+    retry: false,
     queryFn: async () => {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/lowstock/products/${customerId}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      const url = `${import.meta.env.VITE_API_BASE_URL}/api/lowstock/products/${customerId}`;
+      console.log('🔍 Fetching products from:', url);
+      const response = await fetch(url, {
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
       });
       if (!response.ok) throw new Error('Failed to fetch products');
-      return response.json();
+      const data = await response.json();
+      console.log('🔍 Products fetched:', data);
+      return data;
     }
   });
 
-  const { data: locations = [], isLoading: loadingLocations } = useQuery({
+  const { data: locations = [], isLoading: loadingLocations, error: locationsError } = useQuery({
     queryKey: ['locations', customerId],
+    retry: false,
     queryFn: async () => {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/lowstock/locations/${customerId}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      const url = `${import.meta.env.VITE_API_BASE_URL}/api/lowstock/locations/${customerId}`;
+      console.log('🔍 Fetching locations from:', url);
+      const response = await fetch(url, {
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
       });
       if (!response.ok) throw new Error('Failed to fetch locations');
-      return response.json();
+      const data = await response.json();
+      console.log('🔍 Locations fetched:', data);
+      return data;
     }
+  });
+  
+  console.log('🔍 Query states:', { 
+    loadingThresholds, 
+    loadingProducts, 
+    loadingLocations,
+    thresholdsError,
+    productsError,
+    locationsError
   });
 
   // Mutations
   const createThresholdMutation = useMutation({
     mutationFn: async (data: CreateThresholdData) => {
+      console.log('🔍 Creating threshold with data:', data);
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/lowstock/thresholds`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(data)
       });
       if (!response.ok) {
         const error = await response.text();
+        console.error('🔴 Create threshold error:', error);
         throw new Error(error || 'Failed to create threshold');
       }
       return response.json();
     },
     onSuccess: () => {
+      console.log('✅ Threshold created successfully');
       queryClient.invalidateQueries({ queryKey: ['lowStockThresholds', customerId] });
       setIsAddModalOpen(false);
       resetForm();
+    },
+    onError: (error: any) => {
+      console.error('🔴 Mutation error:', error);
     }
   });
 
@@ -123,9 +187,9 @@ const LowStockAdmin: React.FC = () => {
     mutationFn: async ({ id, thresholdQuantity }: { id: number; thresholdQuantity: number }) => {
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/lowstock/thresholds/${id}`, {
         method: 'PUT',
+        credentials: 'include',
         headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ thresholdQuantity })
       });
@@ -142,7 +206,8 @@ const LowStockAdmin: React.FC = () => {
     mutationFn: async (id: number) => {
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/lowstock/thresholds/${id}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
       });
       if (!response.ok) throw new Error('Failed to delete threshold');
     },
@@ -154,9 +219,11 @@ const LowStockAdmin: React.FC = () => {
   // Notification preferences query
   const { data: notificationData } = useQuery({
     queryKey: ['notificationPreferences', customerId],
+    retry: false,
     queryFn: async () => {
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/customernotification/${customerId}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
       });
       if (!response.ok) throw new Error('Failed to fetch notification preferences');
       return response.json();
@@ -174,9 +241,9 @@ const LowStockAdmin: React.FC = () => {
     mutationFn: async (data: typeof notificationPrefs) => {
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/customernotification/${customerId}`, {
         method: 'PUT',
+        credentials: 'include',
         headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(data)
       });
@@ -240,6 +307,33 @@ const LowStockAdmin: React.FC = () => {
     return (
       <div className="flex items-center justify-center min-h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  // Show error if any query failed
+  if (thresholdsError || productsError || locationsError) {
+    console.error('🔴 Query Errors:', { thresholdsError, productsError, locationsError });
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center p-6 bg-red-50 border border-red-200 rounded-lg max-w-md">
+          <p className="text-red-700 font-semibold mb-2">Error loading data</p>
+          {thresholdsError && (
+            <p className="text-red-600 text-sm mb-2">
+              Thresholds: {(thresholdsError as Error).message}
+            </p>
+          )}
+          {productsError && (
+            <p className="text-red-600 text-sm mb-2">
+              Products: {(productsError as Error).message}
+            </p>
+          )}
+          {locationsError && (
+            <p className="text-red-600 text-sm mb-2">
+              Locations: {(locationsError as Error).message}
+            </p>
+          )}
+        </div>
       </div>
     );
   }
@@ -439,7 +533,13 @@ const LowStockAdmin: React.FC = () => {
                   type="number"
                   min="0"
                   value={formData.thresholdQuantity}
-                  onChange={(e) => setFormData({ ...formData, thresholdQuantity: parseInt(e.target.value) })}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFormData({ 
+                      ...formData, 
+                      thresholdQuantity: val === '' ? 0 : parseInt(val, 10) 
+                    });
+                  }}
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />

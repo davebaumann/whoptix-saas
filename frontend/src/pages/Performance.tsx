@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 // import PackerPerformanceDetail from '../components/PackerPerformanceDetail';
-import { TrendingUp, TrendingDown, Activity, Package, BarChart3, AlertTriangle, DollarSign, ShoppingCart, Zap } from 'lucide-react';
+import { TrendingUp, TrendingDown, Activity, Package, BarChart3, AlertTriangle, ShoppingCart, Zap } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import WithMembershipCheck from '../components/WithMembershipCheck';
 import { useAuth } from '../contexts/AuthContext';
@@ -8,7 +8,6 @@ import { useAuth } from '../contexts/AuthContext';
 const PerformanceContent: React.FC = () => {
   const { user } = useAuth()
   const [selectedTimeframe, setSelectedTimeframe] = useState('30days');
-  const [selectedMetric, setSelectedMetric] = useState('velocity');
   const customerId = user?.customerId || 1
   const [pickerModal, setPickerModal] = useState<{ pickerName: string | null }>({ pickerName: null });
 
@@ -130,51 +129,44 @@ const PerformanceContent: React.FC = () => {
             Track inventory velocity, turnover rates, and product performance metrics
           </p>
         </div>
-        <div className="mt-4 flex md:ml-4 md:mt-0 space-x-3">
-          <select
-            value={selectedTimeframe}
-            onChange={(e) => setSelectedTimeframe(e.target.value)}
-            className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-          >
-            <option value="7days">Last 7 days</option>
-            <option value="30days">Last 30 days</option>
-            <option value="90days">Last 90 days</option>
-          </select>
-          <select
-            value={selectedMetric}
-            onChange={(e) => setSelectedMetric(e.target.value)}
-            className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-          >
-            <option value="velocity">Velocity View</option>
-            <option value="turnover">Turnover View</option>
-            <option value="revenue">Revenue View</option>
-          </select>
+        <div className="mt-4 flex md:ml-4 md:mt-0 space-x-3 flex-wrap gap-2">
+          <div className="flex gap-2">
+            <button
+              onClick={() => setSelectedTimeframe('7days')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                selectedTimeframe === '7days'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              Last 7 Days
+            </button>
+            <button
+              onClick={() => setSelectedTimeframe('30days')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                selectedTimeframe === '30days'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              Last 30 Days
+            </button>
+            <button
+              onClick={() => setSelectedTimeframe('90days')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                selectedTimeframe === '90days'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              Last 90 Days
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Enhanced Summary Cards */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6 border-l-4 border-green-500">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <DollarSign className="h-6 w-6 text-green-600" />
-            </div>
-            <div className="ml-3 w-0 flex-1">
-              <dt className="truncate text-sm font-medium text-gray-500">Total Revenue</dt>
-              <dd className="mt-1 text-2xl font-bold text-gray-900">
-                {formatCurrency(summary.totalRevenue)}
-              </dd>
-              <div className="mt-2 flex items-center text-sm">
-                {getTrendIcon(summary.revenueGrowth)}
-                <span className={`ml-1 font-semibold ${getTrendColor(summary.revenueGrowth)}`}>
-                  {formatPercentage(summary.revenueGrowth)}
-                </span>
-                <span className="ml-1 text-gray-500">vs last period</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
         <div className="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6 border-l-4 border-blue-500">
           <div className="flex items-center">
             <div className="flex-shrink-0">
@@ -233,6 +225,30 @@ const PerformanceContent: React.FC = () => {
             </div>
           </div>
         </div>
+
+        <div className="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6 border-l-4 border-green-500">
+          <h3 className="text-sm font-medium text-gray-500 mb-3">Performance Trends</h3>
+          <div className="space-y-2">
+            {trends?.slice(0, 3).map((trend: any, index: number) => (
+              <div key={index} className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className={`w-2 h-2 rounded-full mr-2 ${
+                    trend.direction === 'up' ? 'bg-green-500' : 
+                    trend.direction === 'down' ? 'bg-red-500' : 'bg-gray-400'
+                  }`}></div>
+                  <span className="text-xs text-gray-600">{trend.metric}</span>
+                </div>
+                <span className={`text-xs font-semibold ${getTrendColor(trend.change)}`}>
+                  {formatPercentage(trend.change)}
+                </span>
+              </div>
+            )) || (
+              <div className="text-center py-2 text-xs text-gray-500">
+                No trend data
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Detailed Metrics Grid */}
@@ -250,13 +266,13 @@ const PerformanceContent: React.FC = () => {
                   
                   return (
                     <>
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         <span className="text-sm text-gray-600">Fast Moving (≥10/day)</span>
-                        <div className="flex items-center">
-                          <span className="text-sm font-semibold text-green-600 mr-2">
+                        <div className="flex items-center flex-shrink-0">
+                          <span className="text-sm font-semibold text-green-600 mr-2 min-w-fit">
                             {fast}
                           </span>
-                          <div className="w-16 bg-gray-200 rounded-full h-2">
+                          <div className="w-16 bg-gray-200 rounded-full h-2 flex-shrink-0">
                             <div 
                               className="bg-green-500 h-2 rounded-full" 
                               style={{ 
@@ -266,13 +282,13 @@ const PerformanceContent: React.FC = () => {
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         <span className="text-sm text-gray-600">Medium Moving (5-10/day)</span>
-                        <div className="flex items-center">
-                          <span className="text-sm font-semibold text-blue-600 mr-2">
+                        <div className="flex items-center flex-shrink-0">
+                          <span className="text-sm font-semibold text-blue-600 mr-2 min-w-fit">
                             {medium}
                           </span>
-                          <div className="w-16 bg-gray-200 rounded-full h-2">
+                          <div className="w-16 bg-gray-200 rounded-full h-2 flex-shrink-0">
                             <div 
                               className="bg-blue-500 h-2 rounded-full" 
                               style={{ 
@@ -282,13 +298,13 @@ const PerformanceContent: React.FC = () => {
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         <span className="text-sm text-gray-600">Slow Moving (1-5/day)</span>
-                        <div className="flex items-center">
-                          <span className="text-sm font-semibold text-yellow-600 mr-2">
+                        <div className="flex items-center flex-shrink-0">
+                          <span className="text-sm font-semibold text-yellow-600 mr-2 min-w-fit">
                             {slow}
                           </span>
-                          <div className="w-16 bg-gray-200 rounded-full h-2">
+                          <div className="w-16 bg-gray-200 rounded-full h-2 flex-shrink-0">
                             <div 
                               className="bg-yellow-500 h-2 rounded-full" 
                               style={{ 
@@ -298,13 +314,13 @@ const PerformanceContent: React.FC = () => {
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         <span className="text-sm text-gray-600">Dead Stock (&lt;1/day)</span>
-                        <div className="flex items-center">
-                          <span className="text-sm font-semibold text-red-600 mr-2">
+                        <div className="flex items-center flex-shrink-0">
+                          <span className="text-sm font-semibold text-red-600 mr-2 min-w-fit">
                             {velocityMetrics?.deadStockCount || 0}
                           </span>
-                          <div className="w-16 bg-gray-200 rounded-full h-2">
+                          <div className="w-16 bg-gray-200 rounded-full h-2 flex-shrink-0">
                             <div 
                               className="bg-red-500 h-2 rounded-full" 
                               style={{ 
@@ -319,6 +335,22 @@ const PerformanceContent: React.FC = () => {
                 })()}
               </>
             )}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Turnover Analysis</h3>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center py-3 border-b border-gray-100">
+              <span className="text-sm text-gray-600">Average Turnover Rate</span>
+              <span className="text-2xl font-bold text-gray-900">
+                {turnoverMetrics?.averageTurnover?.toFixed(2) || '0.00'}x
+              </span>
+            </div>
+            <div className="bg-blue-50 p-3 rounded text-sm text-blue-700">
+              <p className="font-medium">What is Turnover?</p>
+              <p className="mt-1">The number of times inventory is sold and replaced. Higher = faster moving products.</p>
+            </div>
           </div>
         </div>
 
@@ -349,30 +381,6 @@ const PerformanceContent: React.FC = () => {
                 {formatNumber(summary.totalTransactions || 0)}
               </span>
             </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Performance Trends</h3>
-          <div className="space-y-4">
-            {trends?.slice(0, 5).map((trend: any, index: number) => (
-              <div key={index} className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className={`w-2 h-2 rounded-full mr-3 ${
-                    trend.direction === 'up' ? 'bg-green-500' : 
-                    trend.direction === 'down' ? 'bg-red-500' : 'bg-gray-400'
-                  }`}></div>
-                  <span className="text-sm text-gray-600">{trend.metric}</span>
-                </div>
-                <span className={`text-sm font-semibold ${getTrendColor(trend.change)}`}>
-                  {formatPercentage(trend.change)}
-                </span>
-              </div>
-            )) || (
-              <div className="text-center py-4 text-sm text-gray-500">
-                No trend data available
-              </div>
-            )}
           </div>
         </div>
       </div>

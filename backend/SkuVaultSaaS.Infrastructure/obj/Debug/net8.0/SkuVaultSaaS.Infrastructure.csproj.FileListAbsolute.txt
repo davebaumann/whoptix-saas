@@ -8,9 +8,9 @@ C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Debug\n
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Debug\net8.0\SkuVaultSaaS.Infrastructure.AssemblyInfoInputs.cache
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Debug\net8.0\SkuVaultSaaS.Infrastructure.AssemblyInfo.cs
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Debug\net8.0\SkuVaultSaaS.Infrastructure.csproj.CoreCompileInputs.cache
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Debug\net8.0\SkuVaultSaaS.Infrastructure.sourcelink.json
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Debug\net8.0\SkuVault.6DC8B1F6.Up2Date
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Debug\net8.0\SkuVaultSaaS.Infrastructure.dll
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Debug\net8.0\refint\SkuVaultSaaS.Infrastructure.dll
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Debug\net8.0\SkuVaultSaaS.Infrastructure.pdb
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Debug\net8.0\ref\SkuVaultSaaS.Infrastructure.dll
-C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Infrastructure\obj\Debug\net8.0\SkuVaultSaaS.Infrastructure.sourcelink.json

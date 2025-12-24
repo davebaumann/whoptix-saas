@@ -41,6 +41,7 @@ import Demo from './pages/Demo'
 import DemoDashboard from './pages/DemoDashboard'
 import ProfitabilityReport from './pages/ProfitabilityReport'
 import DemandForecast from './pages/DemandForecast'
+import ChannelPerformance from './pages/ChannelPerformance'
 
 function App() {
   return (
@@ -79,6 +80,7 @@ function App() {
                   <Route path="/financial-warehouse" element={<FinancialWarehouseReport />} />
                   <Route path="/locations" element={<Locations />} />
                   <Route path="/performance" element={<Performance />} />
+                  <Route path="/channel-performance" element={<ChannelPerformance />} />
                   <Route path="/inventory-turnover" element={<InventoryTurnoverReport />} />
                   <Route path="/low-stock" element={<LowStockReport />} />
                   <Route path="/low-stock-admin" element={<LowStockAdmin />} />

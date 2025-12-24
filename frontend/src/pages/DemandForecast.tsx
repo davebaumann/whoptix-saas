@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { AlertCircle, TrendingUp, Package, Calendar, Shield, Info } from 'lucide-react'
+import { AlertCircle, TrendingUp, Package, Calendar, Shield, Info, Download } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import WithMembershipCheck from '../components/WithMembershipCheck'
 
@@ -87,6 +87,8 @@ export default function DemandForecast() {
   const [forecastDays, setForecastDays] = useState(30)
   const [sortBy, setSortBy] = useState<'risk' | 'demand' | 'trend'>('risk')
   const [filterRisk, setFilterRisk] = useState<string>('all')
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 25
 
   useEffect(() => {
     const fetchDemandForecast = async () => {
@@ -125,6 +127,10 @@ export default function DemandForecast() {
     fetchDemandForecast()
   }, [customerId, forecastDays])
 
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [filterRisk, sortBy])
+
   const getSortedForecasts = () => {
     let sorted = [...forecasts]
 
@@ -145,6 +151,42 @@ export default function DemandForecast() {
             (riskOrder[a.riskLevel as keyof typeof riskOrder] ?? 0)
         })
     }
+  }
+
+  const sortedForecasts = getSortedForecasts()
+  const totalPages = Math.ceil(sortedForecasts.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedForecasts = sortedForecasts.slice(startIndex, endIndex)
+
+  const exportToCsv = () => {
+    if (sortedForecasts.length === 0) return
+
+    const rows: string[] = []
+    
+    // Header row
+    rows.push('SKU,Product Name,Category,Historical Avg Daily Demand,Forecasted Demand,Demand Trend %,Current Stock,Days of Stock Available,Recommended Safety Stock,Confidence Score,Risk Level')
+    
+    // Data rows
+    sortedForecasts.forEach((item: DemandForecastItem) => {
+      rows.push(
+        `"${item.sku}","${item.productName}","${item.category}",${item.historicalAvgDailyDemand.toFixed(2)},${item.forecastedDemand.toFixed(2)},${item.demandTrend.toFixed(2)},${item.currentStock},${item.daysOfStockAvailable.toFixed(2)},${item.recommendedSafetyStock.toFixed(2)},${item.confidenceScore.toFixed(2)},"${item.riskLevel}"`
+      )
+    })
+    
+    // Create blob and download
+    const csv = rows.join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    
+    link.setAttribute('href', url)
+    link.setAttribute('download', `demand-forecast-${forecastDays}days-${new Date().toISOString().split('T')[0]}.csv`)
+    link.style.visibility = 'hidden'
+    
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
   }
 
   const getRiskColor = (risk: string) => {
@@ -177,8 +219,6 @@ export default function DemandForecast() {
     }
   }
 
-  const sortedForecasts = getSortedForecasts()
-
   if (loading) {
     return (
       <div className="flex justify-center items-center h-96">
@@ -204,20 +244,61 @@ export default function DemandForecast() {
           <h1 className="text-3xl font-bold text-gray-900">Demand Forecast</h1>
           <p className="text-gray-600 mt-1">Predict future inventory needs based on historical sales patterns</p>
         </div>
-        <div className="flex gap-4">
+        <div className="flex flex-col gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Forecast Period</label>
-            <select
-              value={forecastDays}
-              onChange={(e) => setForecastDays(parseInt(e.target.value))}
-              className="px-3 py-2 border border-gray-300 rounded-md text-sm"
-            >
-              <option value={7}>7 days</option>
-              <option value={14}>14 days</option>
-              <option value={30}>30 days</option>
-              <option value={60}>60 days</option>
-              <option value={90}>90 days</option>
-            </select>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Forecast Period</label>
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={() => setForecastDays(7)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  forecastDays === 7
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                7 Days
+              </button>
+              <button
+                onClick={() => setForecastDays(14)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  forecastDays === 14
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                14 Days
+              </button>
+              <button
+                onClick={() => setForecastDays(30)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  forecastDays === 30
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                30 Days
+              </button>
+              <button
+                onClick={() => setForecastDays(60)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  forecastDays === 60
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                60 Days
+              </button>
+              <button
+                onClick={() => setForecastDays(90)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  forecastDays === 90
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                90 Days
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -307,6 +388,14 @@ export default function DemandForecast() {
           <div className="flex justify-between items-center">
             <h2 className="text-lg font-semibold text-gray-900">Demand Forecasts</h2>
             <div className="flex gap-2">
+              <button
+                onClick={exportToCsv}
+                disabled={sortedForecasts.length === 0}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              >
+                <Download className="h-4 w-4" />
+                Export CSV
+              </button>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}
@@ -368,7 +457,7 @@ export default function DemandForecast() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {sortedForecasts.slice(0, 50).map((item, idx) => (
+              {paginatedForecasts.map((item, idx) => (
                 <tr key={idx} className={`transition-colors ${getRiskBgColor(item.riskLevel)}`}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-mono font-semibold text-gray-900">
                     {item.sku}
@@ -421,13 +510,61 @@ export default function DemandForecast() {
             No demand forecasts available
           </div>
         )}
-      </div>
 
-      {sortedForecasts.length > 50 && (
-        <p className="text-center text-sm text-gray-600">
-          Showing 50 of {sortedForecasts.length} forecasts. Apply filters to see more specific results.
-        </p>
-      )}
+        {sortedForecasts.length > 0 && (
+          <div className="mt-6 flex items-center justify-between">
+            <div className="text-sm text-gray-600">
+              Showing <span className="font-semibold">{startIndex + 1}</span> to <span className="font-semibold">{Math.min(endIndex, sortedForecasts.length)}</span> of <span className="font-semibold">{sortedForecasts.length}</span> results
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum
+                  if (totalPages <= 5) {
+                    pageNum = i + 1
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i
+                  } else {
+                    pageNum = currentPage - 2 + i
+                  }
+                  
+                  if (pageNum < 1 || pageNum > totalPages) return null
+                  
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`px-3 py-2 rounded-md text-sm font-medium ${
+                        currentPage === pageNum
+                          ? 'bg-blue-600 text-white'
+                          : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  )
+                })}
+              </div>
+              <button
+                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage === totalPages}
+                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
       </div>
     </WithMembershipCheck>
   )

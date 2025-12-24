@@ -30,6 +30,7 @@ const TierConfigPage: React.FC = () => {
     'inventory': { tier: 1, name: 'Inventory Report', description: 'Basic inventory tracking and stock levels' },
     'low-stock': { tier: 2, name: 'Low Stock Report', description: 'Automated low stock alerts and notifications' },
     'aging-inventory': { tier: 3, name: 'Aging Inventory Report', description: 'Track inventory age and identify slow-moving stock' },
+    'channel-performance': { tier: 1, name: 'Channel Performance', description: 'Revenue analysis and top SKUs by sales channel' },
     'profitability': { tier: 3, name: 'Profitability Report', description: 'Product-level profit analysis and margin insights' },
     'demand-forecast': { tier: 3, name: 'Demand Forecast', description: 'Predict future inventory needs based on historical patterns' },
     'financial-warehouse': { tier: 3, name: 'Financial Warehouse Report', description: 'Financial analytics and warehouse value tracking' },

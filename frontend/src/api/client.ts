@@ -91,6 +91,46 @@ export interface DailyCountsResponse {
   dailyCounts: DailyCount[]
 }
 
+// Channel Performance Interfaces
+export interface ChannelRevenue {
+  channel: string
+  revenue: number
+  orders: number
+  items: number
+}
+
+export interface ChannelRevenueResponse {
+  revenue: ChannelRevenue[]
+}
+
+export interface TopSku {
+  sku: string
+  quantity: number
+  revenue: number
+  orders: number
+}
+
+export interface TopSkuByChannel {
+  channel: string
+  topSkus: TopSku[]
+}
+
+export interface TopSkuResponse {
+  topSkus: TopSkuByChannel[]
+}
+
+export interface ChannelTrendPoint {
+  date: string
+  channel: string
+  revenue: number
+  orders: number
+  items: number
+}
+
+export interface ChannelTrendResponse {
+  trends: ChannelTrendPoint[]
+}
+
 export interface DashboardKPIs {
   totalTransactions: number
   totalQuantity: number
@@ -358,6 +398,53 @@ class ApiClient {
     const queryString = params.toString();
     return this.fetch<PickerPerformanceResponse>(
       `/api/transactions/customer/${customerId}/picker-performance${queryString ? `?${queryString}` : ''}`
+    );
+  }
+
+  async getChannelRevenueByChannel(
+    customerId: number,
+    from?: string,
+    to?: string
+  ): Promise<ChannelRevenueResponse> {
+    const params = new URLSearchParams();
+    if (from) params.append('from', from);
+    if (to) params.append('to', to);
+
+    const queryString = params.toString();
+    return this.fetch<ChannelRevenueResponse>(
+      `/api/channel-performance/customer/${customerId}/revenue${queryString ? `?${queryString}` : ''}`
+    );
+  }
+
+  async getTopSkusByChannel(
+    customerId: number,
+    from?: string,
+    to?: string,
+    limit: number = 10
+  ): Promise<TopSkuResponse> {
+    const params = new URLSearchParams();
+    if (from) params.append('from', from);
+    if (to) params.append('to', to);
+    params.append('limit', limit.toString());
+
+    const queryString = params.toString();
+    return this.fetch<TopSkuResponse>(
+      `/api/channel-performance/customer/${customerId}/top-skus${queryString ? `?${queryString}` : ''}`
+    );
+  }
+
+  async getChannelTrends(
+    customerId: number,
+    from?: string,
+    to?: string
+  ): Promise<ChannelTrendResponse> {
+    const params = new URLSearchParams();
+    if (from) params.append('from', from);
+    if (to) params.append('to', to);
+
+    const queryString = params.toString();
+    return this.fetch<ChannelTrendResponse>(
+      `/api/channel-performance/customer/${customerId}/trends${queryString ? `?${queryString}` : ''}`
     );
   }
 

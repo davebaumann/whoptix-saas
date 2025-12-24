@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
+import { Download } from 'lucide-react'
 
 interface FinancialWarehouseItem {
   sku: string
@@ -136,6 +137,36 @@ export default function FinancialWarehouseReport() {
     })
   }
 
+  const exportToCSV = () => {
+    if (!financialData) return
+
+    const rows: string[] = []
+    
+    // Header row
+    rows.push('SKU,Product Name,Warehouse,Location,Quantity,Unit Cost,Unit Price,Total Cost Value,Total Retail Value')
+    
+    // Data rows
+    getSortedData().forEach((item: FinancialWarehouseItem) => {
+      rows.push(
+        `"${item.sku}","${item.productName}","${item.warehouse}","${item.location}",${item.quantity},${item.cost.toFixed(2)},${item.price.toFixed(2)},${item.totalCostValue.toFixed(2)},${item.totalRetailValue.toFixed(2)}`
+      )
+    })
+    
+    // Create blob and download
+    const csv = rows.join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    
+    link.setAttribute('href', url)
+    link.setAttribute('download', `inventory-valuation-${new Date().toISOString().split('T')[0]}.csv`)
+    link.style.visibility = 'hidden'
+    
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
   const getMarginColor = (cost: number, price: number): string => {
     if (cost === 0 || price === 0) return 'text-gray-600'
     const marginPercent = ((price - cost) / price) * 100
@@ -261,8 +292,16 @@ export default function FinancialWarehouseReport() {
 
           {/* Detailed Inventory Table */}
           <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200">
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
               <h3 className="text-lg font-medium text-gray-900">Detailed Inventory Valuation</h3>
+              <button
+                onClick={exportToCSV}
+                disabled={!financialData || financialData.details.length === 0}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              >
+                <Download className="h-4 w-4" />
+                Export CSV
+              </button>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">

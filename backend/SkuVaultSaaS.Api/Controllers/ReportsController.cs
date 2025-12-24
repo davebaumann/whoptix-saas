@@ -6,6 +6,7 @@ using SkuVaultSaaS.Api.Services;
 using SkuVaultSaaS.Core.Models;
 using SkuVaultSaaS.Core.Services;
 using SkuVaultSaaS.Core.Enums;
+using System.Globalization;
 
 namespace SkuVaultSaaS.Api.Controllers
 {
@@ -844,8 +845,6 @@ namespace SkuVaultSaaS.Api.Controllers
                     AverageTurnover = turnoverMetrics.Any() ? turnoverMetrics.Average(t => t.TurnoverRate) : 0,
                     FastMovers = velocityMetrics.Count(v => v.Velocity > 10), // More than 10 units per day
                     SlowMovers = velocityMetrics.Count(v => v.Velocity < 1), // Less than 1 unit per day
-                    TotalRevenue = currentPeriodMovements.Where(m => m.TransactionType == "Pick" || m.TransactionType == "Sale").Sum(m => Math.Abs(m.QuantityChange) * (m.Product.Cost ?? 0)),
-                    RevenueGrowth = CalculateRevenueGrowth(currentPeriodMovements, previousPeriodMovements),
                     UnitsSold = (int)totalUnitsSold,
                     UnitsSoldGrowth = (double)unitsSoldGrowth,
                     AverageStockCoverage = inventoryLevels.Any() ? inventoryLevels.Average(il => il.QuantityOnHand * 30) : 0, // Rough estimate
@@ -870,7 +869,6 @@ namespace SkuVaultSaaS.Api.Controllers
                     },
                     trends = new[] {
                         new { metric = "Sales Growth", change = (double)performanceTrends.SalesGrowth, direction = performanceTrends.SalesGrowth >= 0 ? "up" : "down" },
-                        new { metric = "Revenue Growth", change = (double)performanceTrends.RevenueGrowth, direction = performanceTrends.RevenueGrowth >= 0 ? "up" : "down" },
                         new { metric = "Movement Growth", change = (double)performanceTrends.MovementGrowth, direction = performanceTrends.MovementGrowth >= 0 ? "up" : "down" },
                         new { metric = "Active Products", change = 0.0, direction = "stable" }
                     },
@@ -907,7 +905,7 @@ namespace SkuVaultSaaS.Api.Controllers
 
         [HttpGet("customer/{customerId}/profitability")]
         [Authorize]
-        public async Task<IActionResult> GetProfitabilityReport(int customerId)
+        public async Task<IActionResult> GetProfitabilityReport(int customerId, [FromQuery] string? from = null, [FromQuery] string? to = null)
         {
             // Check tenant access and membership level
             var accessCheck = await CheckReportAccessAsync(customerId, "profitability");
@@ -915,10 +913,53 @@ namespace SkuVaultSaaS.Api.Controllers
 
             try
             {
+                // Parse dates from query string
+                DateTime? fromDate = null;
+                DateTime? toDate = null;
+
+                if (!string.IsNullOrEmpty(from))
+                {
+                    if (DateTime.TryParseExact(from, new[] { "yyyy-MM-dd'Z'", "yyyy-MM-ddTHH:mm:ss'Z'", "yyyy-MM-dd", "yyyy-MM-ddTHH:mm:ss" },
+                        CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsedFrom))
+                    {
+                        fromDate = parsedFrom;
+                    }
+                    else if (DateTime.TryParse(from, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsedFrom2))
+                    {
+                        fromDate = parsedFrom2;
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(to))
+                {
+                    if (DateTime.TryParseExact(to, new[] { "yyyy-MM-dd'Z'", "yyyy-MM-ddTHH:mm:ss'Z'", "yyyy-MM-dd", "yyyy-MM-ddTHH:mm:ss" },
+                        CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsedTo))
+                    {
+                        toDate = parsedTo;
+                    }
+                    else if (DateTime.TryParse(to, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsedTo2))
+                    {
+                        toDate = parsedTo2;
+                    }
+                }
+
+                // Default to all-time if no dates specified
+                var query = _context.Sales.Where(s => s.CustomerId == customerId);
+
+                if (fromDate.HasValue)
+                {
+                    var fromDateUtc = fromDate.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(fromDate.Value, DateTimeKind.Utc) : fromDate.Value;
+                    query = query.Where(s => s.SaleDate >= fromDateUtc);
+                }
+
+                if (toDate.HasValue)
+                {
+                    var toDateUtc = toDate.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(toDate.Value, DateTimeKind.Utc) : toDate.Value;
+                    query = query.Where(s => s.SaleDate <= toDateUtc);
+                }
+
                 // Get all sales for this customer
-                var sales = await _context.Sales
-                    .Where(s => s.CustomerId == customerId)
-                    .ToListAsync();
+                var sales = await query.ToListAsync();
 
                 // Get all products with their costs
                 var products = await _context.Products
@@ -1528,8 +1569,6 @@ namespace SkuVaultSaaS.Api.Controllers
         public decimal AverageTurnover { get; set; }
         public int FastMovers { get; set; }
         public int SlowMovers { get; set; }
-        public decimal TotalRevenue { get; set; }
-        public decimal RevenueGrowth { get; set; }
         public int UnitsSold { get; set; }
         public double UnitsSoldGrowth { get; set; }
         public double AverageStockCoverage { get; set; }

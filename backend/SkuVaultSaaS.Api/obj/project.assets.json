@@ -1135,6 +1135,19 @@
           }
         }
       },
+      "Portable.BouncyCastle/1.9.0": {
+        "type": "package",
+        "compile": {
+          "lib/netstandard2.0/BouncyCastle.Crypto.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/netstandard2.0/BouncyCastle.Crypto.dll": {
+            "related": ".xml"
+          }
+        }
+      },
       "runtime.debian.8-x64.runtime.native.System.Security.Cryptography.OpenSsl/4.3.2": {
         "type": "package",
         "runtimeTargets": {
@@ -4631,6 +4644,21 @@
         "lib/net8.0/Pomelo.EntityFrameworkCore.MySql.xml",
         "pomelo.entityframeworkcore.mysql.8.0.0-beta.2.nupkg.sha512",
         "pomelo.entityframeworkcore.mysql.nuspec"
+      ]
+    },
+    "Portable.BouncyCastle/1.9.0": {
+      "sha512": "eZZBCABzVOek+id9Xy04HhmgykF0wZg9wpByzrWN7q8qEI0Qen9b7tfd7w8VA3dOeesumMG7C5ZPy0jk7PSRHw==",
+      "type": "package",
+      "path": "portable.bouncycastle/1.9.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "lib/net40/BouncyCastle.Crypto.dll",
+        "lib/net40/BouncyCastle.Crypto.xml",
+        "lib/netstandard2.0/BouncyCastle.Crypto.dll",
+        "lib/netstandard2.0/BouncyCastle.Crypto.xml",
+        "portable.bouncycastle.1.9.0.nupkg.sha512",
+        "portable.bouncycastle.nuspec"
       ]
     },
     "runtime.debian.8-x64.runtime.native.System.Security.Cryptography.OpenSsl/4.3.2": {
@@ -8454,6 +8482,7 @@
       "Microsoft.EntityFrameworkCore >= 8.0.11",
       "Microsoft.EntityFrameworkCore.Design >= 8.0.11",
       "Pomelo.EntityFrameworkCore.MySql >= 8.0.0-beta.2",
+      "Portable.BouncyCastle >= 1.9.0",
       "SkuVaultSaaS.Core >= 1.0.0",
       "SkuVaultSaaS.Infrastructure >= 1.0.0",
       "Stripe.net >= 49.2.0",
@@ -8466,11 +8495,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\skuvaultsaas.api\\SkuVaultSaaS.Api.csproj",
+      "projectUniqueName": "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\SkuVaultSaaS.Api\\SkuVaultSaaS.Api.csproj",
       "projectName": "SkuVaultSaaS.Api",
-      "projectPath": "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\skuvaultsaas.api\\SkuVaultSaaS.Api.csproj",
+      "projectPath": "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\SkuVaultSaaS.Api\\SkuVaultSaaS.Api.csproj",
       "packagesPath": "C:\\Users\\dcbau\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\skuvaultsaas.api\\obj\\",
+      "outputPath": "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\SkuVaultSaaS.Api\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\dcbau\\AppData\\Roaming\\NuGet\\NuGet.Config"
@@ -8542,6 +8571,10 @@
           "Pomelo.EntityFrameworkCore.MySql": {
             "target": "Package",
             "version": "[8.0.0-beta.2, )"
+          },
+          "Portable.BouncyCastle": {
+            "target": "Package",
+            "version": "[1.9.0, )"
           },
           "Stripe.net": {
             "target": "Package",

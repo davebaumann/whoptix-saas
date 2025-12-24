@@ -1,6 +1,16 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
+import { Download, Info } from 'lucide-react'
+
+interface Tooltip {
+  [key: string]: string
+}
+
+const METRIC_TOOLTIPS: Tooltip = {
+  utilizationScore: 'Utilization Score = (SKU Diversity × 40%) + (Quantity Volume × 30%) + (Cost Value × 30%). Diversity: SKU Count / 10 (max 40pts). Quantity: Total Qty / 100 (max 30pts). Value: Total Cost / $10,000 (max 30pts). Maximum score: 100%.',
+  averageUtilization: 'Average utilization score across all locations in the warehouse'
+}
 
 interface LocationAnalytic {
   locationId: number
@@ -49,6 +59,23 @@ export default function Locations() {
   const [selectedWarehouse, setSelectedWarehouse] = useState<string>('all')
   const [sortField, setSortField] = useState<keyof LocationAnalytic>('totalCostValue')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
+  const [hoveredTooltip, setHoveredTooltip] = useState<string | null>(null)
+
+  const renderTooltip = (key: string) => (
+    <div className="relative group inline-block">
+      <Info 
+        className="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help"
+        onMouseEnter={() => setHoveredTooltip(key)}
+        onMouseLeave={() => setHoveredTooltip(null)}
+      />
+      {hoveredTooltip === key && (
+        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-xs rounded p-2 z-10 pointer-events-none">
+          {METRIC_TOOLTIPS[key]}
+          <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+        </div>
+      )}
+    </div>
+  )
 
   // Early loading state
   if (authLoading) {
@@ -124,6 +151,8 @@ export default function Locations() {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
     }).format(value)
   }
 
@@ -132,6 +161,36 @@ export default function Locations() {
     if (score >= 60) return 'text-yellow-600 bg-yellow-100'
     if (score >= 40) return 'text-orange-600 bg-orange-100'
     return 'text-red-600 bg-red-100'
+  }
+
+  const exportToCSV = () => {
+    if (!locationsData) return
+
+    const rows: string[] = []
+    
+    // Header row
+    rows.push('Location Code,Location Name,Warehouse,Total SKUs,Total Quantity,Total Cost Value,Total Retail Value,Avg Quantity Per SKU,Low Stock Items,Utilization Score %')
+    
+    // Data rows - use sorted and filtered locations
+    getSortedData().forEach((location: LocationAnalytic) => {
+      rows.push(
+        `"${location.locationCode}","${location.locationName}","${location.warehouse}",${location.totalSkus},${location.totalQuantity},${location.totalCostValue.toFixed(2)},${location.totalRetailValue.toFixed(2)},${location.averageQuantityPerSku.toFixed(2)},${location.lowStockItems},${location.utilizationScore.toFixed(2)}`
+      )
+    })
+    
+    // Create blob and download
+    const csv = rows.join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    
+    link.setAttribute('href', url)
+    link.setAttribute('download', `location-details-${new Date().toISOString().split('T')[0]}.csv`)
+    link.style.visibility = 'hidden'
+    
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
   }
 
   if (isLoading) {
@@ -212,9 +271,9 @@ export default function Locations() {
             <div className="flex-shrink-0">
               <div className="text-2xl">💰</div>
             </div>
-            <div className="ml-4">
+            <div className="ml-4 min-w-0">
               <p className="text-sm font-medium text-gray-600">Total Value</p>
-              <p className="text-2xl font-bold text-gray-900">{formatCurrency(locationsData.summary.totalRetailValue)}</p>
+              <p className="text-2xl font-bold text-gray-900 truncate">{formatCurrency(locationsData.summary.totalRetailValue)}</p>
             </div>
           </div>
         </div>
@@ -224,8 +283,11 @@ export default function Locations() {
             <div className="flex-shrink-0">
               <div className="text-2xl">⚡</div>
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Avg Utilization</p>
+            <div className="ml-4 flex-1">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium text-gray-600">Avg Utilization</p>
+                {renderTooltip('averageUtilization')}
+              </div>
               <p className="text-2xl font-bold text-gray-900">{locationsData.summary.averageUtilization.toFixed(0)}%</p>
             </div>
           </div>
@@ -241,14 +303,14 @@ export default function Locations() {
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Warehouse</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Locations</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKUs</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Value</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Utilization</th>
-                </tr>
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Warehouse</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Locations</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKUs</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Value</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider flex items-center gap-1">Utilization {renderTooltip('averageUtilization')}</th>
+              </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {locationsData.warehouses.map((warehouse, index) => (
@@ -302,8 +364,16 @@ export default function Locations() {
 
       {/* Location Details */}
       <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
+        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
           <h3 className="text-lg font-medium text-gray-900">Location Details</h3>
+          <button
+            onClick={exportToCSV}
+            disabled={!locationsData || locationsData.locations.length === 0}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </button>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -352,10 +422,11 @@ export default function Locations() {
                   Low Stock {sortField === 'lowStockItems' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </th>
                 <th 
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 flex items-center gap-1"
                   onClick={() => handleSort('utilizationScore')}
                 >
-                  Utilization {sortField === 'utilizationScore' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  <span>Utilization {sortField === 'utilizationScore' && (sortDirection === 'asc' ? '↑' : '↓')}</span>
+                  {renderTooltip('utilizationScore')}
                 </th>
               </tr>
             </thead>
