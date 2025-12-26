@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { apiClient } from '../api/client'
 
 interface LoginForm {
   email: string
@@ -32,50 +31,38 @@ export default function Login() {
     setError('')
 
     try {
-      await apiClient.login(formData.email, formData.password)
-      
-      // Check if we need 2FA
-      const meResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/auth/me`, {
-        method: 'GET',
+      // Call login endpoint directly to check for 2FA requirement
+      const loginResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/auth/login`, {
+        method: 'POST',
         credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
       })
 
-      if (meResponse.status === 401) {
-        // Likely 2FA is required, get the login response to check
-        const loginResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/auth/login`, {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData)
-        })
-
-        const loginData = await loginResponse.json()
-        if (loginData.requiresTwoFactor) {
-          setRequiresTwoFactor(true)
-          setTempToken(loginData.tempToken)
-          return
-        }
+      if (!loginResponse.ok) {
+        const errorData = await loginResponse.json()
+        throw new Error(errorData.message || 'Invalid credentials')
       }
-      
-      if (meResponse.ok) {
-        const userData = await meResponse.json()
-        const isAdmin = userData.roles?.includes('Admin') || false
-        
-        // Redirect based on user type
-        if (isAdmin) {
-          window.location.href = '/app/admin'
-        } else {
-          window.location.href = from === '/' ? '/app/dashboard' : from
-        }
+
+      const loginData = await loginResponse.json()
+
+      // Check if 2FA is required
+      if (loginData.requiresTwoFactor) {
+        setRequiresTwoFactor(true)
+        setTempToken(loginData.tempToken)
+        setError('')
+        return
+      }
+
+      // No 2FA needed, redirect
+      const isAdmin = loginData.roles?.includes('Admin') || false
+      if (isAdmin) {
+        window.location.href = '/app/admin'
       } else {
         window.location.href = from === '/' ? '/app/dashboard' : from
       }
     } catch (err) {
-      if (err instanceof Error && err.message.includes('401')) {
-        setError('Invalid email or password')
-      } else {
-        setError(err instanceof Error ? err.message : 'Login failed')
-      }
+      setError(err instanceof Error ? err.message : 'Login failed')
     } finally {
       setIsLoading(false)
     }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -7,7 +8,7 @@ namespace SkuVaultSaaS.Api.Services
 {
     public interface ITwoFactorService
     {
-        (string Secret, string QrCodeUri) GenerateTwoFactorSecret(string email);
+        (string Secret, string QrCodeDataUrl) GenerateTwoFactorSecret(string email);
         bool VerifyCode(string secret, string code);
         List<string> GenerateBackupCodes(int count = 10);
         bool UseBackupCode(List<string> backupCodes, string code);
@@ -17,9 +18,9 @@ namespace SkuVaultSaaS.Api.Services
     {
         private const int TimeStep = 30;
         private const int CodeLength = 6;
-        private const string Issuer = "SkuVault";
+        private const string Issuer = "JUSTSKU";
 
-        public (string Secret, string QrCodeUri) GenerateTwoFactorSecret(string email)
+        public (string Secret, string QrCodeDataUrl) GenerateTwoFactorSecret(string email)
         {
             // Generate random 20-byte secret
             var secretBytes = new byte[20];
@@ -31,10 +32,14 @@ namespace SkuVaultSaaS.Api.Services
             // Encode as base32
             var base32Secret = Base32Encode(secretBytes);
 
-            // Create QR code URI
-            var qrCodeUri = $"otpauth://totp/{Issuer}%20({email})?secret={base32Secret}&issuer={Issuer}&algorithm=SHA1&digits=6&period={TimeStep}";
+            // Create QR code URI for authenticator apps
+            var otpAuthUri = $"otpauth://totp/{Issuer}%20({email})?secret={base32Secret}&issuer={Issuer}&algorithm=SHA1&digits=6&period={TimeStep}";
 
-            return (base32Secret, qrCodeUri);
+            // Generate QR code image using a free QR code API
+            var encodedUri = WebUtility.UrlEncode(otpAuthUri);
+            var qrCodeImageUrl = $"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={encodedUri}";
+            
+            return (base32Secret, qrCodeImageUrl);
         }
 
         public bool VerifyCode(string secret, string code)
@@ -147,7 +152,7 @@ namespace SkuVaultSaaS.Api.Services
                 {
                     var index = alphabet.IndexOf(char.ToUpper(c));
                     if (index < 0)
-                        return null;
+                        return Array.Empty<byte>();
                     bits += Convert.ToString(index, 2).PadLeft(5, '0');
                 }
 
@@ -162,7 +167,7 @@ namespace SkuVaultSaaS.Api.Services
             }
             catch
             {
-                return null;
+                return Array.Empty<byte>();
             }
         }
     }

@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useMembership } from '../contexts/MembershipContext';
 import { Crown } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface AccountInfo {
   id: number;
@@ -244,12 +245,12 @@ const ChangePasswordModal: React.FC<{ isOpen: boolean; onClose: () => void }> = 
   );
 };
 
-const TwoFactorModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
+const TwoFactorModal: React.FC<{ isOpen: boolean; onClose: () => void; userEmail?: string }> = ({ isOpen, onClose, userEmail }) => {
   const [step, setStep] = useState<'setup' | 'verify'>('setup');
   const [verificationCode, setVerificationCode] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [qrCodeUri, setQrCodeUri] = useState('');
+  const [secret, setSecret] = useState('');
   const [backupCodes, setBackupCodes] = useState<string[]>([]);
   const [showBackupCodes, setShowBackupCodes] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -262,16 +263,22 @@ const TwoFactorModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ is
         headers: { 'Content-Type': 'application/json' }
       });
       if (!response.ok) {
+        const error = await response.text();
+        console.error('2FA setup failed:', response.status, error);
         throw new Error('Failed to setup 2FA');
       }
-      return response.json();
+      const data = await response.json();
+      console.log('2FA setup response:', data);
+      return data;
     },
     onSuccess: (data) => {
-      setQrCodeUri(data.qrCodeUri);
+      console.log('2FA setup success, setting state:', { secret: data.secret });
+      setSecret(data.secret);
       setBackupCodes(data.backupCodes);
       setStep('verify');
     },
-    onError: () => {
+    onError: (error) => {
+      console.error('2FA setup mutation error:', error);
       setError('Failed to setup 2FA');
     }
   });
@@ -298,7 +305,7 @@ const TwoFactorModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ is
         setVerificationCode('');
         setError('');
         setSuccess('');
-        setQrCodeUri('');
+        setSecret('');
         setBackupCodes([]);
         setShowBackupCodes(false);
       }, 2000);
@@ -315,6 +322,36 @@ const TwoFactorModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ is
       setTimeout(() => setCopied(false), 2000);
     });
   };
+
+  const disable2FAMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/auth/2fa/disable`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!response.ok) {
+        throw new Error('Failed to disable 2FA');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      setSuccess('Two-factor authentication has been disabled.');
+      setTimeout(() => {
+        onClose();
+        setStep('setup');
+        setVerificationCode('');
+        setError('');
+        setSuccess('');
+        setSecret('');
+        setBackupCodes([]);
+        setShowBackupCodes(false);
+      }, 2000);
+    },
+    onError: () => {
+      setError('Failed to disable 2FA');
+    }
+  });
 
   const handleSetup = () => {
     setError('');
@@ -353,17 +390,10 @@ const TwoFactorModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ is
 
         {step === 'setup' ? (
           <div className="space-y-4">
-            <p className="text-sm text-gray-600">
-              Scan this QR code with an authenticator app like Google Authenticator, Microsoft Authenticator, or Authy.
-            </p>
-            {qrCodeUri && (
-              <div className="flex justify-center">
-                <img src={qrCodeUri} alt="2FA QR Code" className="w-48 h-48 border border-gray-200 rounded" />
-              </div>
-            )}
-            <div className="bg-gray-50 p-4 rounded border border-gray-200">
-              <p className="text-xs text-gray-500 mb-2">Manual Entry Key (if scanning doesn't work):</p>
-              <p className="font-mono text-sm text-gray-900 break-all">{qrCodeUri.split('secret=')[1]?.split('&')[0] || 'Loading...'}</p>
+            <div className="bg-blue-50 border border-blue-200 rounded p-4">
+              <p className="text-sm text-blue-900">
+                Click "Next" to generate your two-factor authentication setup. You'll be able to scan a QR code or enter a key manually into your authenticator app.
+              </p>
             </div>
             <div className="flex gap-3 pt-4">
               <button
@@ -383,6 +413,27 @@ const TwoFactorModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ is
           </div>
         ) : (
           <div className="space-y-4">
+            {/* Display QR Code and Manual Key in verify step */}
+            {secret && (
+              <>
+                <div className="bg-blue-50 border border-blue-200 rounded p-3 mb-4">
+                  <p className="text-sm font-medium text-blue-900 mb-2">Authenticator App Setup:</p>
+                  <div className="flex justify-center mb-3">
+                    <QRCodeSVG 
+                      value={`otpauth://totp/JUSTSKU%20(${encodeURIComponent(userEmail || '')})?secret=${secret}&issuer=JUSTSKU&algorithm=SHA1&digits=6&period=30`}
+                      size={160}
+                      level="H"
+                      includeMargin={true}
+                    />
+                  </div>
+                  <div className="bg-gray-50 p-3 rounded border border-gray-200">
+                    <p className="text-xs text-gray-500 mb-2">Manual Entry Key (if QR code doesn't work):</p>
+                    <p className="font-mono text-sm text-gray-900 break-all">{secret}</p>
+                  </div>
+                </div>
+              </>
+            )}
+            
             <p className="text-sm text-gray-600">
               Enter the 6-digit code from your authenticator app to verify the setup.
             </p>
@@ -445,6 +496,21 @@ const TwoFactorModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ is
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
                 {verify2FAMutation.isPending ? 'Verifying...' : 'Enable 2FA'}
+              </button>
+            </div>
+
+            {/* Disable 2FA button - shown when 2FA is enabled */}
+            <div className="pt-4 border-t border-gray-200">
+              <button
+                onClick={() => {
+                  if (window.confirm('Are you sure you want to disable two-factor authentication?')) {
+                    disable2FAMutation.mutate();
+                  }
+                }}
+                disabled={disable2FAMutation.isPending}
+                className="w-full px-4 py-2 text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50"
+              >
+                {disable2FAMutation.isPending ? 'Disabling...' : 'Disable Two-Factor Authentication'}
               </button>
             </div>
           </div>
@@ -671,6 +737,7 @@ const AccountSettings: React.FC = () => {
       <TwoFactorModal 
         isOpen={show2FAModal} 
         onClose={() => setShow2FAModal(false)} 
+        userEmail={user?.email}
       />
     </div>
   );

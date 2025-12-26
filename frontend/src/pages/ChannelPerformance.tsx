@@ -10,7 +10,7 @@ const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'
 
 export default function ChannelPerformance() {
   const { user } = useAuth()
-  const customerId = typeof (user?.id) === 'string' ? parseInt(user.id, 10) : (user?.id || 1)
+  const customerId = user?.customerId || 1
   const [dateRange, setDateRange] = useState<'today' | 'last7' | 'last30' | 'custom'>('last30')
   const [fromDate, setFromDate] = useState<string | undefined>()
   const [toDate, setToDate] = useState<string | undefined>()

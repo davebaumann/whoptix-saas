@@ -536,7 +536,7 @@ namespace SkuVaultSaaS.Api.Controllers
         [AllowAnonymous]
         public IActionResult Test() => Ok(new { message = "test works" });
 
-        private async Task<(string, DateTime)> GenerateTempTokenAsync(ApplicationUser user, int expiresMinutes)
+        private Task<(string, DateTime)> GenerateTempTokenAsync(ApplicationUser user, int expiresMinutes)
         {
             var jwtSection = _config.GetSection("Jwt");
             var key = jwtSection.GetValue<string>("Key") ?? throw new InvalidOperationException("Jwt:Key not configured");
@@ -563,7 +563,7 @@ namespace SkuVaultSaaS.Api.Controllers
                 signingCredentials: creds);
 
             var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
-            return (tokenString, expires);
+            return Task.FromResult((tokenString, expires));
         }
 
         private async Task<(string, DateTime)> GenerateJwtTokenAsync(ApplicationUser user)

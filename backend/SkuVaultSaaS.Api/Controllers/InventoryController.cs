@@ -29,20 +29,23 @@ namespace SkuVaultSaaS.Api.Controllers
                 return true;
             }
 
-            // Get current user's email
-            var userEmail = User.FindFirst(ClaimTypes.Email)?.Value ?? 
-                           User.FindFirst(ClaimTypes.Name)?.Value;
-            
-            if (string.IsNullOrEmpty(userEmail))
+            // Get current user's CustomerId from claims or database
+            var userIdStr = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ??
+                           User.FindFirst("sub")?.Value;
+
+            if (string.IsNullOrEmpty(userIdStr))
             {
                 return false;
             }
 
             // Check if user is associated with this customer
-            var customer = await _context.Customers
-                .FirstOrDefaultAsync(c => c.Id == customerId && c.Email == userEmail);
-            
-            return customer != null;
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userIdStr);
+            if (user == null || user.CustomerId != customerId)
+            {
+                return false;
+            }
+
+            return true;
         }
 
         // Low Stock Report
