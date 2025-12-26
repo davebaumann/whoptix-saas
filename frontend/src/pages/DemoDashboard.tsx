@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, TrendingUp, Users, Package, AlertCircle, Activity } from 'lucide-react'
+import { ArrowLeft, Users, Package, AlertCircle } from 'lucide-react'
 
 export default function DemoDashboard() {
   const navigate = useNavigate()
@@ -267,91 +267,11 @@ export default function DemoDashboard() {
                   <p className="text-3xl font-bold text-gray-900 mb-2">
                     {typeof kpi.value === 'number' ? kpi.value.toLocaleString() : kpi.value}
                   </p>
-                  <p className={`text-sm font-medium ${kpi.trend.startsWith('+') ? 'text-green-600' : 'text-gray-600'}`}>
+                  <p className={`text-sm font-medium ${kpi.trend && kpi.trend.startsWith('+') ? 'text-green-600' : 'text-gray-600'}`}>
                     {kpi.trend}
                   </p>
                 </div>
               ))}
-            </div>
-
-            {/* Main Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Top Performers - Left Column (2 cols) */}
-              <div className="lg:col-span-2 bg-white rounded-lg shadow">
-                <div className="px-6 py-5 sm:p-6 border-b border-gray-200">
-                  <div className="flex items-center">
-                    <TrendingUp className="w-5 h-5 text-blue-600 mr-2" />
-                    <h2 className="text-lg font-semibold text-gray-900">Top Performers</h2>
-                  </div>
-                </div>
-                <div className="p-6">
-                  <div className="space-y-4">
-                    {displayData.topPerformers.map((performer: any) => (
-                      <div 
-                        key={performer.rank} 
-                        className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-blue-50 cursor-pointer transition-colors"
-                      >
-                        <div className="flex items-center space-x-4 flex-1 min-w-0">
-                          <div className="flex-shrink-0">
-                            <div className="h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
-                              <span className="text-sm font-bold text-blue-700">{performer.rank}</span>
-                            </div>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-gray-900 truncate">
-                              {performer.name}
-                            </p>
-                            <p className="text-sm text-gray-500">
-                              {performer.picks} picks • {performer.velocity} picks/hr
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex-shrink-0 ml-4 flex items-center gap-2">
-                          <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${
-                            performer.rating === 'Excellent' ? 'bg-green-100 text-green-800' :
-                            performer.rating === 'Good' ? 'bg-blue-100 text-blue-800' :
-                            'bg-yellow-100 text-yellow-800'
-                          }`}>
-                            {performer.rating}
-                          </span>
-                          <span className={`text-sm font-semibold ${performer.trend.startsWith('+') ? 'text-green-600' : 'text-red-600'}`}>
-                            {performer.trend}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Performance Summary - Right Column */}
-              <div className="bg-white rounded-lg shadow">
-                <div className="px-6 py-5 sm:p-6 border-b border-gray-200">
-                  <div className="flex items-center">
-                    <Activity className="w-5 h-5 text-blue-600 mr-2" />
-                    <h2 className="text-lg font-semibold text-gray-900">Performance</h2>
-                  </div>
-                </div>
-                <div className="p-6 space-y-4">
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Avg Picks/Hour</p>
-                    <p className="text-2xl font-bold text-gray-900">{displayData.performanceMetrics.avgPicksPerHour}</p>
-                  </div>
-                  <div className="border-t pt-4">
-                    <p className="text-sm text-gray-600 mb-1">Avg Packs/Hour</p>
-                    <p className="text-2xl font-bold text-gray-900">{displayData.performanceMetrics.avgPacksPerHour}</p>
-                  </div>
-                  <div className="border-t pt-4">
-                    <p className="text-sm text-gray-600 mb-1">Error Rate</p>
-                    <p className="text-2xl font-bold text-red-600">{displayData.performanceMetrics.avgErrorRate}%</p>
-                  </div>
-                  <div className="border-t pt-4">
-                    <p className="text-sm text-gray-600 mb-1">Top SKU</p>
-                    <p className="text-sm font-medium text-gray-900 break-words">{displayData.performanceMetrics.topSKU.sku}</p>
-                    <p className="text-xs text-gray-500 mt-1">{displayData.performanceMetrics.topSKU.picks} picks</p>
-                  </div>
-                </div>
-              </div>
             </div>
 
             {/* Activity Summary */}
@@ -363,23 +283,19 @@ export default function DemoDashboard() {
                 </div>
               </div>
               <div className="p-6">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   <div>
                     <p className="text-sm text-gray-600">Total Transactions</p>
                     <p className="text-2xl font-bold text-gray-900 mt-1">{displayData.activitySummary.totalTransactions.toLocaleString()}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Active Users</p>
-                    <p className="text-2xl font-bold text-gray-900 mt-1">{displayData.activitySummary.uniqueUsers}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Items Moved</p>
                     <p className="text-2xl font-bold text-gray-900 mt-1">{displayData.activitySummary.totalQuantity.toLocaleString()}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Avg per User</p>
+                    <p className="text-sm text-gray-600">Avg per Transaction</p>
                     <p className="text-2xl font-bold text-gray-900 mt-1">
-                      {Math.round(displayData.activitySummary.totalQuantity / displayData.activitySummary.uniqueUsers)}
+                      {Math.round(displayData.activitySummary.totalQuantity / displayData.activitySummary.totalTransactions)}
                     </p>
                   </div>
                 </div>
