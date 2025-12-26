@@ -6,6 +6,7 @@ export default function DemoDashboard() {
   const navigate = useNavigate()
   const [currentReport, setCurrentReport] = useState<'dashboard' | 'inventory' | 'low-stock' | 'aging-inventory' | 'profitability'>('dashboard')
   const [data, setData] = useState<any | null>(null)
+  const [topPerformers, setTopPerformers] = useState<any | null>(null)
   const [inventoryData, setInventoryData] = useState<any | null>(null)
   const [lowStockData, setLowStockData] = useState<any | null>(null)
   const [agingInventoryData, setAgingInventoryData] = useState<any | null>(null)
@@ -36,12 +37,20 @@ export default function DemoDashboard() {
         const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '') || 'http://localhost:5239'
         
         // Fetch from demo-specific endpoints (no authentication needed)
-        const dashboardResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/dashboard`, {
+        const dashboardResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/dashboard?dateRange=${dateRange}`, {
           headers: { 'Content-Type': 'application/json' }
         })
         if (dashboardResponse.ok) {
           const dashboardData = await dashboardResponse.json()
           setData(dashboardData)
+        }
+
+        const topPerformersResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/top-performers`, {
+          headers: { 'Content-Type': 'application/json' }
+        })
+        if (topPerformersResponse.ok) {
+          const tpData = await topPerformersResponse.json()
+          setTopPerformers(tpData)
         }
 
         const inventoryResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/inventory`, {
@@ -86,7 +95,7 @@ export default function DemoDashboard() {
     }
 
     fetchAllDemoData()
-  }, [])
+  }, [dateRange])
 
   // Load tier configuration and report access from backend
   useEffect(() => {
@@ -274,6 +283,37 @@ export default function DemoDashboard() {
               ))}
             </div>
 
+            {/* Main Content Grid */}
+            <div className="bg-white rounded-lg shadow">
+              <div className="px-6 py-5 sm:p-6 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900">Top Performers (Last 7 Days)</h2>
+              </div>
+              <div className="p-6">
+                {topPerformers?.topPerformers && topPerformers.topPerformers.length > 0 ? (
+                  <div className="space-y-2">
+                    {topPerformers.topPerformers.slice(0, 10).map((performer: any) => (
+                      <div 
+                        key={performer.rank} 
+                        className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors"
+                      >
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-gray-900">{performer.name}</p>
+                        </div>
+                        <div className="flex items-center gap-8">
+                          <div className="text-right">
+                            <p className="text-sm font-semibold text-teal-600">{performer.picksPerHour.toFixed(1)} picks/hr</p>
+                            <p className="text-xs text-gray-500">{performer.picks} total picks</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500">Loading performers...</p>
+                )}
+              </div>
+            </div>
+
             {/* Activity Summary */}
             <div className="bg-white rounded-lg shadow">
               <div className="px-6 py-5 sm:p-6 border-b border-gray-200">
@@ -283,7 +323,7 @@ export default function DemoDashboard() {
                 </div>
               </div>
               <div className="p-6">
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
                   <div>
                     <p className="text-sm text-gray-600">Total Transactions</p>
                     <p className="text-2xl font-bold text-gray-900 mt-1">{displayData.activitySummary.totalTransactions.toLocaleString()}</p>
@@ -300,17 +340,36 @@ export default function DemoDashboard() {
                   </div>
                 </div>
 
-                {/* Transaction Types Breakdown */}
-                <div className="mt-6 pt-6 border-t">
-                  <p className="text-sm font-medium text-gray-700 mb-4">Transaction Types</p>
-                  <div className="space-y-3">
-                    {displayData.activitySummary.byType.map((type: any) => (
-                      <div key={type.type} className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">{type.type}</span>
-                        <span className="text-sm font-semibold text-gray-900">{type.count.toLocaleString()}</span>
-                      </div>
-                    ))}
-                  </div>
+                {/* Transaction Types by User - Table */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 border-b">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-semibold text-gray-700">User</th>
+                        <th className="px-4 py-3 text-left font-semibold text-gray-700">Transaction Type</th>
+                        <th className="px-4 py-3 text-right font-semibold text-gray-700">Count</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {displayData.activitySummary.byUser && displayData.activitySummary.byUser.map((userGroup: any, userIdx: number) => {
+                        const transactionTypes = userGroup.transactionTypes || []
+                        return transactionTypes.map((type: any, typeIdx: number) => (
+                          <tr key={`${userIdx}-${typeIdx}`} className="hover:bg-gray-50">
+                            {typeIdx === 0 && (
+                              <td 
+                                rowSpan={transactionTypes.length}
+                                className="px-4 py-3 font-medium text-gray-900 align-top border-r"
+                              >
+                                {userGroup.user}
+                              </td>
+                            )}
+                            <td className="px-4 py-3 text-gray-600">{type.type}</td>
+                            <td className="px-4 py-3 text-right font-medium text-gray-900">{type.count}</td>
+                          </tr>
+                        ))
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>

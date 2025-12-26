@@ -28,23 +28,30 @@ namespace SkuVaultSaaS.Api.Controllers
         /// Get demo dashboard for customer 2 (demo customer)
         /// </summary>
         [HttpGet("customer/2/dashboard")]
-        public async Task<IActionResult> GetDemoDashboard()
+        public async Task<IActionResult> GetDemoDashboard([FromQuery] string dateRange = "today")
         {
-            _logger.LogInformation("DemoReportsController.GetDemoDashboard: Called");
+            _logger.LogInformation($"DemoReportsController.GetDemoDashboard: Called with dateRange={dateRange}");
             try
             {
                 var customerId = 2; // Hard-coded demo customer
 
                 var now = DateTime.UtcNow;
-                var last30Days = now.AddDays(-30);
-                var last7Days = now.AddDays(-7);
+                var startDate = dateRange switch
+                {
+                    "yesterday" => now.AddDays(-1).Date,
+                    "last7days" => now.AddDays(-7).Date,
+                    _ => now.Date // "today"
+                };
+                var endDate = dateRange == "yesterday" 
+                    ? now.AddDays(-1).Date.AddDays(1).AddTicks(-1) 
+                    : now;
 
                 var transactions = await _context.Transactions
-                    .Where(t => t.CustomerId == customerId && t.TransactionDate >= last30Days)
+                    .Where(t => t.CustomerId == customerId && t.TransactionDate >= startDate && t.TransactionDate <= endDate)
                     .ToListAsync();
 
                 var recentTransactions = await _context.Transactions
-                    .Where(t => t.CustomerId == customerId && t.TransactionDate >= last7Days)
+                    .Where(t => t.CustomerId == customerId && t.TransactionDate >= startDate && t.TransactionDate <= endDate)
                     .OrderByDescending(t => t.TransactionDate)
                     .Take(10)
                     .Select(t => new
@@ -59,7 +66,7 @@ namespace SkuVaultSaaS.Api.Controllers
                     .ToListAsync();
 
                 var movements = await _context.InventoryMovements
-                    .Where(im => im.CustomerId == customerId && im.OccurredAtUtc >= last30Days)
+                    .Where(im => im.CustomerId == customerId && im.OccurredAtUtc >= startDate && im.OccurredAtUtc <= endDate)
                     .ToListAsync();
 
                 var kpis = new[]
@@ -97,12 +104,19 @@ namespace SkuVaultSaaS.Api.Controllers
                     {
                         totalTransactions = transactions.Count,
                         totalQuantity = movements.Sum(m => Math.Abs(m.QuantityChange)),
-                        byType = movements
-                            .GroupBy(m => m.TransactionType)
-                            .Select(g => new
+                        byUser = movements
+                            .GroupBy(m => m.PerformedBy)
+                            .Select(userGroup => new
                             {
-                                type = g.Key,
-                                count = g.Count()
+                                user = userGroup.Key,
+                                transactionTypes = userGroup
+                                    .GroupBy(m => m.TransactionType)
+                                    .Select(typeGroup => new
+                                    {
+                                        type = typeGroup.Key,
+                                        count = typeGroup.Count()
+                                    })
+                                    .ToList()
                             })
                             .ToList()
                     },
@@ -386,6 +400,91 @@ namespace SkuVaultSaaS.Api.Controllers
             {
                 _logger.LogError(ex, "Error fetching demo profitability");
                 return StatusCode(500, new { message = "Error fetching demo profitability" });
+            }
+        }
+
+        /// <summary>
+        /// Get top performers for demo customer 2
+        /// </summary>
+        [HttpGet("customer/2/top-performers")]
+        public async Task<IActionResult> GetDemoTopPerformers()
+        {
+            _logger.LogInformation("DemoReportsController.GetDemoTopPerformers: Called");
+            try
+            {
+                var customerId = 2;
+                var now = DateTime.UtcNow;
+                var today = now.Date;
+
+                var movements = await _context.InventoryMovements
+                    .Where(im => im.CustomerId == customerId && im.OccurredAtUtc >= today)
+                    .ToListAsync();
+
+                var topPerformers = movements
+                    .GroupBy(m => m.PerformedBy)
+                    .Select((g, idx) => new
+                    {
+                        rank = idx + 1,
+                        name = g.Key,
+                        picks = g.Count(m => m.TransactionType == "Pick"),
+                        picksPerHour = g.Count(m => m.TransactionType == "Pick") / Math.Max(1, (now - g.Min(m => m.OccurredAtUtc)).TotalHours),
+                        accuracy = 98 + (idx % 3), // Demo data
+                        status = idx < 3 ? "On Track" : "Active"
+                    })
+                    .OrderByDescending(p => p.picks)
+                    .Take(10)
+                    .ToList();
+
+                return Ok(new { topPerformers });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching demo top performers");
+                return StatusCode(500, new { message = "Error fetching demo top performers" });
+            }
+        }
+
+        /// <summary>
+        /// Get picker performance chart data for demo customer 2
+        /// </summary>
+        [HttpGet("customer/2/picker-performance")]
+        public async Task<IActionResult> GetDemoPickerPerformance()
+        {
+            _logger.LogInformation("DemoReportsController.GetDemoPickerPerformance: Called");
+            try
+            {
+                var customerId = 2;
+                var now = DateTime.UtcNow;
+                var last7Days = now.AddDays(-7);
+
+                var movements = await _context.InventoryMovements
+                    .Where(im => im.CustomerId == customerId && im.OccurredAtUtc >= last7Days)
+                    .ToListAsync();
+
+                // Group by transaction type and date
+                var chartData = movements
+                    .GroupBy(m => new { m.TransactionType, Date = m.OccurredAtUtc.Date })
+                    .GroupBy(g => g.Key.TransactionType)
+                    .Select(g => new
+                    {
+                        name = g.Key,
+                        data = g
+                            .OrderBy(item => item.Key.Date)
+                            .Select(item => new
+                            {
+                                date = item.Key.Date.ToString("yyyy-MM-dd"),
+                                value = item.Count()
+                            })
+                            .ToList()
+                    })
+                    .ToList();
+
+                return Ok(new { chartData });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching demo picker performance");
+                return StatusCode(500, new { message = "Error fetching demo picker performance" });
             }
         }
     }
