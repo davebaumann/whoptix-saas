@@ -77,7 +77,7 @@ export default function DemoDashboard() {
           setAgingInventoryData(agingData)
         }
 
-        const profitabilityResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/profitability`, {
+        const profitabilityResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/profitability?dateRange=${dateRange}`, {
           headers: { 'Content-Type': 'application/json' }
         })
         if (profitabilityResponse.ok) {
