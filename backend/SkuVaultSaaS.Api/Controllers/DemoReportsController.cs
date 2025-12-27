@@ -628,5 +628,88 @@ namespace SkuVaultSaaS.Api.Controllers
                 return StatusCode(500, new { message = "Error fetching demo demand forecast" });
             }
         }
+
+        /// <summary>
+        /// Get financial report for demo customer 2
+        /// </summary>
+        [HttpGet("customer/2/financial")]
+        public async Task<IActionResult> GetDemoFinancial([FromQuery] string dateRange = "today")
+        {
+            _logger.LogInformation($"DemoReportsController.GetDemoFinancial: Called with dateRange={dateRange}");
+            try
+            {
+                var customerId = 2;
+
+                // Generate demo financial data with values varying by date range
+                var (multiplier, period) = dateRange switch
+                {
+                    "yesterday" => (0.8, "Yesterday"),
+                    "last7days" => (5.5, "Last 7 Days"),
+                    _ => (1.0, "Today") // default "today"
+                };
+
+                var topProducts = new[]
+                {
+                    new { sku = "KITT-GENE-3386", productName = "Generic Product - Green One Size", unitsSold = (int)(145 * multiplier), revenue = 2175.00 * multiplier, cogs = 1305.00 * multiplier, profit = 870.00 * multiplier, marginPercent = 40.0 },
+                    new { sku = "SPO-BICY-8687", productName = "Bicycle Helmet - Standard", unitsSold = (int)(98 * multiplier), revenue = 1960.00 * multiplier, cogs = 1078.00 * multiplier, profit = 882.00 * multiplier, marginPercent = 45.0 },
+                    new { sku = "HOM-PICT-4364", productName = "Picture Frame - Gray", unitsSold = (int)(156 * multiplier), revenue = 1404.00 * multiplier, cogs = 701.00 * multiplier, profit = 703.00 * multiplier, marginPercent = 50.0 },
+                    new { sku = "AUT-FLOO-7837", productName = "Floor Mats - Standard", unitsSold = (int)(234 * multiplier), revenue = 2106.00 * multiplier, cogs = 1263.00 * multiplier, profit = 843.00 * multiplier, marginPercent = 40.0 },
+                    new { sku = "AUT-WIND-7622", productName = "Windshield Wipers - Red", unitsSold = (int)(178 * multiplier), revenue = 1960.00 * multiplier, cogs = 941.00 * multiplier, profit = 1019.00 * multiplier, marginPercent = 52.0 },
+                    new { sku = "ELE-BATT-5523", productName = "AA Battery Pack", unitsSold = (int)(412 * multiplier), revenue = 1648.00 * multiplier, cogs = 742.00 * multiplier, profit = 906.00 * multiplier, marginPercent = 55.0 },
+                    new { sku = "HOB-KNOB-3344", productName = "Door Knob Chrome", unitsSold = (int)(89 * multiplier), revenue = 1602.00 * multiplier, cogs = 480.00 * multiplier, profit = 1122.00 * multiplier, marginPercent = 70.0 },
+                    new { sku = "AUT-WIND-2453", productName = "Windshield Wipers - White Large", unitsSold = (int)(67 * multiplier), revenue = 1340.00 * multiplier, cogs = 536.00 * multiplier, profit = 804.00 * multiplier, marginPercent = 60.0 }
+                };
+
+                var totalRevenue = topProducts.Sum(p => p.revenue);
+                var totalCogs = topProducts.Sum(p => p.cogs);
+                var grossProfit = totalRevenue - totalCogs;
+                var totalUnits = topProducts.Sum(p => p.unitsSold);
+                var totalOrders = (int)(127 * multiplier);
+
+                var categoryPerformance = new[]
+                {
+                    new { category = "Kitchen & Dining", revenue = 2175.00 * multiplier },
+                    new { category = "Sports & Outdoors", revenue = 1960.00 * multiplier },
+                    new { category = "Home & Garden", revenue = 3245.00 * multiplier },
+                    new { category = "Automotive", revenue = 5406.00 * multiplier },
+                    new { category = "Electronics", revenue = 1648.00 * multiplier },
+                    new { category = "Home Hardware", revenue = 1602.00 * multiplier }
+                };
+
+                var kpis = new
+                {
+                    totalRevenue = (int)totalRevenue,
+                    grossProfit = (int)grossProfit,
+                    totalOrders,
+                    cogs = (int)totalCogs,
+                    avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0,
+                    totalUnits,
+                    grossMarginPercent = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0,
+                    cogsPercent = totalRevenue > 0 ? (totalCogs / totalRevenue) * 100 : 0
+                };
+
+                var metrics = new
+                {
+                    returnRate = 2.5,
+                    customerLTV = 485.25 * multiplier,
+                    inventoryTurnover = 3.4,
+                    daysInventoryOutstanding = 107,
+                    profitMargin = 22.5
+                };
+
+                return Ok(new
+                {
+                    kpis,
+                    categoryPerformance,
+                    metrics,
+                    topProducts
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching demo financial data");
+                return StatusCode(500, new { message = "Error fetching demo financial data" });
+            }
+        }
     }
 }

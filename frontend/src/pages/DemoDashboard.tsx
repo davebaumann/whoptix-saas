@@ -4,7 +4,7 @@ import { ArrowLeft, Users, Package, AlertCircle } from 'lucide-react'
 
 export default function DemoDashboard() {
   const navigate = useNavigate()
-  const [currentReport, setCurrentReport] = useState<'dashboard' | 'inventory' | 'low-stock' | 'aging-inventory' | 'profitability' | 'demand-forecast'>('dashboard')
+  const [currentReport, setCurrentReport] = useState<'dashboard' | 'inventory' | 'low-stock' | 'aging-inventory' | 'profitability' | 'demand-forecast' | 'financial-warehouse'>('dashboard')
   const [data, setData] = useState<any | null>(null)
   const [topPerformers, setTopPerformers] = useState<any | null>(null)
   const [inventoryData, setInventoryData] = useState<any | null>(null)
@@ -12,6 +12,7 @@ export default function DemoDashboard() {
   const [agingInventoryData, setAgingInventoryData] = useState<any | null>(null)
   const [profitabilityData, setProfitabilityData] = useState<any | null>(null)
   const [demandForecastData, setDemandForecastData] = useState<any | null>(null)
+  const [financialData, setFinancialData] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [dateRange, setDateRange] = useState('today')
@@ -33,12 +34,12 @@ export default function DemoDashboard() {
   }
 
   useEffect(() => {
-    const fetchAllDemoData = async () => {
+    const fetchDemoData = async () => {
       try {
         setLoading(true)
         const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '') || 'http://localhost:5239'
         
-        // Fetch from demo-specific endpoints (no authentication needed)
+        // Fetch dashboard-related data (doesn't change with date range in this case, but keep for consistency)
         const dashboardResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/dashboard?dateRange=${dateRange}`, {
           headers: { 'Content-Type': 'application/json' }
         })
@@ -79,22 +80,6 @@ export default function DemoDashboard() {
           setAgingInventoryData(agingData)
         }
 
-        const profitabilityResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/profitability?dateRange=${dateRange}`, {
-          headers: { 'Content-Type': 'application/json' }
-        })
-        if (profitabilityResponse.ok) {
-          const profData = await profitabilityResponse.json()
-          setProfitabilityData(profData)
-        }
-
-        const demandForecastResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/demand-forecast?forecastPeriod=${forecastPeriod}`, {
-          headers: { 'Content-Type': 'application/json' }
-        })
-        if (demandForecastResponse.ok) {
-          const dfData = await demandForecastResponse.json()
-          setDemandForecastData(dfData)
-        }
-
         setError(null)
       } catch (err) {
         console.error('Failed to fetch demo data:', err)
@@ -104,8 +89,71 @@ export default function DemoDashboard() {
       }
     }
 
-    fetchAllDemoData()
-  }, [dateRange, forecastPeriod])
+    fetchDemoData()
+  }, [])
+
+  // Fetch profitability data when date range changes
+  useEffect(() => {
+    const fetchProfitability = async () => {
+      try {
+        const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '') || 'http://localhost:5239'
+        
+        const profitabilityResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/profitability?dateRange=${dateRange}`, {
+          headers: { 'Content-Type': 'application/json' }
+        })
+        if (profitabilityResponse.ok) {
+          const profData = await profitabilityResponse.json()
+          setProfitabilityData(profData)
+        }
+      } catch (err) {
+        console.error('Failed to fetch profitability data:', err)
+      }
+    }
+
+    fetchProfitability()
+  }, [dateRange])
+
+  // Fetch demand forecast when forecast period changes
+  useEffect(() => {
+    const fetchDemandForecast = async () => {
+      try {
+        const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '') || 'http://localhost:5239'
+        
+        const demandForecastResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/demand-forecast?forecastPeriod=${forecastPeriod}`, {
+          headers: { 'Content-Type': 'application/json' }
+        })
+        if (demandForecastResponse.ok) {
+          const dfData = await demandForecastResponse.json()
+          setDemandForecastData(dfData)
+        }
+      } catch (err) {
+        console.error('Failed to fetch demand forecast data:', err)
+      }
+    }
+
+    fetchDemandForecast()
+  }, [forecastPeriod])
+
+  // Fetch financial data when date range changes
+  useEffect(() => {
+    const fetchFinancial = async () => {
+      try {
+        const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '') || 'http://localhost:5239'
+        
+        const financialResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/financial?dateRange=${dateRange}`, {
+          headers: { 'Content-Type': 'application/json' }
+        })
+        if (financialResponse.ok) {
+          const finData = await financialResponse.json()
+          setFinancialData(finData)
+        }
+      } catch (err) {
+        console.error('Failed to fetch financial data:', err)
+      }
+    }
+
+    fetchFinancial()
+  }, [dateRange])
 
   // Load tier configuration and report access from backend
   useEffect(() => {
@@ -211,7 +259,7 @@ export default function DemoDashboard() {
               return (
                 <button
                   key={key}
-                  onClick={() => available && setCurrentReport(key as 'dashboard' | 'inventory' | 'low-stock' | 'aging-inventory' | 'profitability' | 'demand-forecast')}
+                  onClick={() => available && setCurrentReport(key as 'dashboard' | 'inventory' | 'low-stock' | 'aging-inventory' | 'profitability' | 'demand-forecast' | 'financial-warehouse')}
                   disabled={!available}
                   className={`px-3 py-2 rounded-md text-sm font-medium transition-all ${
                     available
@@ -230,7 +278,7 @@ export default function DemoDashboard() {
         </div>
 
         {/* Header - Dashboard Title */}
-        {currentReport !== 'demand-forecast' && (
+        {currentReport !== 'demand-forecast' && currentReport !== 'financial-warehouse' && (
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-gray-900">
               {currentReport === 'dashboard' ? 'Demo Picker Dashboard' : currentReport === 'inventory' ? 'Inventory Report' : currentReport === 'low-stock' ? 'Low Stock Report' : currentReport === 'aging-inventory' ? 'Aging Inventory Report' : currentReport === 'profitability' ? 'Profitability Report' : 'Demand Forecast'}
@@ -977,6 +1025,161 @@ export default function DemoDashboard() {
               </>
             ) : (
               <p className="text-gray-500">Loading forecast data...</p>
+            )}
+          </div>
+        ) : currentReport === 'financial-warehouse' ? (
+          <div className="space-y-6">
+            {financialData ? (
+              <>
+                {/* Title and Date Range Selection */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900">Financial Report</h2>
+                    <p className="text-sm text-gray-600 mt-1">Comprehensive financial metrics and performance analysis</p>
+                  </div>
+                  <div className="flex gap-2">
+                    {['today', 'yesterday', 'last7days'].map((period) => (
+                      <button
+                        key={period}
+                        onClick={() => setDateRange(period)}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                          period === dateRange
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {period === 'today' ? 'Today' : period === 'yesterday' ? 'Yesterday' : 'Last 7 Days'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* KPI Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                  <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
+                    <p className="text-sm font-medium text-gray-600 mb-2">Total Revenue</p>
+                    <p className="text-3xl font-bold text-gray-900">${(financialData.kpis.totalRevenue / 1000).toFixed(1)}K</p>
+                    <p className="text-xs text-gray-500 mt-1">Orders: {financialData.kpis.totalOrders}</p>
+                  </div>
+                  <div className="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
+                    <p className="text-sm font-medium text-gray-600 mb-2">Gross Profit</p>
+                    <p className="text-3xl font-bold text-gray-900">${(financialData.kpis.grossProfit / 1000).toFixed(1)}K</p>
+                    <p className="text-xs text-gray-500 mt-1">{financialData.kpis.grossMarginPercent.toFixed(1)}% margin</p>
+                  </div>
+                  <div className="bg-white rounded-lg shadow p-6 border-l-4 border-purple-500">
+                    <p className="text-sm font-medium text-gray-600 mb-2">Cost of Goods Sold</p>
+                    <p className="text-3xl font-bold text-gray-900">${(financialData.kpis.cogs / 1000).toFixed(1)}K</p>
+                    <p className="text-xs text-gray-500 mt-1">{financialData.kpis.cogsPercent.toFixed(1)}% of revenue</p>
+                  </div>
+                  <div className="bg-white rounded-lg shadow p-6 border-l-4 border-amber-500">
+                    <p className="text-sm font-medium text-gray-600 mb-2">Avg Order Value</p>
+                    <p className="text-3xl font-bold text-gray-900">${financialData.kpis.avgOrderValue.toFixed(2)}</p>
+                    <p className="text-xs text-gray-500 mt-1">Units: {Math.round(financialData.kpis.totalUnits)}</p>
+                  </div>
+                </div>
+
+                {/* Summary Stats */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Category Performance</h3>
+                    <div className="space-y-3">
+                      {financialData.categoryPerformance.map((cat: any) => (
+                        <div key={cat.category} className="flex items-center justify-between">
+                          <span className="text-gray-600">{cat.category}</span>
+                          <div className="flex items-center gap-3">
+                            <div className="w-24 bg-gray-200 rounded-full h-2">
+                              <div 
+                                className="bg-blue-600 h-2 rounded-full" 
+                                style={{width: `${(cat.revenue / financialData.kpis.totalRevenue) * 100}%`}}
+                              ></div>
+                            </div>
+                            <span className="text-sm font-medium text-gray-900 w-16 text-right">
+                              ${(cat.revenue / 1000).toFixed(1)}K
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Metrics Summary</h3>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Return Rate:</span>
+                        <span className="font-medium">{financialData.metrics.returnRate.toFixed(2)}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Customer LTV:</span>
+                        <span className="font-medium">${financialData.metrics.customerLTV.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Inventory Turnover:</span>
+                        <span className="font-medium">{financialData.metrics.inventoryTurnover.toFixed(2)}x</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Days Inventory Outstanding:</span>
+                        <span className="font-medium">{Math.round(financialData.metrics.daysInventoryOutstanding)} days</span>
+                      </div>
+                      <div className="flex justify-between pt-2 border-t">
+                        <span className="text-gray-600 font-medium">Profit Margin:</span>
+                        <span className="font-semibold text-green-600">{financialData.metrics.profitMargin.toFixed(2)}%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Top Products by Revenue */}
+                <div className="bg-white rounded-lg shadow p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Top Products by Revenue</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b-2 border-gray-200">
+                          <th className="px-6 py-3 text-left font-semibold text-gray-700">SKU</th>
+                          <th className="px-6 py-3 text-left font-semibold text-gray-700">Product</th>
+                          <th className="px-6 py-3 text-right font-semibold text-gray-700">Units Sold</th>
+                          <th className="px-6 py-3 text-right font-semibold text-gray-700">Revenue</th>
+                          <th className="px-6 py-3 text-right font-semibold text-gray-700">COGS</th>
+                          <th className="px-6 py-3 text-right font-semibold text-gray-700">Profit</th>
+                          <th className="px-6 py-3 text-right font-semibold text-gray-700">Margin %</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {financialData.topProducts.map((item: any) => (
+                          <tr key={item.sku} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 font-mono text-xs font-semibold text-gray-900">{item.sku}</td>
+                            <td className="px-6 py-4 text-gray-900 font-medium">{item.productName}</td>
+                            <td className="px-6 py-4 text-right text-gray-900">{item.unitsSold}</td>
+                            <td className="px-6 py-4 text-right text-gray-900 font-semibold">${item.revenue.toFixed(2)}</td>
+                            <td className="px-6 py-4 text-right text-gray-600">${item.cogs.toFixed(2)}</td>
+                            <td className="px-6 py-4 text-right font-semibold text-green-600">${item.profit.toFixed(2)}</td>
+                            <td className="px-6 py-4 text-right">
+                              <span className="inline-block px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                {item.marginPercent.toFixed(1)}%
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Info Banner */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-start">
+                    <AlertCircle className="w-5 h-5 text-blue-600 mr-3 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm text-blue-800">
+                        <strong>Enterprise Feature:</strong> This demo shows comprehensive financial metrics including revenue analysis, profitability by product and category, inventory turnover, and key performance indicators. Get actionable insights to optimize pricing, inventory levels, and product mix.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p className="text-gray-500">Loading financial data...</p>
             )}
           </div>
         ) : (
