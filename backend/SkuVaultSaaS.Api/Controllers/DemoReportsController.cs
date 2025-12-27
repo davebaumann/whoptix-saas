@@ -557,5 +557,76 @@ namespace SkuVaultSaaS.Api.Controllers
                 return StatusCode(500, new { message = "Error fetching demo picker performance" });
             }
         }
+
+        /// <summary>
+        /// Get demand forecast for demo customer 2
+        /// </summary>
+        [HttpGet("customer/2/demand-forecast")]
+        public async Task<IActionResult> GetDemoDemandForecast([FromQuery] string forecastPeriod = "30days")
+        {
+            _logger.LogInformation($"DemoReportsController.GetDemoDemandForecast: Called with forecastPeriod={forecastPeriod}");
+            try
+            {
+                var customerId = 2;
+
+                // Generate demo forecast data
+                var forecastItems = new[]
+                {
+                    new { sku = "KITT-GENE-3386", productName = "Generic Product - Green One Size", category = "Kitchen & Dining", avgDaily = 15.0, forecast = 450, trend = 0.0, currentStock = 104, daysLeft = 6.9, confidence = 95, risk = "Critical" },
+                    new { sku = "SPO-BICY-8687", productName = "Bicycle Helmet - Standard", category = "Sports & Outdoors", avgDaily = 12.0, forecast = 360, trend = 0.0, currentStock = 7, daysLeft = 0.6, confidence = 95, risk = "Critical" },
+                    new { sku = "HOM-PICT-4364", productName = "Picture Frame - Gray", category = "Home & Garden", avgDaily = 7.7, forecast = 345, trend = 50.0, currentStock = 45, daysLeft = 5.9, confidence = 93, risk = "Critical" },
+                    new { sku = "AUT-FLOO-7837", productName = "Floor Mats - Standard", category = "Automotive", avgDaily = 9.0, forecast = 270, trend = 0.0, currentStock = 35, daysLeft = 3.9, confidence = 95, risk = "Critical" },
+                    new { sku = "AUT-WIND-7622", productName = "Windshield Wipers - Red", category = "Automotive", avgDaily = 9.0, forecast = 270, trend = 0.0, currentStock = 50, daysLeft = 5.6, confidence = 95, risk = "Critical" },
+                    new { sku = "AUT-WIND-2453", productName = "Windshield Wipers - White Large", category = "Automotive", avgDaily = 5.5, forecast = 247, trend = 50.0, currentStock = 21, daysLeft = 3.8, confidence = 95, risk = "Critical" },
+                    new { sku = "ELE-BATT-5523", productName = "AA Battery Pack", category = "Electronics", avgDaily = 8.3, forecast = 223, trend = -10.0, currentStock = 156, daysLeft = 18.8, confidence = 92, risk = "Low" },
+                    new { sku = "HOB-KNOB-3344", productName = "Door Knob Chrome", category = "Home Hardware", avgDaily = 4.2, forecast = 189, trend = 25.0, currentStock = 72, daysLeft = 17.1, confidence = 90, risk = "Low" }
+                };
+
+                var riskCounts = new
+                {
+                    critical = forecastItems.Count(i => i.risk == "Critical"),
+                    high = forecastItems.Count(i => i.risk == "High"),
+                    medium = forecastItems.Count(i => i.risk == "Medium"),
+                    low = forecastItems.Count(i => i.risk == "Low")
+                };
+
+                // Calculate forecast metrics based on period
+                var (periodDays, periodLabel, totalDemand) = forecastPeriod switch
+                {
+                    "7days" => (7, "7 days", 29400),
+                    "14days" => (14, "14 days", 52000),
+                    "60days" => (60, "60 days", 150000),
+                    "90days" => (90, "90 days", 210000),
+                    _ => (30, "30 days", 74448) // default 30days
+                };
+
+                var kpis = new
+                {
+                    skusAnalyzed = 601,
+                    totalForecastedDemand = totalDemand,
+                    forecastPeriod = periodLabel,
+                    avgDailyDemand = (decimal)totalDemand / periodDays,
+                    atRiskSkus = riskCounts.critical + riskCounts.high
+                };
+
+                return Ok(new
+                {
+                    kpis,
+                    riskDistribution = new
+                    {
+                        critical = riskCounts.critical,
+                        high = riskCounts.high,
+                        medium = riskCounts.medium,
+                        low = riskCounts.low
+                    },
+                    forecastItems
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching demo demand forecast");
+                return StatusCode(500, new { message = "Error fetching demo demand forecast" });
+            }
+        }
     }
 }

@@ -4,16 +4,18 @@ import { ArrowLeft, Users, Package, AlertCircle } from 'lucide-react'
 
 export default function DemoDashboard() {
   const navigate = useNavigate()
-  const [currentReport, setCurrentReport] = useState<'dashboard' | 'inventory' | 'low-stock' | 'aging-inventory' | 'profitability'>('dashboard')
+  const [currentReport, setCurrentReport] = useState<'dashboard' | 'inventory' | 'low-stock' | 'aging-inventory' | 'profitability' | 'demand-forecast'>('dashboard')
   const [data, setData] = useState<any | null>(null)
   const [topPerformers, setTopPerformers] = useState<any | null>(null)
   const [inventoryData, setInventoryData] = useState<any | null>(null)
   const [lowStockData, setLowStockData] = useState<any | null>(null)
   const [agingInventoryData, setAgingInventoryData] = useState<any | null>(null)
   const [profitabilityData, setProfitabilityData] = useState<any | null>(null)
+  const [demandForecastData, setDemandForecastData] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [dateRange, setDateRange] = useState('today')
+  const [forecastPeriod, setForecastPeriod] = useState('30days')
   const [planTier, setPlanTier] = useState<number>(2) // Default to Standard (level 2)
   const [tiers, setTiers] = useState<Array<{ level: number; name: string }>>([])
   const [reportAccess, setReportAccess] = useState<Record<string, number>>({})
@@ -85,6 +87,14 @@ export default function DemoDashboard() {
           setProfitabilityData(profData)
         }
 
+        const demandForecastResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/demand-forecast?forecastPeriod=${forecastPeriod}`, {
+          headers: { 'Content-Type': 'application/json' }
+        })
+        if (demandForecastResponse.ok) {
+          const dfData = await demandForecastResponse.json()
+          setDemandForecastData(dfData)
+        }
+
         setError(null)
       } catch (err) {
         console.error('Failed to fetch demo data:', err)
@@ -95,7 +105,7 @@ export default function DemoDashboard() {
     }
 
     fetchAllDemoData()
-  }, [dateRange])
+  }, [dateRange, forecastPeriod])
 
   // Load tier configuration and report access from backend
   useEffect(() => {
@@ -201,7 +211,7 @@ export default function DemoDashboard() {
               return (
                 <button
                   key={key}
-                  onClick={() => available && setCurrentReport(key as 'dashboard' | 'inventory' | 'low-stock' | 'aging-inventory' | 'profitability')}
+                  onClick={() => available && setCurrentReport(key as 'dashboard' | 'inventory' | 'low-stock' | 'aging-inventory' | 'profitability' | 'demand-forecast')}
                   disabled={!available}
                   className={`px-3 py-2 rounded-md text-sm font-medium transition-all ${
                     available
@@ -220,22 +230,26 @@ export default function DemoDashboard() {
         </div>
 
         {/* Header - Dashboard Title */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">
-            {currentReport === 'dashboard' ? 'Demo Picker Dashboard' : currentReport === 'inventory' ? 'Inventory Report' : currentReport === 'low-stock' ? 'Low Stock Report' : currentReport === 'aging-inventory' ? 'Aging Inventory Report' : 'Profitability Report'}
-          </h1>
-          <p className="mt-1 text-sm text-gray-600">
-            {currentReport === 'dashboard' 
-              ? 'Real-time warehouse operations'
-              : currentReport === 'inventory'
-              ? 'Complete inventory levels and valuations'
-              : currentReport === 'low-stock'
-              ? 'Items below threshold quantities'
-              : currentReport === 'aging-inventory'
-              ? 'Slow-moving and aged inventory analysis'
-              : 'Product-level profit analysis and margins'}
-          </p>
-        </div>
+        {currentReport !== 'demand-forecast' && (
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold text-gray-900">
+              {currentReport === 'dashboard' ? 'Demo Picker Dashboard' : currentReport === 'inventory' ? 'Inventory Report' : currentReport === 'low-stock' ? 'Low Stock Report' : currentReport === 'aging-inventory' ? 'Aging Inventory Report' : currentReport === 'profitability' ? 'Profitability Report' : 'Demand Forecast'}
+            </h1>
+            <p className="mt-1 text-sm text-gray-600">
+              {currentReport === 'dashboard' 
+                ? 'Real-time warehouse operations'
+                : currentReport === 'inventory'
+                ? 'Complete inventory levels and valuations'
+                : currentReport === 'low-stock'
+                ? 'Items below threshold quantities'
+                : currentReport === 'aging-inventory'
+                ? 'Slow-moving and aged inventory analysis'
+                : currentReport === 'profitability'
+                ? 'Product-level profit analysis and margins'
+                : 'Predict future inventory needs based on historical sales patterns'}
+            </p>
+          </div>
+        )}
 
         {error && (
           <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
@@ -825,6 +839,144 @@ export default function DemoDashboard() {
               <div className="text-center py-8">
                 <p className="text-gray-600">Loading profitability data...</p>
               </div>
+            )}
+          </div>
+        ) : currentReport === 'demand-forecast' ? (
+          <div className="space-y-6">
+            {demandForecastData ? (
+              <>
+                {/* Title and Forecast Period Selection */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900">Demand Forecast</h2>
+                    <p className="text-sm text-gray-600 mt-1">Predict future inventory needs based on historical sales patterns</p>
+                  </div>
+                  <div className="flex gap-2">
+                    {['7days', '14days', '30days', '60days', '90days'].map((period) => (
+                      <button
+                        key={period}
+                        onClick={() => setForecastPeriod(period)}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                          period === forecastPeriod
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {period === '7days' ? '7 Days' : period === '14days' ? '14 Days' : period === '30days' ? '30 Days' : period === '60days' ? '60 Days' : '90 Days'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* KPI Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                  <div className="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
+                    <p className="text-sm font-medium text-gray-600 mb-2">SKUs Analyzed</p>
+                    <p className="text-3xl font-bold text-gray-900">{demandForecastData.kpis.skusAnalyzed}</p>
+                  </div>
+                  <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
+                    <p className="text-sm font-medium text-gray-600 mb-2">Total Forecasted Demand</p>
+                    <p className="text-3xl font-bold text-gray-900">{demandForecastData.kpis.totalForecastedDemand.toLocaleString()}</p>
+                    <p className="text-xs text-gray-500 mt-1">units in {demandForecastData.kpis.forecastPeriod}</p>
+                  </div>
+                  <div className="bg-white rounded-lg shadow p-6 border-l-4 border-purple-500">
+                    <p className="text-sm font-medium text-gray-600 mb-2">Avg Daily Demand</p>
+                    <p className="text-3xl font-bold text-gray-900">{Math.round(demandForecastData.kpis.avgDailyDemand)}</p>
+                    <p className="text-xs text-gray-500 mt-1">units/day</p>
+                  </div>
+                  <div className="bg-white rounded-lg shadow p-6 border-l-4 border-red-500">
+                    <p className="text-sm font-medium text-gray-600 mb-2">At-Risk SKUs</p>
+                    <p className="text-3xl font-bold text-gray-900">{demandForecastData.kpis.atRiskSkus}</p>
+                    <p className="text-xs text-gray-500 mt-1">Critical + High</p>
+                  </div>
+                </div>
+
+                {/* Risk Distribution */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Risk Distribution</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="bg-red-50 rounded-lg border border-red-200 p-6 text-center">
+                      <div className="text-2xl font-bold text-red-600 mb-2">{demandForecastData.riskDistribution.critical}</div>
+                      <p className="text-sm font-medium text-gray-700">Critical</p>
+                    </div>
+                    <div className="bg-orange-50 rounded-lg border border-orange-200 p-6 text-center">
+                      <div className="text-2xl font-bold text-orange-600 mb-2">{demandForecastData.riskDistribution.high}</div>
+                      <p className="text-sm font-medium text-gray-700">High</p>
+                    </div>
+                    <div className="bg-yellow-50 rounded-lg border border-yellow-200 p-6 text-center">
+                      <div className="text-2xl font-bold text-yellow-600 mb-2">{demandForecastData.riskDistribution.medium}</div>
+                      <p className="text-sm font-medium text-gray-700">Medium</p>
+                    </div>
+                    <div className="bg-green-50 rounded-lg border border-green-200 p-6 text-center">
+                      <div className="text-2xl font-bold text-green-600 mb-2">{demandForecastData.riskDistribution.low}</div>
+                      <p className="text-sm font-medium text-gray-700">Low</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Forecast Table */}
+                <div className="bg-white rounded-lg shadow overflow-hidden">
+                  <div className="px-6 py-4 bg-gray-50 border-b flex items-center justify-between">
+                    <h3 className="font-semibold text-gray-900">Demand Forecasts</h3>
+                    <button className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
+                      ⬇ Export CSV
+                    </button>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 border-b">
+                        <tr>
+                          <th className="px-6 py-3 text-left font-medium text-gray-700">SKU</th>
+                          <th className="px-6 py-3 text-left font-medium text-gray-700">PRODUCT</th>
+                          <th className="px-6 py-3 text-left font-medium text-gray-700">CATEGORY</th>
+                          <th className="px-6 py-3 text-right font-medium text-gray-700">AVG DAILY</th>
+                          <th className="px-6 py-3 text-right font-medium text-gray-700">FORECAST</th>
+                          <th className="px-6 py-3 text-right font-medium text-gray-700">TREND</th>
+                          <th className="px-6 py-3 text-right font-medium text-gray-700">CURRENT STOCK</th>
+                          <th className="px-6 py-3 text-right font-medium text-gray-700">DAYS LEFT</th>
+                          <th className="px-6 py-3 text-right font-medium text-gray-700">CONFIDENCE</th>
+                          <th className="px-6 py-3 text-left font-medium text-gray-700">RISK</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {demandForecastData.forecastItems.map((item: any) => (
+                          <tr key={item.sku} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 font-mono text-xs font-semibold text-gray-900">{item.sku}</td>
+                            <td className="px-6 py-4 text-gray-900 font-medium">{item.productName}</td>
+                            <td className="px-6 py-4 text-gray-600 text-sm">{item.category}</td>
+                            <td className="px-6 py-4 text-right text-gray-900">{item.avgDaily}</td>
+                            <td className="px-6 py-4 text-right text-gray-900 font-semibold">{item.forecast}</td>
+                            <td className="px-6 py-4 text-right">
+                              <span className={`font-medium ${item.trend > 0 ? 'text-green-600' : item.trend < 0 ? 'text-red-600' : 'text-gray-600'}`}>
+                                {item.trend > 0 ? '+' : ''}{item.trend}%
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-right text-gray-900">{item.currentStock}</td>
+                            <td className="px-6 py-4 text-right">
+                              <span className={`font-semibold ${item.daysLeft < 5 ? 'text-red-600' : 'text-gray-900'}`}>
+                                {item.daysLeft}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-right text-gray-900">{item.confidence}%</td>
+                            <td className="px-6 py-4">
+                              <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                                item.risk === 'Critical' ? 'bg-red-100 text-red-800' :
+                                item.risk === 'High' ? 'bg-orange-100 text-orange-800' :
+                                item.risk === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-green-100 text-green-800'
+                              }`}>
+                                {item.risk}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p className="text-gray-500">Loading forecast data...</p>
             )}
           </div>
         ) : (
