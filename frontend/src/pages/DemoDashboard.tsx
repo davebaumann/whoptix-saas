@@ -4,7 +4,7 @@ import { ArrowLeft, Users, Package, AlertCircle } from 'lucide-react'
 
 export default function DemoDashboard() {
   const navigate = useNavigate()
-  const [currentReport, setCurrentReport] = useState<'dashboard' | 'inventory' | 'low-stock' | 'aging-inventory' | 'profitability' | 'demand-forecast' | 'financial-warehouse'>('dashboard')
+  const [currentReport, setCurrentReport] = useState<'dashboard' | 'inventory' | 'low-stock' | 'aging-inventory' | 'profitability' | 'demand-forecast' | 'financial-warehouse' | 'locations'>('dashboard')
   const [data, setData] = useState<any | null>(null)
   const [topPerformers, setTopPerformers] = useState<any | null>(null)
   const [inventoryData, setInventoryData] = useState<any | null>(null)
@@ -13,6 +13,7 @@ export default function DemoDashboard() {
   const [profitabilityData, setProfitabilityData] = useState<any | null>(null)
   const [demandForecastData, setDemandForecastData] = useState<any | null>(null)
   const [financialData, setFinancialData] = useState<any | null>(null)
+  const [locationData, setLocationData] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [dateRange, setDateRange] = useState('today')
@@ -155,6 +156,27 @@ export default function DemoDashboard() {
     fetchFinancial()
   }, [dateRange])
 
+  // Fetch location data (no date range needed for location analysis)
+  useEffect(() => {
+    const fetchLocations = async () => {
+      try {
+        const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '') || 'http://localhost:5239'
+        
+        const locationResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/locations`, {
+          headers: { 'Content-Type': 'application/json' }
+        })
+        if (locationResponse.ok) {
+          const locData = await locationResponse.json()
+          setLocationData(locData)
+        }
+      } catch (err) {
+        console.error('Failed to fetch location data:', err)
+      }
+    }
+
+    fetchLocations()
+  }, [])
+
   // Load tier configuration and report access from backend
   useEffect(() => {
     // For demo, use hardcoded defaults (demo users aren't authenticated)
@@ -259,7 +281,7 @@ export default function DemoDashboard() {
               return (
                 <button
                   key={key}
-                  onClick={() => available && setCurrentReport(key as 'dashboard' | 'inventory' | 'low-stock' | 'aging-inventory' | 'profitability' | 'demand-forecast' | 'financial-warehouse')}
+                  onClick={() => available && setCurrentReport(key as 'dashboard' | 'inventory' | 'low-stock' | 'aging-inventory' | 'profitability' | 'demand-forecast' | 'financial-warehouse' | 'locations')}
                   disabled={!available}
                   className={`px-3 py-2 rounded-md text-sm font-medium transition-all ${
                     available
@@ -278,7 +300,7 @@ export default function DemoDashboard() {
         </div>
 
         {/* Header - Dashboard Title */}
-        {currentReport !== 'demand-forecast' && currentReport !== 'financial-warehouse' && (
+        {currentReport !== 'demand-forecast' && currentReport !== 'financial-warehouse' && currentReport !== 'locations' && (
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-gray-900">
               {currentReport === 'dashboard' ? 'Demo Picker Dashboard' : currentReport === 'inventory' ? 'Inventory Report' : currentReport === 'low-stock' ? 'Low Stock Report' : currentReport === 'aging-inventory' ? 'Aging Inventory Report' : currentReport === 'profitability' ? 'Profitability Report' : 'Demand Forecast'}
@@ -1180,6 +1202,148 @@ export default function DemoDashboard() {
               </>
             ) : (
               <p className="text-gray-500">Loading financial data...</p>
+            )}
+          </div>
+        ) : currentReport === 'locations' ? (
+          <div className="space-y-6">
+            {locationData ? (
+              <>
+                {/* Title */}
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Location Analysis</h2>
+                  <p className="text-sm text-gray-600 mt-1">Warehouse performance, inventory distribution, and operational efficiency across locations</p>
+                </div>
+
+                {/* KPI Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                  <div className="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
+                    <p className="text-sm font-medium text-gray-600 mb-2">Total Locations</p>
+                    <p className="text-3xl font-bold text-gray-900">{locationData.kpis.totalLocations}</p>
+                    <p className="text-xs text-gray-500 mt-1">Active warehouses</p>
+                  </div>
+                  <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
+                    <p className="text-sm font-medium text-gray-600 mb-2">Total Inventory Value</p>
+                    <p className="text-3xl font-bold text-gray-900">${(locationData.kpis.totalInventoryValue / 1000).toFixed(1)}K</p>
+                    <p className="text-xs text-gray-500 mt-1">Across all locations</p>
+                  </div>
+                  <div className="bg-white rounded-lg shadow p-6 border-l-4 border-purple-500">
+                    <p className="text-sm font-medium text-gray-600 mb-2">Avg Utilization</p>
+                    <p className="text-3xl font-bold text-gray-900">{locationData.kpis.avgUtilization.toFixed(1)}%</p>
+                    <p className="text-xs text-gray-500 mt-1">Capacity used</p>
+                  </div>
+                  <div className="bg-white rounded-lg shadow p-6 border-l-4 border-amber-500">
+                    <p className="text-sm font-medium text-gray-600 mb-2">Total SKUs</p>
+                    <p className="text-3xl font-bold text-gray-900">{locationData.kpis.totalSkus}</p>
+                    <p className="text-xs text-gray-500 mt-1">Unique products</p>
+                  </div>
+                </div>
+
+                {/* Location Performance Table */}
+                <div className="bg-white rounded-lg shadow p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Location Performance</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b-2 border-gray-200">
+                          <th className="px-6 py-3 text-left font-semibold text-gray-700">Location</th>
+                          <th className="px-6 py-3 text-right font-semibold text-gray-700">SKUs</th>
+                          <th className="px-6 py-3 text-right font-semibold text-gray-700">Inventory Value</th>
+                          <th className="px-6 py-3 text-right font-semibold text-gray-700">Units</th>
+                          <th className="px-6 py-3 text-right font-semibold text-gray-700">Utilization</th>
+                          <th className="px-6 py-3 text-right font-semibold text-gray-700">Low Stock Items</th>
+                          <th className="px-6 py-3 text-right font-semibold text-gray-700">Health</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {locationData.locations.map((location: any) => (
+                          <tr key={location.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 font-medium text-gray-900">{location.name}</td>
+                            <td className="px-6 py-4 text-right text-gray-900">{location.skuCount}</td>
+                            <td className="px-6 py-4 text-right font-semibold text-gray-900">${(location.inventoryValue / 1000).toFixed(1)}K</td>
+                            <td className="px-6 py-4 text-right text-gray-900">{location.totalUnits.toLocaleString()}</td>
+                            <td className="px-6 py-4 text-right">
+                              <div className="flex items-center gap-2 justify-end">
+                                <div className="w-20 bg-gray-200 rounded-full h-2">
+                                  <div 
+                                    className={`h-2 rounded-full ${location.utilization > 85 ? 'bg-red-500' : location.utilization > 70 ? 'bg-yellow-500' : 'bg-green-500'}`}
+                                    style={{width: `${location.utilization}%`}}
+                                  ></div>
+                                </div>
+                                <span className="text-xs font-medium w-10 text-right">{location.utilization}%</span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                                location.lowStockItems > 20 ? 'bg-red-100 text-red-800' :
+                                location.lowStockItems > 10 ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-green-100 text-green-800'
+                              }`}>
+                                {location.lowStockItems}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                                location.health === 'Critical' ? 'bg-red-100 text-red-800' :
+                                location.health === 'Warning' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-green-100 text-green-800'
+                              }`}>
+                                {location.health}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Top SKUs by Location */}
+                <div className="bg-white rounded-lg shadow p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Top SKUs by Distribution</h3>
+                  <div className="space-y-3">
+                    {locationData.topSkus.map((sku: any) => (
+                      <div key={sku.sku} className="flex items-center justify-between">
+                        <div>
+                          <p className="font-mono text-xs font-semibold text-gray-900">{sku.sku}</p>
+                          <p className="text-sm text-gray-600">{sku.productName}</p>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <div className="w-40">
+                            <div className="flex gap-1 h-3">
+                              {sku.distribution.map((dist: any, idx: number) => (
+                                <div 
+                                  key={idx}
+                                  className={`flex-1 rounded-sm ${
+                                    dist.percentage > 30 ? 'bg-blue-600' :
+                                    dist.percentage > 20 ? 'bg-blue-400' :
+                                    'bg-blue-200'
+                                  }`}
+                                  title={`${dist.location}: ${dist.percentage}%`}
+                                ></div>
+                              ))}
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1 text-center">Total Units: {sku.totalUnits}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Info Banner */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-start">
+                    <AlertCircle className="w-5 h-5 text-blue-600 mr-3 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm text-blue-800">
+                        <strong>Premium Feature:</strong> This demo shows detailed warehouse location analysis including inventory distribution, capacity utilization, and location health metrics. Optimize inventory placement across facilities to improve efficiency and reduce fulfillment times.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p className="text-gray-500">Loading location data...</p>
             )}
           </div>
         ) : (

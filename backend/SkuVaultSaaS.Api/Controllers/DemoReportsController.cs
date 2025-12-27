@@ -711,5 +711,95 @@ namespace SkuVaultSaaS.Api.Controllers
                 return StatusCode(500, new { message = "Error fetching demo financial data" });
             }
         }
+
+        /// <summary>
+        /// Get location analysis for demo customer 2
+        /// </summary>
+        [HttpGet("customer/2/locations")]
+        public async Task<IActionResult> GetDemoLocations()
+        {
+            _logger.LogInformation("DemoReportsController.GetDemoLocations: Called");
+            try
+            {
+                var customerId = 2;
+
+                // Generate demo location data
+                var locations = new[]
+                {
+                    new { id = 1, name = "Main Warehouse - CA", skuCount = 1234, inventoryValue = 145000.00, totalUnits = 5420, utilization = 72, lowStockItems = 8, health = "Good" },
+                    new { id = 2, name = "Regional Hub - TX", skuCount = 892, inventoryValue = 98500.00, totalUnits = 3847, utilization = 65, lowStockItems = 5, health = "Good" },
+                    new { id = 3, name = "Distribution Center - NY", skuCount = 1067, inventoryValue = 112300.00, totalUnits = 4512, utilization = 81, lowStockItems = 14, health = "Warning" },
+                    new { id = 4, name = "Fulfillment Center - IL", skuCount = 756, inventoryValue = 67200.00, totalUnits = 2834, utilization = 58, lowStockItems = 3, health = "Good" }
+                };
+
+                var topSkus = new[]
+                {
+                    new { 
+                        sku = "KITT-GENE-3386", 
+                        productName = "Generic Product - Green One Size", 
+                        totalUnits = 1245,
+                        distribution = new[] {
+                            new { location = "Main Warehouse - CA", percentage = 35 },
+                            new { location = "Regional Hub - TX", percentage = 28 },
+                            new { location = "Distribution Center - NY", percentage = 22 },
+                            new { location = "Fulfillment Center - IL", percentage = 15 }
+                        }
+                    },
+                    new { 
+                        sku = "SPO-BICY-8687", 
+                        productName = "Bicycle Helmet - Standard", 
+                        totalUnits = 956,
+                        distribution = new[] {
+                            new { location = "Main Warehouse - CA", percentage = 40 },
+                            new { location = "Regional Hub - TX", percentage = 32 },
+                            new { location = "Distribution Center - NY", percentage = 18 },
+                            new { location = "Fulfillment Center - IL", percentage = 10 }
+                        }
+                    },
+                    new { 
+                        sku = "AUT-FLOO-7837", 
+                        productName = "Floor Mats - Standard", 
+                        totalUnits = 1872,
+                        distribution = new[] {
+                            new { location = "Main Warehouse - CA", percentage = 28 },
+                            new { location = "Regional Hub - TX", percentage = 24 },
+                            new { location = "Distribution Center - NY", percentage = 32 },
+                            new { location = "Fulfillment Center - IL", percentage = 16 }
+                        }
+                    },
+                    new { 
+                        sku = "HOB-KNOB-3344", 
+                        productName = "Door Knob Chrome", 
+                        totalUnits = 734,
+                        distribution = new[] {
+                            new { location = "Main Warehouse - CA", percentage = 38 },
+                            new { location = "Regional Hub - TX", percentage = 26 },
+                            new { location = "Distribution Center - NY", percentage = 20 },
+                            new { location = "Fulfillment Center - IL", percentage = 16 }
+                        }
+                    }
+                };
+
+                var kpis = new
+                {
+                    totalLocations = locations.Length,
+                    totalInventoryValue = locations.Sum(l => l.inventoryValue),
+                    avgUtilization = locations.Average(l => l.utilization),
+                    totalSkus = locations.Sum(l => l.skuCount)
+                };
+
+                return Ok(new
+                {
+                    kpis,
+                    locations,
+                    topSkus
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching demo location data");
+                return StatusCode(500, new { message = "Error fetching demo location data" });
+            }
+        }
     }
 }
