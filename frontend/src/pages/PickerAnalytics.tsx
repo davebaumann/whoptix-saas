@@ -85,7 +85,7 @@ const PickerAnalyticsContent: React.FC = () => {
         </div>
         <div className="bg-white rounded-lg shadow p-6 border-l-4 border-amber-500">
           <p className="text-sm font-medium text-gray-600 mb-2">On-Time Ship Rate</p>
-          <p className="text-3xl font-bold text-gray-900">{pickerData.kpis.onTimeShipRate.toFixed(1)}%</p>
+          <p className="text-3xl font-bold text-gray-900">{pickerData.kpis.onTimeShipRate > 0 ? `${pickerData.kpis.onTimeShipRate.toFixed(1)}%` : 'N/A'}</p>
           <p className="text-xs text-gray-500 mt-1">Orders shipped on time</p>
         </div>
       </div>
