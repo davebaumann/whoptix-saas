@@ -29,6 +29,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/app/locations', label: 'Locations Report', icon: '📍', reportName: 'locations' },
     { path: '/app/low-stock', label: 'Low Stock Report', icon: '⚠️', reportName: 'low-stock' },
     { path: '/app/performance', label: 'Performance Metrics', icon: '📈', reportName: 'performance' },
+    { path: '/app/picker-analytics', label: 'Picker Analytics', icon: '👥', reportName: 'picker-analytics' },
     { path: '/app/profitability', label: 'Profitability Report', icon: '💹', reportName: 'profitability' },
   ]
 

@@ -7,5 +7,6 @@
   "demand-forecast": 3,
   "financial-warehouse": 4,
   "locations": 3,
-  "performance": 4
+  "performance": 4,
+  "picker-analytics": 4
 }

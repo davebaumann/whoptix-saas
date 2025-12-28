@@ -42,7 +42,8 @@ namespace SkuVaultSaaS.Core.Services
                 { "locations", 3 },
                 { "profitability", 3 },
                 { "demand-forecast", 3 },
-                { "performance", 4 }
+                { "performance", 4 },
+                { "picker-analytics", 4 }
             };
         }
 
