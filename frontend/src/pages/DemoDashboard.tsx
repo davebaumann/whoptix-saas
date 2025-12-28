@@ -4,7 +4,7 @@ import { ArrowLeft, Users, Package, AlertCircle } from 'lucide-react'
 
 export default function DemoDashboard() {
   const navigate = useNavigate()
-  const [currentReport, setCurrentReport] = useState<'dashboard' | 'inventory' | 'low-stock' | 'aging-inventory' | 'profitability' | 'demand-forecast' | 'financial-warehouse' | 'locations'>('dashboard')
+  const [currentReport, setCurrentReport] = useState<'dashboard' | 'inventory' | 'low-stock' | 'aging-inventory' | 'profitability' | 'demand-forecast' | 'financial-warehouse' | 'locations' | 'performance-metrics'>('dashboard')
   const [data, setData] = useState<any | null>(null)
   const [topPerformers, setTopPerformers] = useState<any | null>(null)
   const [inventoryData, setInventoryData] = useState<any | null>(null)
@@ -14,6 +14,7 @@ export default function DemoDashboard() {
   const [demandForecastData, setDemandForecastData] = useState<any | null>(null)
   const [financialData, setFinancialData] = useState<any | null>(null)
   const [locationData, setLocationData] = useState<any | null>(null)
+  const [performanceMetricsData, setPerformanceMetricsData] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [dateRange, setDateRange] = useState('today')
@@ -31,7 +32,7 @@ export default function DemoDashboard() {
     'demand-forecast': { label: 'Demand Forecast', icon: '🔮' },
     'financial-warehouse': { label: 'Financial Reports', icon: '💰' },
     'locations': { label: 'Location Analysis', icon: '📍' },
-    'performance': { label: 'Performance Analytics', icon: '📈' }
+    'performance-metrics': { label: 'Performance Metrics', icon: '📈' }
   }
 
   useEffect(() => {
@@ -177,6 +178,27 @@ export default function DemoDashboard() {
     fetchLocations()
   }, [])
 
+  // Fetch performance metrics
+  useEffect(() => {
+    const fetchPerformanceMetrics = async () => {
+      try {
+        const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '') || 'http://localhost:5239'
+        
+        const metricsResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/performance-metrics`, {
+          headers: { 'Content-Type': 'application/json' }
+        })
+        if (metricsResponse.ok) {
+          const metricsData = await metricsResponse.json()
+          setPerformanceMetricsData(metricsData)
+        }
+      } catch (err) {
+        console.error('Failed to fetch performance metrics:', err)
+      }
+    }
+
+    fetchPerformanceMetrics()
+  }, [])
+
   // Load tier configuration and report access from backend
   useEffect(() => {
     // For demo, use hardcoded defaults (demo users aren't authenticated)
@@ -193,7 +215,7 @@ export default function DemoDashboard() {
       'demand-forecast': 3,
       'financial-warehouse': 4,
       'locations': 4,
-      'performance': 4
+      'performance-metrics': 4
     })
   }, [])
 
@@ -281,7 +303,7 @@ export default function DemoDashboard() {
               return (
                 <button
                   key={key}
-                  onClick={() => available && setCurrentReport(key as 'dashboard' | 'inventory' | 'low-stock' | 'aging-inventory' | 'profitability' | 'demand-forecast' | 'financial-warehouse' | 'locations')}
+                  onClick={() => available && setCurrentReport(key as 'dashboard' | 'inventory' | 'low-stock' | 'aging-inventory' | 'profitability' | 'demand-forecast' | 'financial-warehouse' | 'locations' | 'performance-metrics')}
                   disabled={!available}
                   className={`px-3 py-2 rounded-md text-sm font-medium transition-all ${
                     available
@@ -300,7 +322,7 @@ export default function DemoDashboard() {
         </div>
 
         {/* Header - Dashboard Title */}
-        {currentReport !== 'demand-forecast' && currentReport !== 'financial-warehouse' && currentReport !== 'locations' && (
+        {currentReport !== 'demand-forecast' && currentReport !== 'financial-warehouse' && currentReport !== 'locations' && currentReport !== 'performance-metrics' && (
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-gray-900">
               {currentReport === 'dashboard' ? 'Demo Picker Dashboard' : currentReport === 'inventory' ? 'Inventory Report' : currentReport === 'low-stock' ? 'Low Stock Report' : currentReport === 'aging-inventory' ? 'Aging Inventory Report' : currentReport === 'profitability' ? 'Profitability Report' : 'Demand Forecast'}
@@ -1344,6 +1366,208 @@ export default function DemoDashboard() {
               </>
             ) : (
               <p className="text-gray-500">Loading location data...</p>
+            )}
+          </div>
+        ) : currentReport === 'performance-metrics' ? (
+          <div className="space-y-6">
+            {performanceMetricsData ? (
+              <>
+                {/* Title */}
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Performance Metrics</h2>
+                  <p className="text-sm text-gray-600 mt-1">Inventory velocity, turnover, and product-level performance analysis</p>
+                </div>
+
+                {/* KPI Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                  <div className="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
+                    <p className="text-sm font-medium text-gray-600 mb-2">Avg Velocity</p>
+                    <p className="text-3xl font-bold text-gray-900">{performanceMetricsData.summary.averageVelocity.toFixed(1)}</p>
+                    <p className="text-xs text-gray-500 mt-1">Units/day</p>
+                  </div>
+                  <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
+                    <p className="text-sm font-medium text-gray-600 mb-2">Fast Movers</p>
+                    <p className="text-3xl font-bold text-gray-900">{performanceMetricsData.velocityMetrics.fastMovingCount}</p>
+                    <p className="text-xs text-gray-500 mt-1">&gt; 10 units/day</p>
+                  </div>
+                  <div className="bg-white rounded-lg shadow p-6 border-l-4 border-purple-500">
+                    <p className="text-sm font-medium text-gray-600 mb-2">Avg Turnover</p>
+                    <p className="text-3xl font-bold text-gray-900">{performanceMetricsData.summary.averageTurnover.toFixed(2)}</p>
+                    <p className="text-xs text-gray-500 mt-1">Turns/period</p>
+                  </div>
+                  <div className="bg-white rounded-lg shadow p-6 border-l-4 border-amber-500">
+                    <p className="text-sm font-medium text-gray-600 mb-2">Dead Stock</p>
+                    <p className="text-3xl font-bold text-gray-900">{performanceMetricsData.velocityMetrics.deadStockCount}</p>
+                    <p className="text-xs text-gray-500 mt-1">&lt; 1 unit/day</p>
+                  </div>
+                </div>
+
+                {/* Velocity Distribution */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-white rounded-lg shadow p-6 overflow-hidden">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Velocity Distribution</h3>
+                    <div className="space-y-4">
+                      {(() => {
+                        const maxCount = Math.max(
+                          performanceMetricsData.velocityMetrics.fastMovingCount,
+                          performanceMetricsData.velocityMetrics.mediumMovingCount,
+                          performanceMetricsData.velocityMetrics.slowMovingCount,
+                          performanceMetricsData.velocityMetrics.deadStockCount
+                        )
+                        return (
+                          <>
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-3">
+                                <span className="text-sm text-gray-600 flex-1 min-w-0">Fast Movers (&gt;10)</span>
+                                <span className="text-sm font-medium text-gray-900 flex-shrink-0">{performanceMetricsData.velocityMetrics.fastMovingCount}</span>
+                              </div>
+                              <div className="overflow-hidden bg-gray-200 rounded-full h-2">
+                                <div className="bg-green-500 h-2 rounded-full" style={{width: `${(performanceMetricsData.velocityMetrics.fastMovingCount / maxCount) * 100}%`}}></div>
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-3">
+                                <span className="text-sm text-gray-600 flex-1 min-w-0">Medium Movers (5-10)</span>
+                                <span className="text-sm font-medium text-gray-900 flex-shrink-0">{performanceMetricsData.velocityMetrics.mediumMovingCount}</span>
+                              </div>
+                              <div className="overflow-hidden bg-gray-200 rounded-full h-2">
+                                <div className="bg-blue-500 h-2 rounded-full" style={{width: `${(performanceMetricsData.velocityMetrics.mediumMovingCount / maxCount) * 100}%`}}></div>
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-3">
+                                <span className="text-sm text-gray-600 flex-1 min-w-0">Slow Movers (1-5)</span>
+                                <span className="text-sm font-medium text-gray-900 flex-shrink-0">{performanceMetricsData.velocityMetrics.slowMovingCount}</span>
+                              </div>
+                              <div className="overflow-hidden bg-gray-200 rounded-full h-2">
+                                <div className="bg-yellow-500 h-2 rounded-full" style={{width: `${(performanceMetricsData.velocityMetrics.slowMovingCount / maxCount) * 100}%`}}></div>
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-3">
+                                <span className="text-sm text-gray-600 flex-1 min-w-0">Dead Stock (&lt;1)</span>
+                                <span className="text-sm font-medium text-gray-900 flex-shrink-0">{performanceMetricsData.velocityMetrics.deadStockCount}</span>
+                              </div>
+                              <div className="overflow-hidden bg-gray-200 rounded-full h-2">
+                                <div className="bg-red-500 h-2 rounded-full" style={{width: `${(performanceMetricsData.velocityMetrics.deadStockCount / maxCount) * 100}%`}}></div>
+                              </div>
+                            </div>
+                          </>
+                        )
+                      })()}
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Performance Trends</h3>
+                    <div className="space-y-3">
+                      {performanceMetricsData.trends.map((trend: any) => (
+                        <div key={trend.metric} className="flex items-center justify-between">
+                          <span className="text-gray-600">{trend.metric}</span>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-sm font-medium ${trend.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {trend.change >= 0 ? '+' : ''}{trend.change.toFixed(1)}%
+                            </span>
+                            <span className="text-xs text-gray-500">{trend.direction}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Top Performers */}
+                <div className="bg-white rounded-lg shadow p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Top Performing SKUs</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b-2 border-gray-200">
+                          <th className="px-6 py-3 text-left font-semibold text-gray-700">SKU</th>
+                          <th className="px-6 py-3 text-left font-semibold text-gray-700">Product</th>
+                          <th className="px-6 py-3 text-right font-semibold text-gray-700">Velocity</th>
+                          <th className="px-6 py-3 text-right font-semibold text-gray-700">Turnover</th>
+                          <th className="px-6 py-3 text-right font-semibold text-gray-700">Stock</th>
+                          <th className="px-6 py-3 text-right font-semibold text-gray-700">Category</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {performanceMetricsData.topPerformers.map((item: any) => (
+                          <tr key={item.sku} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 font-mono text-xs font-semibold text-gray-900">{item.sku}</td>
+                            <td className="px-6 py-4 text-gray-900 font-medium">{item.productName}</td>
+                            <td className="px-6 py-4 text-right">
+                              <span className="inline-block px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                {item.velocity.toFixed(1)}/day
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-right text-gray-900 font-semibold">{item.turnoverRate.toFixed(2)}</td>
+                            <td className="px-6 py-4 text-right text-gray-900">{item.currentStock}</td>
+                            <td className="px-6 py-4 text-gray-600 text-sm">{item.category}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Under Performers */}
+                <div className="bg-white rounded-lg shadow p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Under Performing SKUs</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b-2 border-gray-200">
+                          <th className="px-6 py-3 text-left font-semibold text-gray-700">SKU</th>
+                          <th className="px-6 py-3 text-left font-semibold text-gray-700">Product</th>
+                          <th className="px-6 py-3 text-right font-semibold text-gray-700">Velocity</th>
+                          <th className="px-6 py-3 text-right font-semibold text-gray-700">Days on Hand</th>
+                          <th className="px-6 py-3 text-right font-semibold text-gray-700">Stock</th>
+                          <th className="px-6 py-3 text-right font-semibold text-gray-700">Risk</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {performanceMetricsData.underPerformers.map((item: any) => (
+                          <tr key={item.sku} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 font-mono text-xs font-semibold text-gray-900">{item.sku}</td>
+                            <td className="px-6 py-4 text-gray-900 font-medium">{item.productName}</td>
+                            <td className="px-6 py-4 text-right">
+                              <span className="inline-block px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                {item.velocity.toFixed(2)}/day
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-right text-gray-900">{item.daysOfStock.toFixed(0)} days</td>
+                            <td className="px-6 py-4 text-right text-gray-900">{item.currentStock}</td>
+                            <td className="px-6 py-4 text-right">
+                              <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                                item.daysOfStock > 90 ? 'bg-red-100 text-red-800' :
+                                item.daysOfStock > 60 ? 'bg-orange-100 text-orange-800' :
+                                'bg-yellow-100 text-yellow-800'
+                              }`}>
+                                {item.daysOfStock > 90 ? 'Critical' : item.daysOfStock > 60 ? 'High' : 'Medium'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Info Banner */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-start">
+                    <AlertCircle className="w-5 h-5 text-blue-600 mr-3 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm text-blue-800">
+                        <strong>Premium Feature:</strong> This demo shows comprehensive inventory performance metrics including product velocity, turnover rates, and inventory optimization insights. Identify fast movers, slow movers, and dead stock to optimize inventory mix and improve cash flow.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p className="text-gray-500">Loading performance metrics...</p>
             )}
           </div>
         ) : (

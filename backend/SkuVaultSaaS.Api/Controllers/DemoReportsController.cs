@@ -524,32 +524,59 @@ namespace SkuVaultSaaS.Api.Controllers
             try
             {
                 var customerId = 2;
-                var now = DateTime.UtcNow;
-                var last7Days = now.AddDays(-7);
 
-                var movements = await _context.InventoryMovements
-                    .Where(im => im.CustomerId == customerId && im.OccurredAtUtc >= last7Days)
-                    .ToListAsync();
+                // Generate demo picker performance data
+                var pickerPerformance = new[]
+                {
+                    new { id = 1, name = "Sarah Johnson", shift = "Morning", unitsPicked = 1247, accuracy = 99, avgTimePerUnit = 12, status = "Active" },
+                    new { id = 2, name = "Marcus Chen", shift = "Morning", unitsPicked = 1156, accuracy = 98, avgTimePerUnit = 13, status = "Active" },
+                    new { id = 3, name = "Jessica Martinez", shift = "Afternoon", unitsPicked = 1089, accuracy = 97, avgTimePerUnit = 14, status = "Break" },
+                    new { id = 4, name = "David Kim", shift = "Afternoon", unitsPicked = 1342, accuracy = 99, avgTimePerUnit = 11, status = "Active" },
+                    new { id = 5, name = "Emma Wilson", shift = "Night", unitsPicked = 987, accuracy = 96, avgTimePerUnit = 15, status = "Active" }
+                };
 
-                // Group by transaction type and date
-                var chartData = movements
-                    .GroupBy(m => new { m.TransactionType, Date = m.OccurredAtUtc.Date })
-                    .GroupBy(g => g.Key.TransactionType)
-                    .Select(g => new
-                    {
-                        name = g.Key,
-                        data = g
-                            .OrderBy(item => item.Key.Date)
-                            .Select(item => new
-                            {
-                                date = item.Key.Date.ToString("yyyy-MM-dd"),
-                                value = item.Count()
-                            })
-                            .ToList()
-                    })
-                    .ToList();
+                var trends = new[]
+                {
+                    new { date = "Mon", accuracy = 97 },
+                    new { date = "Tue", accuracy = 98 },
+                    new { date = "Wed", accuracy = 97 },
+                    new { date = "Thu", accuracy = 99 },
+                    new { date = "Fri", accuracy = 98 },
+                    new { date = "Sat", accuracy = 96 },
+                    new { date = "Sun", accuracy = 97 }
+                };
 
-                return Ok(new { chartData });
+                var shiftPerformance = new[]
+                {
+                    new { name = "Morning (6am-2pm)", pickers = 12, avgAccuracy = 98.5, unitsProcessed = 2403 },
+                    new { name = "Afternoon (2pm-10pm)", pickers = 10, avgAccuracy = 98.0, unitsProcessed = 2431 },
+                    new { name = "Night (10pm-6am)", pickers = 5, avgAccuracy = 96.5, unitsProcessed = 987 }
+                };
+
+                var exceptions = new[]
+                {
+                    new { type = "Mispicks", count = 8 },
+                    new { type = "Missing Items", count = 5 },
+                    new { type = "Damaged Units", count = 3 },
+                    new { type = "QC Rejects", count = 2 }
+                };
+
+                var kpis = new
+                {
+                    pickAccuracy = 97.8,
+                    avgProcessingTime = 4.2,
+                    pickRate = "156 units/hr",
+                    onTimeShipRate = 94.5
+                };
+
+                return Ok(new
+                {
+                    kpis,
+                    pickerPerformance,
+                    trends,
+                    shiftPerformance,
+                    exceptions
+                });
             }
             catch (Exception ex)
             {
@@ -799,6 +826,85 @@ namespace SkuVaultSaaS.Api.Controllers
             {
                 _logger.LogError(ex, "Error fetching demo location data");
                 return StatusCode(500, new { message = "Error fetching demo location data" });
+            }
+        }
+
+        /// <summary>
+        /// Get performance metrics for demo customer 2
+        /// </summary>
+        [HttpGet("customer/2/performance-metrics")]
+        public async Task<IActionResult> GetDemoPerformanceMetrics()
+        {
+            _logger.LogInformation("DemoReportsController.GetDemoPerformanceMetrics: Called");
+            try
+            {
+                var customerId = 2;
+
+                // Top performing SKUs
+                var topPerformers = new[]
+                {
+                    new { sku = "SPO-BICY-8687", productName = "Bicycle Helmet - Standard", velocity = 45.5, turnoverRate = 12.3, currentStock = 234, category = "Sports & Outdoors" },
+                    new { sku = "AUT-WIND-7622", productName = "Windshield Wipers - Red", velocity = 38.2, turnoverRate = 10.8, currentStock = 456, category = "Automotive" },
+                    new { sku = "ELE-BATT-5523", productName = "AA Battery Pack", velocity = 67.3, turnoverRate = 15.2, currentStock = 789, category = "Electronics" },
+                    new { sku = "KITT-GENE-3386", productName = "Generic Product - Green One Size", velocity = 52.1, turnoverRate = 11.5, currentStock = 123, category = "Kitchen & Dining" },
+                    new { sku = "HOB-KNOB-3344", productName = "Door Knob Chrome", velocity = 31.8, turnoverRate = 8.9, currentStock = 567, category = "Home Hardware" }
+                };
+
+                // Under performing SKUs
+                var underPerformers = new[]
+                {
+                    new { sku = "HOM-DECOR-2891", productName = "Decorative Mirror - Gold", velocity = 0.3, daysOfStock = 267, currentStock = 89, category = "Home & Garden" },
+                    new { sku = "ART-PAINT-1234", productName = "Professional Paint Set", velocity = 0.8, daysOfStock = 145, currentStock = 34, category = "Art Supplies" },
+                    new { sku = "TOOL-WRENCH-5678", productName = "Adjustable Wrench Set", velocity = 1.2, daysOfStock = 98, currentStock = 56, category = "Tools" },
+                    new { sku = "LIGHT-LED-9999", productName = "LED Strip Lights", velocity = 0.5, daysOfStock = 203, currentStock = 42, category = "Electronics" }
+                };
+
+                // Trends
+                var trends = new[]
+                {
+                    new { metric = "Sales Growth", change = 12.5, direction = "up" },
+                    new { metric = "Units Sold", change = 8.3, direction = "up" },
+                    new { metric = "Movement Growth", change = 5.7, direction = "up" },
+                    new { metric = "Active Products", change = 2.1, direction = "stable" }
+                };
+
+                var velocityMetrics = new
+                {
+                    fastMovingCount = 68,
+                    mediumMovingCount = 145,
+                    slowMovingCount = 234,
+                    deadStockCount = 54
+                };
+
+                var summary = new
+                {
+                    totalProducts = 501,
+                    totalMovements = 3847,
+                    averageVelocity = 8.5,
+                    averageTurnover = 4.2,
+                    fastMovers = velocityMetrics.fastMovingCount,
+                    slowMovers = velocityMetrics.slowMovingCount,
+                    unitsSold = 18234,
+                    unitsSoldGrowth = 8.3,
+                    averageStockCoverage = 45.2,
+                    activeSKUs = 447,
+                    zeroStockSKUs = 12,
+                    totalTransactions = 3847
+                };
+
+                return Ok(new
+                {
+                    summary,
+                    velocityMetrics,
+                    trends,
+                    topPerformers,
+                    underPerformers
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching demo performance metrics");
+                return StatusCode(500, new { message = "Error fetching demo performance metrics" });
             }
         }
     }
