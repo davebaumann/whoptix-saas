@@ -159,12 +159,33 @@ namespace SkuVaultSaaS.Api.Controllers
                         }
                         break;
 
+                    case "invoice.paid":
+                        var paidInvoice = stripeEvent.Data.Object as Invoice;
+                        if (paidInvoice != null)
+                        {
+                            await HandleInvoicePaid(paidInvoice);
+                        }
+                        break;
+
+                    case "invoice.payment_failed":
+                        var failedInvoice = stripeEvent.Data.Object as Invoice;
+                        if (failedInvoice != null)
+                        {
+                            await HandleInvoicePaymentFailed(failedInvoice);
+                        }
+                        break;
+
                     default:
                         _logger.LogWarning("Unhandled Stripe webhook event type: {EventType}", stripeEvent.Type);
                         break;
                 }
 
                 return Ok();
+            }
+            catch (StripeException ex)
+            {
+                _logger.LogError(ex, "Stripe exception handling webhook");
+                return BadRequest();
             }
             catch (Exception ex)
             {
@@ -199,42 +220,213 @@ namespace SkuVaultSaaS.Api.Controllers
 
         private async Task HandleSubscriptionCreated(Subscription subscription)
         {
-            // Handle new subscription creation
-            _logger.LogInformation("New subscription created: {SubscriptionId}", subscription.Id);
-            await Task.CompletedTask;
+            _logger.LogInformation("New subscription created: {SubscriptionId} for customer {CustomerId}", 
+                subscription.Id, subscription.CustomerId);
+            
+            try
+            {
+                // Get the Stripe customer to find our internal customer ID
+                var stripeCustomerService = new CustomerService();
+                var stripeCustomer = await stripeCustomerService.GetAsync(subscription.CustomerId);
+                
+                if (stripeCustomer?.Metadata?.TryGetValue("customer_id", out var customerIdStr) == true &&
+                    int.TryParse(customerIdStr, out var customerId))
+                {
+                    var customer = await _context.Customers.FindAsync(customerId);
+                    if (customer != null)
+                    {
+                        var newLevel = GetMembershipLevelFromSubscriptionItemPrice(subscription.Items.Data.FirstOrDefault()?.PriceId);
+                        if (newLevel.HasValue)
+                        {
+                            customer.MembershipLevel = newLevel.Value;
+                            customer.IsActive = true;
+                            customer.CancelledAt = null;
+                            await _context.SaveChangesAsync();
+
+                            _logger.LogInformation(
+                                "Updated customer {CustomerId} to membership level {Level} via subscription {SubscriptionId}",
+                                customerId, newLevel.Value, subscription.Id);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error handling subscription created for {SubscriptionId}", subscription.Id);
+            }
         }
 
         private async Task HandleSubscriptionUpdated(Subscription subscription)
         {
-            // Handle subscription updates (plan changes, etc.)
-            _logger.LogInformation("Subscription updated: {SubscriptionId}", subscription.Id);
-            await Task.CompletedTask;
+            _logger.LogInformation("Subscription updated: {SubscriptionId} for customer {CustomerId}", 
+                subscription.Id, subscription.CustomerId);
+            
+            try
+            {
+                // If subscription was reactivated (was canceled but now active)
+                if (subscription.Status == "active")
+                {
+                    var stripeCustomerService = new CustomerService();
+                    var stripeCustomer = await stripeCustomerService.GetAsync(subscription.CustomerId);
+                    
+                    if (stripeCustomer?.Metadata?.TryGetValue("customer_id", out var customerIdStr) == true &&
+                        int.TryParse(customerIdStr, out var customerId))
+                    {
+                        var customer = await _context.Customers.FindAsync(customerId);
+                        if (customer != null)
+                        {
+                            var newLevel = GetMembershipLevelFromSubscriptionItemPrice(subscription.Items.Data.FirstOrDefault()?.PriceId);
+                            if (newLevel.HasValue)
+                            {
+                                customer.MembershipLevel = newLevel.Value;
+                                customer.IsActive = true;
+                                customer.CancelledAt = null;
+                                await _context.SaveChangesAsync();
+
+                                _logger.LogInformation(
+                                    "Subscription updated: customer {CustomerId} to level {Level}",
+                                    customerId, newLevel.Value);
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error handling subscription updated for {SubscriptionId}", subscription.Id);
+            }
         }
 
         private async Task HandleSubscriptionCanceled(Subscription subscription)
         {
-            // Handle subscription cancellation
-            _logger.LogInformation("Subscription canceled: {SubscriptionId}", subscription.Id);
-            await Task.CompletedTask;
+            _logger.LogInformation("Subscription canceled: {SubscriptionId} for customer {CustomerId}", 
+                subscription.Id, subscription.CustomerId);
+            
+            try
+            {
+                var stripeCustomerService = new CustomerService();
+                var stripeCustomer = await stripeCustomerService.GetAsync(subscription.CustomerId);
+                
+                if (stripeCustomer?.Metadata?.TryGetValue("customer_id", out var customerIdStr) == true &&
+                    int.TryParse(customerIdStr, out var customerId))
+                {
+                    var customer = await _context.Customers.FindAsync(customerId);
+                    if (customer != null)
+                    {
+                        // Mark as inactive but allow login
+                        customer.IsActive = false;
+                        customer.CancelledAt = DateTime.UtcNow;
+                        // Don't downgrade membership - user can still see reports until upgrade
+                        // But the app will block report/dashboard access based on IsActive flag
+                        await _context.SaveChangesAsync();
+
+                        _logger.LogInformation(
+                            "Marked customer {CustomerId} as inactive due to subscription cancellation",
+                            customerId);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error handling subscription canceled for {SubscriptionId}", subscription.Id);
+            }
+        }
+
+        private async Task HandleInvoicePaid(Invoice invoice)
+        {
+            _logger.LogInformation("Invoice paid: {InvoiceId} for customer {CustomerId}", 
+                invoice.Id, invoice.CustomerId);
+            
+            try
+            {
+                // Find customer and update status if they were previously inactive
+                var stripeCustomerService = new CustomerService();
+                var stripeCustomer = await stripeCustomerService.GetAsync(invoice.CustomerId);
+                
+                if (stripeCustomer?.Metadata?.TryGetValue("customer_id", out var customerIdStr) == true &&
+                    int.TryParse(customerIdStr, out var customerId))
+                {
+                    var customer = await _context.Customers.FindAsync(customerId);
+                    if (customer != null && !customer.IsActive)
+                    {
+                        // Reactivate if invoice was paid (e.g., retry succeeded)
+                        customer.IsActive = true;
+                        customer.CancelledAt = null;
+                        await _context.SaveChangesAsync();
+
+                        _logger.LogInformation(
+                            "Reactivated customer {CustomerId} after successful invoice payment",
+                            customerId);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error handling invoice paid for {InvoiceId}", invoice.Id);
+            }
+        }
+
+        private async Task HandleInvoicePaymentFailed(Invoice invoice)
+        {
+            _logger.LogInformation("Invoice payment failed: {InvoiceId} for customer {CustomerId}", 
+                invoice.Id, invoice.CustomerId);
+            
+            try
+            {
+                // Notify customer of failed payment
+                var stripeCustomerService = new CustomerService();
+                var stripeCustomer = await stripeCustomerService.GetAsync(invoice.CustomerId);
+                
+                if (stripeCustomer?.Metadata?.TryGetValue("customer_id", out var customerIdStr) == true &&
+                    int.TryParse(customerIdStr, out var customerId))
+                {
+                    var customer = await _context.Customers.FindAsync(customerId);
+                    if (customer != null)
+                    {
+                        // Log the failed payment but don't immediately deactivate
+                        // (Stripe will retry automatically, only deactivate on subscription.deleted)
+                        _logger.LogWarning(
+                            "Payment failed for customer {CustomerId}. Invoice: {InvoiceId}. Stripe will retry.",
+                            customerId, invoice.Id);
+                        
+                        // TODO: Send email notification to customer about failed payment
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error handling invoice payment failed for {InvoiceId}", invoice.Id);
+            }
         }
 
         private int GetPriceAmount(string priceId)
         {
-            return priceId switch
+            var amounts = _configuration.GetSection("Stripe:PriceAmounts");
+            if (int.TryParse(amounts[priceId], out var amount))
             {
-                "price_basic_monthly" => 29,
-                "price_standard_monthly" => 59,
-                "price_premium_monthly" => 99,
-                "price_enterprise_monthly" => 199,
-                _ => 0
-            };
+                return amount;
+            }
+            return 0;
         }
 
         private MembershipLevel? GetMembershipLevelFromPriceId(string priceId)
         {
             return priceId switch
             {
-                "price_basic_monthly" => MembershipLevel.Basic,
+                "price_standard_monthly" => MembershipLevel.Standard,
+                "price_premium_monthly" => MembershipLevel.Premium,
+                "price_enterprise_monthly" => MembershipLevel.Enterprise,
+                _ => null
+            };
+        }
+
+        private MembershipLevel? GetMembershipLevelFromSubscriptionItemPrice(string? priceId)
+        {
+            if (string.IsNullOrEmpty(priceId))
+                return null;
+
+            return priceId switch
+            {
                 "price_standard_monthly" => MembershipLevel.Standard,
                 "price_premium_monthly" => MembershipLevel.Premium,
                 "price_enterprise_monthly" => MembershipLevel.Enterprise,
