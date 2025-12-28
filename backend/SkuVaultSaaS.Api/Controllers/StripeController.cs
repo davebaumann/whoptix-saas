@@ -235,7 +235,7 @@ namespace SkuVaultSaaS.Api.Controllers
                     var customer = await _context.Customers.FindAsync(customerId);
                     if (customer != null)
                     {
-                        var newLevel = GetMembershipLevelFromSubscriptionItemPrice(subscription.Items.Data.FirstOrDefault()?.PriceId);
+                        var newLevel = GetMembershipLevelFromSubscriptionItemPrice(subscription.Items.Data.FirstOrDefault()?.Price?.Id);
                         if (newLevel.HasValue)
                         {
                             customer.MembershipLevel = newLevel.Value;
@@ -275,7 +275,7 @@ namespace SkuVaultSaaS.Api.Controllers
                         var customer = await _context.Customers.FindAsync(customerId);
                         if (customer != null)
                         {
-                            var newLevel = GetMembershipLevelFromSubscriptionItemPrice(subscription.Items.Data.FirstOrDefault()?.PriceId);
+                            var newLevel = GetMembershipLevelFromSubscriptionItemPrice(subscription.Items.Data.FirstOrDefault()?.Price?.Id);
                             if (newLevel.HasValue)
                             {
                                 customer.MembershipLevel = newLevel.Value;
