@@ -30,8 +30,8 @@ namespace SkuVaultSaaS.Api.Controllers
                 {
                     Id = lst.Id,
                     ProductId = lst.ProductId,
-                    ProductName = lst.Product.Name,
-                    ProductSku = lst.Product.Sku,
+                    ProductName = lst.Product.Name!,
+                    ProductSku = lst.Product.Sku!,
                     LocationId = lst.LocationId,
                     LocationName = lst.Location != null ? lst.Location.Name : "All Locations",
                     ThresholdQuantity = lst.ThresholdQuantity,
@@ -235,8 +235,8 @@ namespace SkuVaultSaaS.Api.Controllers
                 {
                     Id = lst.Id,
                     ProductId = lst.ProductId,
-                    ProductName = lst.Product.Name,
-                    ProductSku = lst.Product.Sku,
+                    ProductName = lst.Product.Name!,
+                    ProductSku = lst.Product.Sku!,
                     LocationId = lst.LocationId,
                     LocationName = lst.Location != null ? lst.Location.Name : "All Locations",
                     ThresholdQuantity = lst.ThresholdQuantity,

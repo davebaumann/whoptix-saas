@@ -1538,10 +1538,10 @@ namespace SkuVaultSaaS.Api.Controllers
                 {
                     exceptions = new[]
                     {
-                        new { type = "System Adjustment", count = 1 },
-                        new { type = "Manual Count", count = 0 },
-                        new { type = "Discrepancy", count = 0 },
-                        new { type = "Other", count = 0 }
+                        new { type = (string?)"System Adjustment", count = 1 },
+                        new { type = (string?)"Manual Count", count = 0 },
+                        new { type = (string?)"Discrepancy", count = 0 },
+                        new { type = (string?)"Other", count = 0 }
                     };
                 }
 

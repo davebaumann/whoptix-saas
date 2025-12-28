@@ -518,12 +518,11 @@ namespace SkuVaultSaaS.Api.Controllers
         /// Get picker performance chart data for demo customer 2
         /// </summary>
         [HttpGet("customer/2/picker-performance")]
-        public async Task<IActionResult> GetDemoPickerPerformance()
+        public IActionResult GetDemoPickerPerformance()
         {
             _logger.LogInformation("DemoReportsController.GetDemoPickerPerformance: Called");
             try
             {
-                var customerId = 2;
 
                 // Generate demo picker performance data
                 var pickerPerformance = new[]
@@ -589,12 +588,11 @@ namespace SkuVaultSaaS.Api.Controllers
         /// Get demand forecast for demo customer 2
         /// </summary>
         [HttpGet("customer/2/demand-forecast")]
-        public async Task<IActionResult> GetDemoDemandForecast([FromQuery] string forecastPeriod = "30days")
+        public IActionResult GetDemoDemandForecast([FromQuery] string forecastPeriod = "30days")
         {
             _logger.LogInformation($"DemoReportsController.GetDemoDemandForecast: Called with forecastPeriod={forecastPeriod}");
             try
             {
-                var customerId = 2;
 
                 // Generate demo forecast data
                 var forecastItems = new[]
@@ -660,12 +658,11 @@ namespace SkuVaultSaaS.Api.Controllers
         /// Get financial report for demo customer 2
         /// </summary>
         [HttpGet("customer/2/financial")]
-        public async Task<IActionResult> GetDemoFinancial([FromQuery] string dateRange = "today")
+        public IActionResult GetDemoFinancial([FromQuery] string dateRange = "today")
         {
             _logger.LogInformation($"DemoReportsController.GetDemoFinancial: Called with dateRange={dateRange}");
             try
             {
-                var customerId = 2;
 
                 // Generate demo financial data with values varying by date range
                 var (multiplier, period) = dateRange switch
@@ -743,12 +740,11 @@ namespace SkuVaultSaaS.Api.Controllers
         /// Get location analysis for demo customer 2
         /// </summary>
         [HttpGet("customer/2/locations")]
-        public async Task<IActionResult> GetDemoLocations()
+        public IActionResult GetDemoLocations()
         {
             _logger.LogInformation("DemoReportsController.GetDemoLocations: Called");
             try
             {
-                var customerId = 2;
 
                 // Generate demo location data
                 var locations = new[]
@@ -833,12 +829,11 @@ namespace SkuVaultSaaS.Api.Controllers
         /// Get performance metrics for demo customer 2
         /// </summary>
         [HttpGet("customer/2/performance-metrics")]
-        public async Task<IActionResult> GetDemoPerformanceMetrics()
+        public IActionResult GetDemoPerformanceMetrics()
         {
             _logger.LogInformation("DemoReportsController.GetDemoPerformanceMetrics: Called");
             try
             {
-                var customerId = 2;
 
                 // Top performing SKUs
                 var topPerformers = new[]
