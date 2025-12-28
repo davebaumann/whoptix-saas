@@ -1499,13 +1499,7 @@ namespace SkuVaultSaaS.Api.Controllers
                     .ToArray();
 
                 var trends = dailyTrends.Length > 0 ? dailyTrends : new[] {
-                    new { date = "Mon", accuracy = 97 },
-                    new { date = "Tue", accuracy = 98 },
-                    new { date = "Wed", accuracy = 97 },
-                    new { date = "Thu", accuracy = 99 },
-                    new { date = "Fri", accuracy = 98 },
-                    new { date = "Sat", accuracy = 96 },
-                    new { date = "Sun", accuracy = 97 }
+                    new { date = "No Data", accuracy = 0 }
                 };
 
                 // Shift performance - grouped by actual shift from real data
