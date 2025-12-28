@@ -1551,7 +1551,7 @@ namespace SkuVaultSaaS.Api.Controllers
                     pickAccuracy = Math.Round(avgAccuracy, 2),
                     avgProcessingTime = totalUnits > 0 ? Math.Round(totalPicks / (double)totalUnits * (avgTimePerUnit / 60.0), 1) : 0.0,
                     pickRate = totalUnits > 0 ? $"{Math.Round(totalUnits / (double)daysInPeriod)} units/day" : "0 units/day",
-                    onTimeShipRate = 94.5 // This would require shipment data to calculate accurately
+                    onTimeShipRate = (object?)null // No shipment data available for on-time calculation
                 };
 
                 return Ok(new
