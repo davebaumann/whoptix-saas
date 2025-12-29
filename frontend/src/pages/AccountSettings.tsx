@@ -5,6 +5,7 @@ import { useMembership } from '../contexts/MembershipContext';
 import { Crown } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
+import ReceiptsModal from '../components/ReceiptsModal';
 
 interface AccountInfo {
   id: number;
@@ -20,15 +21,96 @@ const SkuVaultCredentialsButton: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [credentials, setCredentials] = useState({ username: '', password: '' });
   const [loading, setLoading] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [testPassed, setTestPassed] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleTest = async () => {
+    setTesting(true);
+    setError('');
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/customers/test-skuvault`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: credentials.username,
+          password: credentials.password
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        setError(errorData.message || 'Test failed. Please check your credentials.');
+        setTestPassed(false);
+      } else {
+        setTestPassed(true);
+        setError('');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Test failed');
+      setTestPassed(false);
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleRefreshTokens = async () => {
+    setRefreshing(true);
+    setError('');
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/customers/refresh-skuvault-tokens`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        setError(errorData.message || 'Failed to refresh tokens');
+      } else {
+        setShowModal(false);
+        setTestPassed(false);
+        setCredentials({ username: '', password: '' });
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to refresh tokens');
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const handleSave = async () => {
     setLoading(true);
+    setError('');
     try {
-      // TODO: API call to save credentials
-      console.log('Saving credentials:', credentials);
-      setShowModal(false);
-    } catch (error) {
-      console.error('Failed to save credentials:', error);
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/customers/update-skuvault-credentials`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: credentials.username,
+          password: credentials.password
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        setError(errorData.message || 'Failed to save credentials');
+      } else {
+        setShowModal(false);
+        setTestPassed(false);
+        setCredentials({ username: '', password: '' });
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save credentials');
     } finally {
       setLoading(false);
     }
@@ -53,12 +135,14 @@ const SkuVaultCredentialsButton: React.FC = () => {
             <h3 className="text-lg font-semibold mb-4">SkuVault Credentials</h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                 <input
-                  type="text"
+                  type="email"
                   value={credentials.username}
                   onChange={(e) => setCredentials({...credentials, username: e.target.value})}
+                  placeholder="your@skuvault.com"
                   className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={testPassed}
                 />
               </div>
               <div>
@@ -68,23 +152,58 @@ const SkuVaultCredentialsButton: React.FC = () => {
                   value={credentials.password}
                   onChange={(e) => setCredentials({...credentials, password: e.target.value})}
                   className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={testPassed}
                 />
               </div>
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-800">
+                  {error}
+                </div>
+              )}
+              {testPassed && (
+                <div className="p-3 bg-green-50 border border-green-200 rounded-md text-sm text-green-800">
+                  ✓ Credentials verified successfully!
+                </div>
+              )}
             </div>
             <div className="flex justify-end space-x-3 mt-6">
               <button
-                onClick={() => setShowModal(false)}
+                onClick={() => {
+                  setShowModal(false);
+                  setTestPassed(false);
+                  setCredentials({ username: '', password: '' });
+                  setError('');
+                }}
                 className="px-4 py-2 text-gray-600 hover:text-gray-800"
               >
                 Cancel
               </button>
-              <button
-                onClick={handleSave}
-                disabled={loading || !credentials.username || !credentials.password}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-              >
-                {loading ? 'Saving...' : 'Save'}
-              </button>
+              {!testPassed ? (
+                <button
+                  onClick={handleTest}
+                  disabled={testing || !credentials.username || !credentials.password}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {testing ? 'Testing...' : 'Test'}
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={handleSave}
+                    disabled={loading}
+                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+                  >
+                    {loading ? 'Saving...' : 'Save'}
+                  </button>
+                  <button
+                    onClick={handleRefreshTokens}
+                    disabled={refreshing}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {refreshing ? 'Refreshing...' : 'Refresh Tokens'}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -525,6 +644,7 @@ const AccountSettings: React.FC = () => {
   const { membershipInfo } = useMembership();
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [show2FAModal, setShow2FAModal] = useState(false);
+  const [showReceiptsModal, setShowReceiptsModal] = useState(false);
   const [twoFactorStatus, setTwoFactorStatus] = useState<{ isEnabled: boolean; backupCodesRemaining: number } | null>(null);
 
   const customerId = user?.customerId || 1;
@@ -622,27 +742,27 @@ const AccountSettings: React.FC = () => {
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <p className="text-gray-500">Next Renewal</p>
-                <p className="font-medium text-gray-900">January 15, 2025</p>
+                <p className="font-medium text-gray-900">
+                  {membershipInfo?.renewalDate 
+                    ? new Date(membershipInfo.renewalDate).toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                      })
+                    : 'Loading...'}
+                </p>
               </div>
               <div>
                 <p className="text-gray-500">Monthly Cost</p>
-                <p className="font-medium text-gray-900">$49.99</p>
+                <p className="font-medium text-gray-900">
+                  {membershipInfo?.monthlyCost ? `$${membershipInfo.monthlyCost}.00` : 'Loading...'}
+                </p>
               </div>
             </div>
             
-            <div className="text-sm text-gray-600">
-              <p className="mb-2">Available Reports:</p>
-              <ul className="space-y-1">
-                {membershipInfo?.availableReports?.map((report, index) => (
-                  <li key={index} className="flex items-center">
-                    <span className="text-green-500 mr-2">✓</span>
-                    {report}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            
-            <button className="w-full text-left p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
+            <button 
+              onClick={() => setShowReceiptsModal(true)}
+              className="w-full text-left p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
                   <span className="text-xl mr-3">🧾</span>
@@ -738,6 +858,11 @@ const AccountSettings: React.FC = () => {
         isOpen={show2FAModal} 
         onClose={() => setShow2FAModal(false)} 
         userEmail={user?.email}
+      />
+
+      <ReceiptsModal
+        isOpen={showReceiptsModal}
+        onClose={() => setShowReceiptsModal(false)}
       />
     </div>
   );

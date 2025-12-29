@@ -145,12 +145,24 @@ namespace SkuVaultSaaS.Api.Controllers
                 return Forbid();
             }
 
-            // Then check membership level
+            // Then check subscription active status
             var customer = await _context.Customers.FindAsync(customerId);
             if (customer == null)
             {
                 return NotFound("Customer not found");
             }
+            
+            if (!customer.IsActive)
+            {
+                return StatusCode(403, new
+                {
+                    message = "Your subscription is inactive. Please upgrade to reactivate access.",
+                    isInactive = true,
+                    cancelledAt = customer.CancelledAt
+                });
+            }
+
+            // Then check membership level
             if (!_reportAccessService.CanAccessReport((int)customer.MembershipLevel, reportName))
             {
                 var requiredLevel = _reportAccessService.GetRequiredMembershipLevel(reportName);

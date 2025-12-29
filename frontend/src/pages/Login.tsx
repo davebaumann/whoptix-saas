@@ -15,7 +15,10 @@ export default function Login() {
   const [tempToken, setTempToken] = useState('')
   const location = useLocation()
 
-  const from = location.state?.from?.pathname || '/'
+  const searchParams = new URLSearchParams(location.search)
+  const redirectTo = searchParams.get('redirect') || '/'
+  const tier = searchParams.get('tier')
+  const from = location.state?.from?.pathname || (tier ? `/app/stripe-setup?tier=${tier}` : redirectTo)
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -40,11 +43,21 @@ export default function Login() {
       })
 
       if (!loginResponse.ok) {
-        const errorData = await loginResponse.json()
-        throw new Error(errorData.message || 'Invalid credentials')
+        const errorText = await loginResponse.text()
+        try {
+          const errorData = JSON.parse(errorText)
+          throw new Error(errorData.message || 'Invalid credentials')
+        } catch {
+          throw new Error(`Login failed: ${loginResponse.status} ${errorText || 'Unknown error'}`)
+        }
       }
 
-      const loginData = await loginResponse.json()
+      const responseText = await loginResponse.text()
+      if (!responseText) {
+        throw new Error('Empty response from server')
+      }
+
+      const loginData = JSON.parse(responseText)
 
       // Check if 2FA is required
       if (loginData.requiresTwoFactor) {

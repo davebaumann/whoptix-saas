@@ -17,15 +17,18 @@ namespace SkuVaultSaaS.Api.Controllers
         private readonly ApplicationDbContext _context;
         private readonly IReportAccessService _reportAccessService;
         private readonly ILogger<MembershipController> _logger;
+        private readonly IConfiguration _configuration;
 
         public MembershipController(
             ApplicationDbContext context,
             IReportAccessService reportAccessService,
-            ILogger<MembershipController> logger)
+            ILogger<MembershipController> logger,
+            IConfiguration configuration)
         {
             _context = context;
             _reportAccessService = reportAccessService;
             _logger = logger;
+            _configuration = configuration;
         }
 
         [HttpGet("customer/{customerId}")]
@@ -43,15 +46,34 @@ namespace SkuVaultSaaS.Api.Controllers
                 }
 
                 var availableReports = _reportAccessService.GetAvailableReports((int)customer.MembershipLevel);
-
                 var allTiers = GetAllMembershipTiers(customer.MembershipLevel);
+                
+                // Get pricing info from config
+                var priceAmounts = _configuration.GetSection("Stripe:PriceAmounts");
+                var tierPriceMap = new Dictionary<int, int>
+                {
+                    { 2, int.Parse(priceAmounts["standard_monthly"] ?? "99") },
+                    { 3, int.Parse(priceAmounts["premium_monthly"] ?? "199") },
+                    { 4, int.Parse(priceAmounts["enterprise_monthly"] ?? "299") }
+                };
+                
+                var monthlyCost = tierPriceMap.ContainsKey((int)customer.MembershipLevel) 
+                    ? tierPriceMap[(int)customer.MembershipLevel] 
+                    : 0;
+                
+                // For now, renewal is 1 year from when they became active (or today if not tracked)
+                // This assumes annual billing - adjust as needed for monthly billing
+                var renewalDate = customer.LastSyncedAt.AddYears(1);
 
                 return Ok(new MembershipInfoDto
                 {
                     CurrentLevel = customer.MembershipLevel,
                     CurrentLevelName = customer.MembershipLevel.ToString(),
                     AvailableReports = availableReports,
-                    AllTiers = allTiers
+                    AllTiers = allTiers,
+                    MonthlyCost = monthlyCost,
+                    RenewalDate = renewalDate,
+                    IsActive = customer.IsActive
                 });
             }
             catch (Exception ex)

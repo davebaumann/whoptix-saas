@@ -11,6 +11,7 @@ namespace SkuVaultSaaS.Core.Models
         public int TenantId { get; set; }
         public Tenant Tenant { get; set; } = null!;
         public DateTime LastSyncedAt { get; set; }
+        public string? StripeCustomerId { get; set; } // Stripe customer ID for receipts/billing
         public MembershipLevel MembershipLevel { get; set; } = MembershipLevel.Basic;
         
         // Low Stock Notification Preferences

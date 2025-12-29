@@ -8,6 +8,9 @@ namespace SkuVaultSaaS.Api.Models
         public string CurrentLevelName { get; set; } = null!;
         public IEnumerable<string> AvailableReports { get; set; } = new List<string>();
         public IEnumerable<MembershipTierDto> AllTiers { get; set; } = new List<MembershipTierDto>();
+        public int MonthlyCost { get; set; }
+        public DateTime RenewalDate { get; set; }
+        public bool IsActive { get; set; }
     }
 
     public class MembershipTierDto

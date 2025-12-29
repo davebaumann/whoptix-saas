@@ -4,82 +4,16 @@ import { useMembership } from '../contexts/MembershipContext'
 import { useAuth } from '../contexts/AuthContext'
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
-import { Crown, Star, Zap, Check } from 'lucide-react'
+import { Check } from 'lucide-react'
+import { MEMBERSHIP_TIERS, MembershipTier } from '../config/membershipTiers.tsx'
 
 // Initialize Stripe - you'll need to replace with your actual publishable key
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_test_your_stripe_publishable_key_here')
 
-interface MembershipPlan {
-  level: number
-  name: string
-  price: number
-  priceId: string // Stripe Price ID
-  icon: React.ReactNode
-  color: string
-  gradient: string
-  features: string[]
-  popular?: boolean
-}
-
-const membershipPlans: MembershipPlan[] = [
-  {
-    level: 2,
-    name: 'Standard',
-    price: 59,
-    priceId: 'price_standard_monthly',
-    icon: <Star className="w-8 h-8" />,
-    color: 'text-blue-600',
-    gradient: 'from-blue-500 to-blue-600',
-    features: [
-      'SkuVault Integration',
-      'Low Stock Alerts',
-      'Email Notifications',
-      'Threshold Management',
-      'Basic Reports',
-      'Priority Support'
-    ]
-  },
-  {
-    level: 3,
-    name: 'Premium',
-    price: 99,
-    priceId: 'price_premium_monthly',
-    icon: <Crown className="w-8 h-8" />,
-    color: 'text-yellow-600',
-    gradient: 'from-yellow-500 to-yellow-600',
-    features: [
-      'All Standard Features',
-      'Aging Inventory Reports',
-      'Financial Analysis',
-      'Location Optimization',
-      'Advanced Analytics',
-      'Phone Support',
-      'Custom Integrations'
-    ]
-  },
-  {
-    level: 4,
-    name: 'Enterprise',
-    price: 199,
-    priceId: 'price_enterprise_monthly',
-    icon: <Zap className="w-8 h-8" />,
-    color: 'text-purple-600',
-    gradient: 'from-purple-500 to-purple-600',
-    features: [
-      'All Premium Features',
-      'Performance Analytics',
-      'Velocity Tracking',
-      'Turnover Analysis',
-      'Growth Trends',
-      'Top Performers',
-      'Dedicated Account Manager',
-    ],
-    popular: true
-  }
-]
+const membershipPlans: MembershipTier[] = MEMBERSHIP_TIERS
 
 interface CheckoutFormProps {
-  plan: MembershipPlan
+  plan: MembershipTier
   onSuccess: () => void
   onCancel: () => void
 }
@@ -222,12 +156,12 @@ function CheckoutForm({ plan, onSuccess, onCancel }: CheckoutFormProps) {
 export default function MembershipUpgrade() {
   const { membershipInfo } = useMembership()
   const navigate = useNavigate()
-  const [selectedPlan, setSelectedPlan] = useState<MembershipPlan | null>(null)
+  const [selectedPlan, setSelectedPlan] = useState<MembershipTier | null>(null)
   const [showSuccess, setShowSuccess] = useState(false)
 
   const currentLevel = membershipInfo?.currentLevel || 1
 
-  const handleUpgrade = (plan: MembershipPlan) => {
+  const handleUpgrade = (plan: MembershipTier) => {
     if (plan.level <= currentLevel) return
     // Route through contract review flow
     navigate(`/app/contract-review?tier=${plan.level}`)

@@ -6,6 +6,8 @@ using Microsoft.IdentityModel.Tokens;
 using SkuVaultSaaS.Api.Models;
 using SkuVaultSaaS.Api.Services;
 using SkuVaultSaaS.Core.Models;
+using SkuVaultSaaS.Core.Enums;
+using SkuVaultSaaS.Infrastructure.Data;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -22,19 +24,23 @@ namespace SkuVaultSaaS.Api.Controllers
         private readonly IEmailService _emailService;
         private readonly ITwoFactorService _twoFactorService;
         private readonly ILogger<AuthController> _logger;
+        private readonly ApplicationDbContext _context;
 
         public AuthController(UserManager<ApplicationUser> userManager,
             SignInManager<ApplicationUser> signInManager,
             IConfiguration config,
             IEmailService emailService,
             ITwoFactorService twoFactorService,
-            ILogger<AuthController> logger)
+            ILogger<AuthController> logger,
+            ApplicationDbContext context)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _config = config;
             _emailService = emailService;
             _twoFactorService = twoFactorService;
+            _logger = logger;
+            _context = context;
             _logger = logger;
         }
 
@@ -82,6 +88,7 @@ namespace SkuVaultSaaS.Api.Controllers
 
             // No 2FA required or recently verified, issue regular token
             var token = await GenerateJwtTokenAsync(user);
+            var roles = await _userManager.GetRolesAsync(user);
             
             // Set secure httpOnly cookie
             var cookieOptions = new CookieOptions
@@ -97,6 +104,7 @@ namespace SkuVaultSaaS.Api.Controllers
             return Ok(new { 
                 email = user.Email,
                 expires = token.Item2,
+                roles = roles,
                 message = "Login successful"
             });
         }
@@ -400,11 +408,10 @@ namespace SkuVaultSaaS.Api.Controllers
                 id = user.Id,
                 email = user.Email,
                 roles = roles,
-                customerId = user.CustomerId, // Will be null for admin users
+                customerId = user.CustomerId, // Will be null until payment is made
                 customerRole = user.CustomerRole.ToString()
             };
             
-
             return Ok(result);
         }
         
@@ -427,7 +434,8 @@ namespace SkuVaultSaaS.Api.Controllers
             {
                 UserName = request.Email,
                 Email = request.Email,
-                EmailConfirmed = false // Require email verification
+                EmailConfirmed = false, // Require email verification
+                CustomerRole = CustomerRole.Owner // Default role for new users (will own their own customer)
             };
 
             var result = await _userManager.CreateAsync(user, request.Password);
@@ -437,6 +445,9 @@ namespace SkuVaultSaaS.Api.Controllers
             }
 
             await _userManager.AddToRoleAsync(user, "CustomerUser");
+
+            // NOTE: Customer and Tenant are created during payment (CreatePaymentIntent)
+            // NOT during signup, to keep the flow clean and only charge for actual members
 
             // Generate email confirmation token
             var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
@@ -478,8 +489,8 @@ namespace SkuVaultSaaS.Api.Controllers
 
             if (user.EmailConfirmed)
             {
-                // Already confirmed, redirect to Stripe
-                return Redirect("/app/stripe-setup");
+                // Already confirmed, redirect to account setup (tier selection)
+                return Redirect("/app/account-setup");
             }
 
             var result = await _userManager.ConfirmEmailAsync(user, token);
@@ -488,8 +499,12 @@ namespace SkuVaultSaaS.Api.Controllers
                 return BadRequest("Email confirmation failed. The link may be expired or invalid.");
             }
 
-            // Email confirmed successfully, redirect to account setup
-            return Redirect("/app/account-setup");
+            // Email confirmed successfully - generate JWT and redirect to account setup with token
+            var (jwtToken, _) = await GenerateJwtTokenAsync(user);
+            
+            // Redirect to frontend account setup page with token
+            // Frontend will store the token and show tier selection
+            return Redirect($"/app/account-setup?token={Uri.EscapeDataString(jwtToken)}");
         }
 
         [HttpPost("resend-verification")]

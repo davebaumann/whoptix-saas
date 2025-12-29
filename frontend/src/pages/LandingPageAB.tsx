@@ -1,61 +1,8 @@
 import { Link } from 'react-router-dom'
-import { Crown, Star, Zap, Check, ArrowRight, AlertTriangle, Users, Clock, Target } from 'lucide-react'
+import { Star, Check, ArrowRight, AlertTriangle, Users, Clock, Target } from 'lucide-react'
+import { MEMBERSHIP_TIERS } from '../config/membershipTiers.tsx'
 
-const membershipPlans = [
-  {
-    level: 2,
-    name: 'Standard',
-    price: 99,
-    icon: <Star className="w-8 h-8" />,
-    color: 'text-blue-600',
-    gradient: 'from-blue-500 to-blue-600',
-    features: [
-      'SkuVault Integration',
-      'Low Stock Alerts',
-      'Email Notifications',
-      'Threshold Management',
-      'Inventory Reports',
-      'Priority Support'
-    ]
-  },
-  {
-    level: 3,
-    name: 'Premium',
-    price: 199,
-    icon: <Crown className="w-8 h-8" />,
-    color: 'text-yellow-600',
-    gradient: 'from-yellow-500 to-yellow-600',
-    features: [
-      'All Standard Features',
-      'Aging Inventory Reports',
-      'Profitability Analysis',
-      'Demand Forecasting',
-      'Financial Warehouse Reports',
-      'Location Optimization',
-      'Advanced Analytics',
-      'Phone Support'
-    ]
-  },
-  {
-    level: 4,
-    name: 'Enterprise',
-    price: 299,
-    icon: <Zap className="w-8 h-8" />,
-    color: 'text-purple-600',
-    gradient: 'from-purple-500 to-purple-600',
-    features: [
-      'All Premium Features',
-      'Performance Analytics',
-      'Velocity Tracking',
-      'Inventory Turnover Reports',
-      'Growth Trends',
-      'Top/Bottom Performers',
-      'Custom Integrations',
-      'Dedicated Account Manager',
-    ],
-    popular: true
-  }
-]
+const membershipPlans = MEMBERSHIP_TIERS
 
 const painPoints = [
   {
@@ -137,7 +84,7 @@ export default function LandingPageAB() {
               For SkuVault Users Only
             </div>
             <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
-              Need Better Visibility Into
+              Need Better Visibility Into 
               <span className="text-blue-600"> Your SkuVault Data?</span>
             </h1>
             <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">

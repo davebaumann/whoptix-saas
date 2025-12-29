@@ -1,6 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.JsonWebTokens;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.Identity;
+using System.Security.Claims;
 using SkuVaultSaaS.Infrastructure.Data;
 using SkuVaultSaaS.Core.Models;
 using SkuVaultSaaS.Core.Enums;
@@ -17,15 +21,18 @@ namespace SkuVaultSaaS.Api.Controllers
         private readonly ApplicationDbContext _context;
         private readonly ILogger<StripeController> _logger;
         private readonly IConfiguration _configuration;
+        private readonly UserManager<ApplicationUser> _userManager;
 
         public StripeController(
             ApplicationDbContext context,
             ILogger<StripeController> logger,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            UserManager<ApplicationUser> userManager)
         {
             _context = context;
             _logger = logger;
             _configuration = configuration;
+            _userManager = userManager;
 
             // Initialize Stripe
             StripeConfiguration.ApiKey = _configuration["Stripe:SecretKey"];
@@ -36,33 +43,106 @@ namespace SkuVaultSaaS.Api.Controllers
         {
             try
             {
-                // Get the customer info
-                var customer = await _context.Customers
-                    .FirstOrDefaultAsync(c => c.Email == request.Email);
+                _logger.LogInformation("CreatePaymentIntent called for email: {Email}, priceId: {PriceId}", request.Email, request.PriceId);
 
-                if (customer == null)
+                // Get the authenticated user
+                var userEmail = User.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress")?.Value ??
+                               User.FindFirst(JwtRegisteredClaimNames.Email)?.Value ??
+                               User.FindFirst("email")?.Value;
+
+                if (string.IsNullOrEmpty(userEmail))
                 {
-                    return NotFound("Customer not found");
+                    _logger.LogWarning("Could not extract user email from JWT claims");
+                    return Unauthorized("User email not found in claims");
                 }
 
+                // Get the current authenticated user's ID from JWT
+                var userId = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value ??
+                            User.FindFirst(ClaimTypes.NameIdentifier)?.Value ??
+                            User.FindFirst("sub")?.Value;
+                
+                var appUser = !string.IsNullOrEmpty(userId) 
+                    ? await _userManager.FindByIdAsync(userId) 
+                    : null;
+
+                // Look for an existing customer linked to this ApplicationUser
+                var customer = appUser?.CustomerId != null 
+                    ? await _context.Customers.FirstOrDefaultAsync(c => c.Id == appUser.CustomerId)
+                    : null;
+
+                // If no customer linked to user, create a new one (don't reuse old seeded ones)
+                if (customer == null)
+                {
+                    _logger.LogWarning("No customer linked to user {UserId} with email {Email}, creating new one", userId, request.Email);
+                    
+                    // Create a new tenant for this customer
+                    var tenant = new Tenant 
+                    { 
+                        Name = request.Email?.Trim() ?? "Unknown"
+                    };
+                    _context.Tenants.Add(tenant);
+                    await _context.SaveChangesAsync();
+
+                    // Create a new customer
+                    customer = new Core.Models.Customer
+                    {
+                        Name = request.Email?.Trim() ?? "Unknown",
+                        Email = (request.Email?.ToLower().Trim()) ?? "unknown@example.com",
+                        ExternalId = Guid.NewGuid().ToString(),
+                        TenantId = tenant.Id,
+                        MembershipLevel = MembershipLevel.Basic,
+                        IsActive = true,
+                        LastSyncedAt = DateTime.UtcNow
+                    };
+                    _context.Customers.Add(customer);
+                    await _context.SaveChangesAsync();
+                    
+                    _logger.LogInformation("Created new customer {CustomerId} and tenant {TenantId} for user {UserId}", customer.Id, tenant.Id, userId);
+                }
+
+                // Ensure the ApplicationUser is linked to this customer
+                if (appUser != null && appUser.CustomerId != customer.Id)
+                {
+                    appUser.CustomerId = customer.Id;
+                    appUser.CustomerRole = CustomerRole.Owner;
+                    await _userManager.UpdateAsync(appUser);
+                    _logger.LogInformation("Linked ApplicationUser {UserId} to customer {CustomerId}", userId, customer.Id);
+                }
+
+                _logger.LogInformation("Using customer {CustomerId} for user {UserId} with email {Email}", customer.Id, userId, request.Email);
+
                 // Get price amount based on priceId (you'll need to configure these)
+                _logger.LogInformation("Looking up price amount for priceId: {PriceId}", request.PriceId);
+                
+                // Log all configured price IDs for debugging
+                var priceIdsSection = _configuration.GetSection("Stripe:PriceIds");
+                _logger.LogInformation("Configured PriceIds: standard_monthly={Standard}, premium_monthly={Premium}, enterprise_monthly={Enterprise}",
+                    priceIdsSection["standard_monthly"],
+                    priceIdsSection["premium_monthly"],
+                    priceIdsSection["enterprise_monthly"]);
+                
                 var priceAmount = GetPriceAmount(request.PriceId);
+                _logger.LogInformation("GetPriceAmount returned: {PriceAmount}", priceAmount);
+                
                 if (priceAmount == 0)
                 {
-                    return BadRequest("Invalid price ID");
+                    _logger.LogError("Invalid price ID: {PriceId} not found in configuration", request.PriceId);
+                    return BadRequest($"Invalid price ID: {request.PriceId} not found in configuration");
                 }
 
                 // Create or retrieve Stripe customer
                 var stripeCustomerService = new CustomerService();
-                var stripeCustomers = await stripeCustomerService.ListAsync(new CustomerListOptions
-                {
-                    Email = request.Email,
-                    Limit = 1
-                });
-
+                
                 string stripeCustomerId;
-                if (stripeCustomers.Data.Count == 0)
+                // If this customer already has a Stripe ID, reuse it
+                if (!string.IsNullOrEmpty(customer.StripeCustomerId))
                 {
+                    stripeCustomerId = customer.StripeCustomerId;
+                    _logger.LogInformation("Using existing Stripe customer {StripeCustomerId} for internal customer {CustomerId}", stripeCustomerId, customer.Id);
+                }
+                else
+                {
+                    // Create a NEW Stripe customer for this internal customer (never reuse by email)
                     var createOptions = new CustomerCreateOptions
                     {
                         Email = request.Email,
@@ -74,10 +154,19 @@ namespace SkuVaultSaaS.Api.Controllers
                     };
                     var stripeCustomer = await stripeCustomerService.CreateAsync(createOptions);
                     stripeCustomerId = stripeCustomer.Id;
+                    customer.StripeCustomerId = stripeCustomerId;
+                    _context.Customers.Update(customer);
+                    await _context.SaveChangesAsync();
+                    _logger.LogInformation("Created NEW Stripe customer {StripeCustomerId} for internal customer {CustomerId}", stripeCustomerId, customer.Id);
                 }
-                else
+
+                // Ensure the Stripe customer ID is always saved
+                if (customer.StripeCustomerId != stripeCustomerId)
                 {
-                    stripeCustomerId = stripeCustomers.Data[0].Id;
+                    customer.StripeCustomerId = stripeCustomerId;
+                    _context.Customers.Update(customer);
+                    await _context.SaveChangesAsync();
+                    _logger.LogInformation("Saved StripeCustomerId {StripeCustomerId} for customer {CustomerId}", stripeCustomerId, customer.Id);
                 }
 
                 // Create the payment intent
@@ -110,13 +199,87 @@ namespace SkuVaultSaaS.Api.Controllers
             }
         }
 
+        [HttpGet("receipts")]
+        [Authorize]
+        public async Task<IActionResult> GetReceipts()
+        {
+            try
+            {
+                // Get the current user's customer ID
+                var userId = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value ??
+                            User.FindFirst(ClaimTypes.NameIdentifier)?.Value ??
+                            User.FindFirst("sub")?.Value;
+
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Unauthorized("User not authenticated");
+                }
+
+                var appUser = await _userManager.FindByIdAsync(userId);
+                if (appUser?.CustomerId == null)
+                {
+                    return BadRequest("No customer account found");
+                }
+
+                // Get the customer to find their Stripe customer ID
+                var customer = await _context.Customers.FindAsync(appUser.CustomerId);
+                if (customer == null)
+                {
+                    return NotFound("Customer not found");
+                }
+
+                // If customer has no Stripe ID, they have no receipts
+                if (string.IsNullOrEmpty(customer.StripeCustomerId))
+                {
+                    _logger.LogInformation("Customer {CustomerId} has no Stripe customer ID, returning empty receipts", customer.Id);
+                    return Ok(new List<object>());
+                }
+
+                // Query Stripe for charges for this customer
+                var chargeService = new ChargeService();
+                var charges = await chargeService.ListAsync(new ChargeListOptions
+                {
+                    Customer = customer.StripeCustomerId,
+                    Limit = 100
+                });
+
+                var receipts = charges.Data
+                    .Where(c => c.Paid && c.ReceiptUrl != null)
+                    .OrderByDescending(c => c.Created)
+                    .Select(c => new
+                    {
+                        c.Id,
+                        Amount = c.Amount / 100m, // Convert cents to dollars
+                        Currency = c.Currency?.ToUpper(),
+                        Date = c.Created,
+                        Status = c.Status,
+                        ReceiptUrl = c.ReceiptUrl,
+                        Description = c.Description
+                    })
+                    .ToList();
+
+                _logger.LogInformation("Retrieved {Count} receipts for customer {CustomerId}", receipts.Count, customer.Id);
+
+                return Ok(receipts);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving receipts");
+                return StatusCode(500, new { message = "Error retrieving receipts" });
+            }
+        }
+
         [HttpPost("webhook")]
         [AllowAnonymous]
         public async Task<IActionResult> HandleWebhook()
         {
+            _logger.LogInformation("=== STRIPE WEBHOOK RECEIVED ===");
+            
             try
             {
                 var json = await new StreamReader(HttpContext.Request.Body).ReadToEndAsync();
+                _logger.LogInformation("Webhook body length: {Length}", json.Length);
+                
                 var endpointSecret = _configuration["Stripe:WebhookSecret"];
 
                 var stripeEvent = EventUtility.ConstructEvent(
@@ -124,6 +287,8 @@ namespace SkuVaultSaaS.Api.Controllers
                     Request.Headers["Stripe-Signature"],
                     endpointSecret
                 );
+
+                _logger.LogInformation("=== STRIPE EVENT RECEIVED: {EventType} ===", stripeEvent.Type);
 
                 switch (stripeEvent.Type)
                 {
@@ -199,22 +364,80 @@ namespace SkuVaultSaaS.Api.Controllers
             var customerIdStr = paymentIntent.Metadata.GetValueOrDefault("customer_id");
             var priceId = paymentIntent.Metadata.GetValueOrDefault("price_id");
 
+            _logger.LogInformation("HandlePaymentSuccess: PaymentIntentId={PaymentIntentId}, CustomerId={CustomerId}, PriceId={PriceId}, MetadataCount={Count}", 
+                paymentIntent.Id, customerIdStr, priceId, paymentIntent.Metadata?.Count ?? 0);
+            
+            if (paymentIntent.Metadata != null)
+            {
+                foreach (var kvp in paymentIntent.Metadata)
+                {
+                    _logger.LogInformation("  Metadata[{Key}]={Value}", kvp.Key, kvp.Value);
+                }
+            }
+
             if (int.TryParse(customerIdStr, out var customerId))
             {
                 var customer = await _context.Customers.FindAsync(customerId);
                 if (customer != null)
                 {
+                    _logger.LogInformation("Found customer {CustomerId}, current level={Level}, TenantId={TenantId}", 
+                        customerId, customer.MembershipLevel, customer.TenantId);
+                    
+                    // If customer doesn't have a Tenant, create one
+                    if (customer.TenantId == 0)
+                    {
+                        try
+                        {
+                            var tenant = new Tenant
+                            {
+                                Name = customer.Email
+                            };
+                            _context.Tenants.Add(tenant);
+                            await _context.SaveChangesAsync();
+                            
+                            customer.TenantId = tenant.Id;
+                            _logger.LogInformation("Created Tenant {TenantId} for customer {CustomerId}", tenant.Id, customerId);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Error creating Tenant for customer {CustomerId}", customerId);
+                            // Continue anyway - don't fail the payment processing
+                        }
+                    }
+                    
+                    if (string.IsNullOrEmpty(priceId))
+                    {
+                        _logger.LogWarning("No price_id found in payment intent metadata for customer {CustomerId}", customerId);
+                        return;
+                    }
+
+                    _logger.LogInformation("Looking up membership level for priceId: {PriceId}", priceId);
                     var newLevel = GetMembershipLevelFromPriceId(priceId!);
+                    _logger.LogInformation("GetMembershipLevelFromPriceId returned: {Level} (null={IsNull})", newLevel, newLevel == null);
+                    
                     if (newLevel.HasValue)
                     {
                         customer.MembershipLevel = newLevel.Value;
+                        customer.IsActive = true;
                         await _context.SaveChangesAsync();
 
                         _logger.LogInformation(
-                            "Updated customer {CustomerId} to membership level {Level} via Stripe payment {PaymentIntentId}",
-                            customerId, newLevel.Value, paymentIntent.Id);
+                            "Updated customer {CustomerId} to membership level {Level} ({LevelValue}) via Stripe payment {PaymentIntentId}",
+                            customerId, newLevel.Value, (int)newLevel.Value, paymentIntent.Id);
+                    }
+                    else
+                    {
+                        _logger.LogError("Could not determine membership level from priceId {PriceId} for customer {CustomerId}", priceId, customerId);
                     }
                 }
+                else
+                {
+                    _logger.LogWarning("Customer {CustomerId} not found for payment intent {PaymentIntentId}", customerId, paymentIntent.Id);
+                }
+            }
+            else
+            {
+                _logger.LogWarning("Could not parse customer_id from payment intent metadata: {CustomerId}", customerIdStr);
             }
         }
 
@@ -399,39 +622,102 @@ namespace SkuVaultSaaS.Api.Controllers
             }
         }
 
-        private int GetPriceAmount(string priceId)
+        private int GetPriceAmount(string stripePriceId)
         {
-            var amounts = _configuration.GetSection("Stripe:PriceAmounts");
-            if (int.TryParse(amounts[priceId], out var amount))
+            _logger.LogDebug("GetPriceAmount called with stripePriceId: {StripePriceId}", stripePriceId);
+            
+            // Reverse lookup: find which config key maps to this Stripe price ID
+            var priceIds = _configuration.GetSection("Stripe:PriceIds");
+            var configKey = priceIds.GetChildren()
+                .FirstOrDefault(x => x.Value == stripePriceId)?
+                .Key;
+            
+            _logger.LogDebug("Found configKey {ConfigKey} for stripePriceId {StripePriceId}", configKey ?? "(null)", stripePriceId);
+            
+            if (configKey != null)
             {
-                return amount;
+                var amounts = _configuration.GetSection("Stripe:PriceAmounts");
+                var amountStr = amounts[configKey];
+                
+                _logger.LogDebug("Amount config for {ConfigKey}: {AmountStr}", configKey, amountStr ?? "(null)");
+                
+                if (int.TryParse(amountStr, out var amount))
+                {
+                    _logger.LogDebug("Successfully parsed amount {Amount} for configKey {ConfigKey}", amount, configKey);
+                    return amount;
+                }
             }
+            
+            _logger.LogWarning("Failed to find or parse amount for stripePriceId {StripePriceId}. configKey: {ConfigKey}", stripePriceId, configKey ?? "(not found)");
             return 0;
         }
 
-        private MembershipLevel? GetMembershipLevelFromPriceId(string priceId)
+        private MembershipLevel? GetMembershipLevelFromPriceId(string stripePriceId)
         {
-            return priceId switch
+            _logger.LogInformation("GetMembershipLevelFromPriceId called with stripePriceId: {StripePriceId}", stripePriceId);
+            
+            // Reverse lookup: find which config key maps to this Stripe price ID
+            var priceIds = _configuration.GetSection("Stripe:PriceIds");
+            
+            var configKey = priceIds.GetChildren()
+                .FirstOrDefault(x => x.Value == stripePriceId)?
+                .Key;
+            
+            _logger.LogInformation("Available price ID mappings:");
+            foreach (var child in priceIds.GetChildren())
             {
-                "price_standard_monthly" => MembershipLevel.Standard,
-                "price_premium_monthly" => MembershipLevel.Premium,
-                "price_enterprise_monthly" => MembershipLevel.Enterprise,
+                _logger.LogInformation("  {Key}={Value}", child.Key, child.Value);
+            }
+            
+            _logger.LogInformation("Lookup result: configKey={ConfigKey} for stripePriceId={StripePriceId}", configKey ?? "(null)", stripePriceId);
+            
+            if (configKey == null)
+            {
+                _logger.LogWarning("No matching config key found for stripePriceId {StripePriceId}", stripePriceId);
+                return null;
+            }
+            
+            var result = configKey switch
+            {
+                "standard_monthly" => (MembershipLevel?)MembershipLevel.Standard,
+                "premium_monthly" => (MembershipLevel?)MembershipLevel.Premium,
+                "enterprise_monthly" => (MembershipLevel?)MembershipLevel.Enterprise,
                 _ => null
             };
+            
+            _logger.LogInformation("GetMembershipLevelFromPriceId result: {Result} ({ResultValue}) for configKey {ConfigKey}", 
+                result?.ToString() ?? "(null)", result.HasValue ? (int)result.Value : -1, configKey);
+            return result;
         }
 
-        private MembershipLevel? GetMembershipLevelFromSubscriptionItemPrice(string? priceId)
+        private MembershipLevel? GetMembershipLevelFromSubscriptionItemPrice(string? stripePriceId)
         {
-            if (string.IsNullOrEmpty(priceId))
+            if (string.IsNullOrEmpty(stripePriceId))
                 return null;
 
-            return priceId switch
+            _logger.LogDebug("GetMembershipLevelFromSubscriptionItemPrice called with stripePriceId: {StripePriceId}", stripePriceId);
+            
+            // Reverse lookup: find which config key maps to this Stripe price ID
+            var priceIds = _configuration.GetSection("Stripe:PriceIds");
+            var configKey = priceIds.GetChildren()
+                .FirstOrDefault(x => x.Value == stripePriceId)?
+                .Key;
+            
+            _logger.LogDebug("Found configKey {ConfigKey} for stripePriceId {StripePriceId}", configKey ?? "(null)", stripePriceId);
+            
+            if (configKey == null)
+                return null;
+
+            var result = configKey switch
             {
-                "price_standard_monthly" => MembershipLevel.Standard,
-                "price_premium_monthly" => MembershipLevel.Premium,
-                "price_enterprise_monthly" => MembershipLevel.Enterprise,
+                "standard_monthly" => (MembershipLevel?)MembershipLevel.Standard,
+                "premium_monthly" => (MembershipLevel?)MembershipLevel.Premium,
+                "enterprise_monthly" => (MembershipLevel?)MembershipLevel.Enterprise,
                 _ => null
             };
+            
+            _logger.LogDebug("GetMembershipLevelFromSubscriptionItemPrice result: {Result} for configKey {ConfigKey}", result, configKey);
+            return result;
         }
     }
 

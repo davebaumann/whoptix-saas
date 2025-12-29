@@ -101,6 +101,7 @@
 
     function onReset(event) {  // 'this' is the form element
         var $form = $(this),
+            // amazonq-ignore-next-line
             key = '__jquery_unobtrusive_validation_form_reset';
         if ($form.data(key)) {
             return;

@@ -1,15 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FileText, CheckCircle } from 'lucide-react';
-
-const getTierInfo = (tier: string) => {
-  const tierMap: Record<string, { name: string; price: string }> = {
-    '2': { name: 'Standard', price: '$59/month' },
-    '3': { name: 'Premium', price: '$99/month' },
-    '4': { name: 'Enterprise', price: '$199/month' }
-  };
-  return tierMap[tier] || { name: 'Unknown', price: 'N/A' };
-};
+import { getTierInfo } from '../config/membershipTiers.tsx';
 
 export default function ContractReview() {
   const [searchParams] = useSearchParams();
@@ -33,8 +25,8 @@ export default function ContractReview() {
     
     // TODO: Save contract acceptance to backend
     
-    // Navigate to Stripe payment with tier info
-    navigate(`/app/stripe-setup?tier=${tier}`);
+    // Redirect to login, then to Stripe payment with tier info
+    navigate(`/login?redirect=/app/stripe-setup&tier=${tier}`);
   };
 
   return (

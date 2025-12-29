@@ -31,11 +31,11 @@ class StripeService {
 
   getPriceIdFromTier(tier: string): string {
     const priceMap: Record<string, string> = {
-      '2': 'price_standard_monthly', // $59 -> matches Standard tier
-      '3': 'price_premium_monthly',  // $99 -> matches Premium tier
-      '4': 'price_enterprise_monthly' // $199 -> matches Enterprise tier
+      '2': 'price_1SicwS17Q4Cr8TzenL7IUQ9D', // Standard $99
+      '3': 'price_1Sicy617Q4Cr8TzeO8tA4qv4',  // Premium $199
+      '4': 'price_1SiczR17Q4Cr8Tzei1NnrhSx' // Enterprise $299
     };
-    return priceMap[tier] || 'price_standard_monthly';
+    return priceMap[tier] || 'price_1SicwS17Q4Cr8TzenL7IUQ9D';
   }
 }
 

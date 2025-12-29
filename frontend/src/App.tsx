@@ -43,6 +43,10 @@ import ProfitabilityReport from './pages/ProfitabilityReport'
 import DemandForecast from './pages/DemandForecast'
 import ChannelPerformance from './pages/ChannelPerformance'
 import PickerAnalytics from './pages/PickerAnalytics'
+import EmailVerified from './pages/EmailVerified'
+import PaymentSuccess from './pages/PaymentSuccess'
+import SkuVaultConnection from './pages/SkuVaultConnection'
+import NotFound from './pages/NotFound'
 
 function App() {
   return (
@@ -63,45 +67,61 @@ function App() {
           <Route path="/status" element={<Status />} />
           <Route path="/about" element={<About />} />
           <Route path="/email-verification" element={<EmailVerification />} />
+          <Route path="/email-verified" element={<EmailVerified />} />
           <Route path="/invitation/:token" element={<InvitationAccept />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route
             path="/app/*"
             element={
-              <ProtectedRoute>
-                <Layout>
-                  <Routes>
-                  <Route path="/" element={<DefaultRoute />} />
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/inventory" element={<Inventory />} />
-                  <Route path="/aging-inventory" element={<AgingInventoryReport />} />
-                  <Route path="/profitability" element={<ProfitabilityReport />} />
-                  <Route path="/demand-forecast" element={<DemandForecast />} />
-                  <Route path="/financial-warehouse" element={<FinancialWarehouseReport />} />
-                  <Route path="/locations" element={<Locations />} />
-                  <Route path="/performance" element={<Performance />} />
-                  <Route path="/picker-analytics" element={<PickerAnalytics />} />
-                  <Route path="/channel-performance" element={<ChannelPerformance />} />
-                  <Route path="/inventory-turnover" element={<InventoryTurnoverReport />} />
-                  <Route path="/low-stock" element={<LowStockReport />} />
-                  <Route path="/low-stock-admin" element={<LowStockAdmin />} />
-                  <Route path="/admin" element={<AdminDashboard />} />
-                  <Route path="/admin/customers" element={<CustomerManagement />} />
-                  <Route path="/admin/tiers" element={<TierConfigPage />} />
-                  <Route path="/admin/users" element={<UserManagement />} />
-                  <Route path="/account-setup" element={<AccountSetup />} />
-                  <Route path="/contract-review" element={<ContractReview />} />
-                  <Route path="/stripe-setup" element={<StripeSetup />} />
-                  <Route path="/membership/upgrade" element={<MembershipUpgrade />} />
-                  <Route path="/account-settings" element={<AccountSettings />} />
-                  <Route path="/user-management" element={<UserManagement />} />
-                </Routes>
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
+              <Routes>
+                {/* Unprotected signup flow pages */}
+                <Route path="/account-setup" element={<AccountSetup />} />
+                <Route path="/contract-review" element={<ContractReview />} />
+                <Route path="/skuvault-connection" element={<SkuVaultConnection />} />
+                
+                {/* Protected pages */}
+                <Route
+                  path="*"
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <Routes>
+                          <Route path="/" element={<DefaultRoute />} />
+                          <Route path="/dashboard" element={<Dashboard />} />
+                          <Route path="/inventory" element={<Inventory />} />
+                          <Route path="/aging-inventory" element={<AgingInventoryReport />} />
+                          <Route path="/profitability" element={<ProfitabilityReport />} />
+                          <Route path="/demand-forecast" element={<DemandForecast />} />
+                          <Route path="/financial-warehouse" element={<FinancialWarehouseReport />} />
+                          <Route path="/locations" element={<Locations />} />
+                          <Route path="/performance" element={<Performance />} />
+                          <Route path="/picker-analytics" element={<PickerAnalytics />} />
+                          <Route path="/channel-performance" element={<ChannelPerformance />} />
+                          <Route path="/inventory-turnover" element={<InventoryTurnoverReport />} />
+                          <Route path="/low-stock" element={<LowStockReport />} />
+                          <Route path="/low-stock-admin" element={<LowStockAdmin />} />
+                          <Route path="/admin" element={<AdminDashboard />} />
+                          <Route path="/admin/customers" element={<CustomerManagement />} />
+                          <Route path="/admin/tiers" element={<TierConfigPage />} />
+                          <Route path="/admin/users" element={<UserManagement />} />
+                          <Route path="/membership/upgrade" element={<MembershipUpgrade />} />
+                          <Route path="/account-settings" element={<AccountSettings />} />
+                          <Route path="/user-management" element={<UserManagement />} />
+                          <Route path="/stripe-setup" element={<StripeSetup />} />
+                          <Route path="/payment-success" element={<PaymentSuccess />} />
+                          <Route path="*" element={<NotFound />} />
+                        </Routes>
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+              </Routes>
+            }
+          />
+          {/* Catch-all route for public pages */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
       </MembershipProvider>
     </AuthProvider>
   )

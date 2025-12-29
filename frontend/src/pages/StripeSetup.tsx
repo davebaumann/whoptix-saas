@@ -5,15 +5,7 @@ import { loadStripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { stripeService } from '../api/stripeService';
 import { useAuth } from '../contexts/AuthContext';
-
-const getTierInfo = (tier: string) => {
-  const tierMap: Record<string, { name: string; price: string }> = {
-    '2': { name: 'Standard', price: '$59/month' },
-    '3': { name: 'Premium', price: '$99/month' },
-    '4': { name: 'Enterprise', price: '$199/month' }
-  };
-  return tierMap[tier] || { name: 'Standard', price: '$59/month' };
-};
+import { getTierInfo } from '../config/membershipTiers.tsx';
 
 function PaymentForm({ tier, tierInfo }: { tier: string; tierInfo: { name: string; price: string } }) {
   const stripe = useStripe();
@@ -34,17 +26,26 @@ function PaymentForm({ tier, tierInfo }: { tier: string; tierInfo: { name: strin
     setError(null);
 
     try {
-      // Get user email from auth context
+      // Get user email from authenticated context
+      console.log('StripeSetup - user object:', user);
+      console.log('StripeSetup - user.email:', user?.email);
+      
       if (!user?.email) {
-        throw new Error('User email not found');
+        throw new Error('User email not found. Please log in first.');
       }
+      
+      console.log('Creating payment intent for email:', user.email);
       
       // Create payment intent
       const priceId = stripeService.getPriceIdFromTier(tier);
+      console.log('Price ID:', priceId);
+      
       const { clientSecret } = await stripeService.createPaymentIntent({
         priceId,
         email: user.email
       });
+
+      console.log('Payment intent created, clientSecret:', clientSecret);
 
       // Confirm payment
       const cardElement = elements.getElement(CardElement);
@@ -59,12 +60,15 @@ function PaymentForm({ tier, tierInfo }: { tier: string; tierInfo: { name: strin
       });
 
       if (stripeError) {
+        console.error('Stripe error:', stripeError);
         setError(stripeError.message || 'Payment failed');
       } else {
-        // Payment succeeded, redirect to dashboard
-        navigate('/app/dashboard');
+        console.log('Payment succeeded');
+        // Payment succeeded, redirect to success page
+        navigate('/app/payment-success');
       }
     } catch (err) {
+      console.error('Error in handleSubmit:', err);
       setError(err instanceof Error ? err.message : 'Payment failed');
     } finally {
       setIsLoading(false);

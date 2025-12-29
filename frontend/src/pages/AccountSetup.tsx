@@ -1,64 +1,54 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { CheckCircle, Crown, Star, Zap, Users } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { CheckCircle, Crown, Users } from 'lucide-react';
+import { MEMBERSHIP_TIERS } from '../config/membershipTiers.tsx';
 
-const membershipTiers = [
-  {
-    level: 2,
-    name: 'Standard',
-    price: '$29/month',
-    description: 'Essential SkuVault optimization features for growing businesses',
-    features: [
-      'SkuVault integration',
-      'Low stock alerts',
-      'Automated notifications',
-      'Priority support',
-      'Up to 2 user accounts'
-    ],
-    icon: <Star className="w-8 h-8 text-blue-500" />,
-    color: 'border-blue-200 hover:border-blue-300'
-  },
-  {
-    level: 3,
-    name: 'Premium',
-    price: '$79/month',
-    description: 'Comprehensive analytics and reporting for established businesses',
-    features: [
-      'Everything in Standard',
-      'Aging inventory analysis',
-      'Financial reporting',
-      'Location optimization',
-      'Advanced analytics',
-      'Phone support',
-      'Up to 5 user accounts'
-    ],
-    icon: <Crown className="w-8 h-8 text-yellow-500" />,
-    color: 'border-yellow-200 hover:border-yellow-300',
-    popular: true
-  },
-  {
-    level: 4,
-    name: 'Enterprise',
-    price: '$199/month',
-    description: 'Full-featured solution for large organizations',
-    features: [
-      'Everything in Premium',
-      'Performance analytics',
-      'Velocity tracking',
-      'Turnover analysis',
-      'Custom reporting',
-      'Dedicated account manager',
-      'Up to 10 user accounts'
-    ],
-    icon: <Zap className="w-8 h-8 text-purple-500" />,
-    color: 'border-purple-200 hover:border-purple-300'
-  }
-];
+const membershipTiers = MEMBERSHIP_TIERS.map(tier => {
+  const colorMap: Record<number, string> = {
+    2: 'border-blue-200 hover:border-blue-300',
+    3: 'border-yellow-200 hover:border-yellow-300',
+    4: 'border-purple-200 hover:border-purple-300'
+  };
+  return {
+    level: tier.level,
+    name: tier.name,
+    price: `$${tier.price}/month`,
+    description: tier.description || '',
+    features: tier.features,
+    icon: tier.icon,
+    color: colorMap[tier.level] || 'border-blue-200 hover:border-blue-300',
+    popular: tier.popular
+  };
+});
 
 export default function AccountSetup() {
   const [selectedOption, setSelectedOption] = useState<'tier' | 'associate' | null>(null);
-
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // If token is provided in query params, store it and clear the URL
+    const token = searchParams.get('token');
+    if (token) {
+      try {
+        localStorage.setItem('authToken', token);
+        
+        // Decode the token to get expiry time
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const decoded = JSON.parse(atob(parts[1]));
+          const expiresAt = new Date(decoded.exp * 1000).toISOString();
+          localStorage.setItem('expiresAt', expiresAt);
+          localStorage.setItem('userEmail', decoded['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress'] || decoded.email || '');
+        }
+
+        // Clean up the URL
+        window.history.replaceState({}, document.title, '/app/account-setup');
+      } catch (err) {
+        console.error('Failed to store auth token:', err);
+      }
+    }
+  }, [searchParams]);
 
   const handleTierSelection = (tierLevel: number) => {
     // Navigate to contract review with selected tier

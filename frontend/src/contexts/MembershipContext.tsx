@@ -20,6 +20,7 @@ export const MembershipProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const refreshMembership = async () => {
     if (!user?.customerId) {
+      console.warn('MembershipProvider: No customerId found', { customerId: user?.customerId });
       setMembershipInfo(null);
       setLoading(false);
       return;
@@ -28,11 +29,18 @@ export const MembershipProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     try {
       setLoading(true);
       setError(null);
+      console.log('Fetching membership info for customerId:', user.customerId);
+      
+      // Small delay to ensure webhook has completed
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       const info = await membershipService.getMembershipInfo(user.customerId);
+      console.log('Membership info received:', info);
       setMembershipInfo(info);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load membership information');
-      console.error('Error loading membership info:', err);
+      const errorMsg = err instanceof Error ? err.message : 'Failed to load membership information';
+      setError(errorMsg);
+      console.error('Error loading membership info:', err, { customerId: user?.customerId });
     } finally {
       setLoading(false);
     }
