@@ -1,12 +1,46 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
 import WithMembershipCheck from '../components/WithMembershipCheck'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, Info } from 'lucide-react'
+
+interface Tooltip {
+  [key: string]: string
+}
+
+const METRIC_TOOLTIPS: Tooltip = {
+  pickAccuracy: 'Average percentage of orders picked correctly across all pickers. Calculated as the mean of individual picker accuracy rates.',
+  avgProcessingTime: 'Average time in minutes per order to complete picking. Calculated from total picks and total units picked.',
+  pickRate: 'Average number of units picked per day across all pickers during the period.',
+  onTimeShipRate: 'Percentage of orders shipped on time after picking. Requires shipment tracking data.',
+  unitsPicked: 'Total number of units picked during the selected time period.',
+  shift: 'Morning (6am-2pm), Afternoon (2pm-10pm), or Night (10pm-6am) based on transaction timestamp.',
+  accuracy: 'Individual picker accuracy rate. Percentage of picks completed correctly without errors or reversals.',
+  avgTimePerUnit: 'Average seconds spent picking per unit. Lower values indicate faster picking performance.',
+  avgAccuracy: 'Average pick accuracy for all pickers assigned to this shift.',
+  unitsProcessed: 'Total number of units picked during this shift.'
+}
 
 const PickerAnalyticsContent: React.FC = () => {
+  const [hoveredTooltip, setHoveredTooltip] = useState<string | null>(null)
   const { user } = useAuth()
   const customerId = user?.customerId || 1
+
+  const renderTooltip = (key: string) => (
+    <div className="relative group inline-block ml-1">
+      <Info 
+        className="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help inline"
+        onMouseEnter={() => setHoveredTooltip(key)}
+        onMouseLeave={() => setHoveredTooltip(null)}
+      />
+      {hoveredTooltip === key && (
+        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-xs rounded p-2 z-10 pointer-events-none">
+          {METRIC_TOOLTIPS[key]}
+          <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+        </div>
+      )}
+    </div>
+  )
 
   const { data: pickerData, isLoading, error } = useQuery({
     queryKey: ['picker-analytics', customerId],
@@ -69,22 +103,34 @@ const PickerAnalyticsContent: React.FC = () => {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
-          <p className="text-sm font-medium text-gray-600 mb-2">Pick Accuracy</p>
+          <div className="flex items-center">
+            <p className="text-sm font-medium text-gray-600 mb-2">Pick Accuracy</p>
+            {renderTooltip('pickAccuracy')}
+          </div>
           <p className="text-3xl font-bold text-gray-900">{pickerData.kpis.pickAccuracy.toFixed(2)}%</p>
           <p className="text-xs text-gray-500 mt-1">Orders picked correctly</p>
         </div>
         <div className="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
-          <p className="text-sm font-medium text-gray-600 mb-2">Avg Order Processing Time</p>
+          <div className="flex items-center">
+            <p className="text-sm font-medium text-gray-600 mb-2">Avg Order Processing Time</p>
+            {renderTooltip('avgProcessingTime')}
+          </div>
           <p className="text-3xl font-bold text-gray-900">{pickerData.kpis.avgProcessingTime.toFixed(1)}min</p>
           <p className="text-xs text-gray-500 mt-1">Per order</p>
         </div>
         <div className="bg-white rounded-lg shadow p-6 border-l-4 border-purple-500">
-          <p className="text-sm font-medium text-gray-600 mb-2">Pick Rate</p>
+          <div className="flex items-center">
+            <p className="text-sm font-medium text-gray-600 mb-2">Pick Rate</p>
+            {renderTooltip('pickRate')}
+          </div>
           <p className="text-3xl font-bold text-gray-900">{pickerData.kpis.pickRate}</p>
           <p className="text-xs text-gray-500 mt-1">Units/hour/picker</p>
         </div>
         <div className="bg-white rounded-lg shadow p-6 border-l-4 border-amber-500">
-          <p className="text-sm font-medium text-gray-600 mb-2">On-Time Ship Rate</p>
+          <div className="flex items-center">
+            <p className="text-sm font-medium text-gray-600 mb-2">On-Time Ship Rate</p>
+            {renderTooltip('onTimeShipRate')}
+          </div>
           <p className="text-3xl font-bold text-gray-900">{pickerData.kpis.onTimeShipRate > 0 ? `${pickerData.kpis.onTimeShipRate.toFixed(1)}%` : 'N/A'}</p>
           <p className="text-xs text-gray-500 mt-1">Orders shipped on time</p>
         </div>
@@ -119,10 +165,10 @@ const PickerAnalyticsContent: React.FC = () => {
             <thead>
               <tr className="border-b-2 border-gray-200">
                 <th className="px-6 py-3 text-left font-semibold text-gray-700">Name</th>
-                <th className="px-6 py-3 text-right font-semibold text-gray-700">Shift</th>
+                <th className="px-6 py-3 text-right font-semibold text-gray-700">Shift {renderTooltip('shift')}</th>
                 <th className="px-6 py-3 text-right font-semibold text-gray-700">Units Picked</th>
-                <th className="px-6 py-3 text-right font-semibold text-gray-700">Accuracy</th>
-                <th className="px-6 py-3 text-right font-semibold text-gray-700">Avg Time/Unit</th>
+                <th className="px-6 py-3 text-right font-semibold text-gray-700">Accuracy {renderTooltip('accuracy')}</th>
+                <th className="px-6 py-3 text-right font-semibold text-gray-700">Avg Time/Unit {renderTooltip('avgTimePerUnit')}</th>
                 <th className="px-6 py-3 text-right font-semibold text-gray-700">Status</th>
               </tr>
             </thead>
@@ -161,7 +207,7 @@ const PickerAnalyticsContent: React.FC = () => {
       {/* Performance Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Shift Performance</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">Shift Performance {renderTooltip('avgAccuracy')}</h3>
           <div className="space-y-3">
             {pickerData.shiftPerformance.map((shift: any) => (
               <div key={shift.name} className="flex items-center justify-between">
@@ -171,7 +217,7 @@ const PickerAnalyticsContent: React.FC = () => {
                 </div>
                 <div className="text-right">
                   <p className="font-semibold text-gray-900">{(typeof shift.avgAccuracy === 'number' ? shift.avgAccuracy.toFixed(1) : shift.avgAccuracy)}%</p>
-                  <p className="text-xs text-gray-500">{shift.unitsProcessed} units</p>
+                  <p className="text-xs text-gray-500">{shift.unitsProcessed} units {renderTooltip('unitsProcessed')}</p>
                 </div>
               </div>
             ))}

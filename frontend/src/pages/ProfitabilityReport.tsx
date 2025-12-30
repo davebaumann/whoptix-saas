@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, DollarSign, AlertCircle, Info } from 'lucide-react'
+import { ArrowLeft, DollarSign, AlertCircle, Info, ChevronDown } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import WithMembershipCheck from '../components/WithMembershipCheck'
 import { format, subDays } from 'date-fns'
@@ -101,7 +101,7 @@ export default function ProfitabilityReport() {
   const [data, setData] = useState<ProfitabilityResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [sortBy, setSortBy] = useState<'margin' | 'profit' | 'revenue'>('margin')
+  const [sortBy, setSortBy] = useState<'margin' | 'profit' | 'revenue' | 'unitsSold'>('margin')
   const [dateRange, setDateRange] = useState<'month' | '90day' | 'all'>('month')
   const [hoveredTooltip, setHoveredTooltip] = useState<string | null>(null)
 
@@ -192,6 +192,8 @@ export default function ProfitabilityReport() {
         return items.sort((a, b) => b.grossProfit - a.grossProfit)
       case 'revenue':
         return items.sort((a, b) => b.totalRevenue - a.totalRevenue)
+      case 'unitsSold':
+        return items.sort((a, b) => b.unitsSold - a.unitsSold)
       default:
         return items
     }
@@ -441,6 +443,16 @@ export default function ProfitabilityReport() {
                   >
                     Revenue
                   </button>
+                  <button
+                    onClick={() => setSortBy('unitsSold')}
+                    className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                      sortBy === 'unitsSold'
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    Units Sold
+                  </button>
                 </div>
               </div>
             </div>
@@ -451,12 +463,36 @@ export default function ProfitabilityReport() {
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Units Sold</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
+                        onClick={() => setSortBy('unitsSold')}>
+                      <div className="flex items-center justify-end gap-1">
+                        Units Sold
+                        {sortBy === 'unitsSold' && <ChevronDown className="w-4 h-4" />}
+                      </div>
+                    </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cost/Unit</th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Sale Price</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Revenue</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Gross Profit</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Margin %</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
+                        onClick={() => setSortBy('revenue')}>
+                      <div className="flex items-center justify-end gap-1">
+                        Revenue
+                        {sortBy === 'revenue' && <ChevronDown className="w-4 h-4" />}
+                      </div>
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
+                        onClick={() => setSortBy('profit')}>
+                      <div className="flex items-center justify-end gap-1">
+                        Gross Profit
+                        {sortBy === 'profit' && <ChevronDown className="w-4 h-4" />}
+                      </div>
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
+                        onClick={() => setSortBy('margin')}>
+                      <div className="flex items-center justify-end gap-1">
+                        Margin %
+                        {sortBy === 'margin' && <ChevronDown className="w-4 h-4" />}
+                      </div>
+                    </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Stock</th>
                   </tr>
                 </thead>
