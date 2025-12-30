@@ -20,17 +20,20 @@ namespace SkuVaultSaaS.Api.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IEmailService _emailService;
         private readonly ILogger<AdminController> _logger;
+        private readonly IEncryptionService _encryptionService;
 
         public AdminController(
             ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
             IEmailService emailService,
-            ILogger<AdminController> logger)
+            ILogger<AdminController> logger,
+            IEncryptionService encryptionService)
         {
             _context = context;
             _userManager = userManager;
             _emailService = emailService;
             _logger = logger;
+            _encryptionService = encryptionService;
         }
 
         [HttpGet("customers")]
@@ -146,8 +149,8 @@ namespace SkuVaultSaaS.Api.Controllers
                     tenant = new Tenant
                     {
                         Name = request.TenantName,
-                        SkuVaultTenantToken = request.SkuVaultTenantToken,
-                        SkuVaultUserToken = request.SkuVaultUserToken
+                        SkuVaultTenantToken = !string.IsNullOrEmpty(request.SkuVaultTenantToken) ? _encryptionService.Encrypt(request.SkuVaultTenantToken) : null,
+                        SkuVaultUserToken = !string.IsNullOrEmpty(request.SkuVaultUserToken) ? _encryptionService.Encrypt(request.SkuVaultUserToken) : null
                     };
                     _context.Tenants.Add(tenant);
                     await _context.SaveChangesAsync();
@@ -251,8 +254,8 @@ namespace SkuVaultSaaS.Api.Controllers
                         tenant = new Tenant
                         {
                             Name = request.TenantName,
-                            SkuVaultTenantToken = request.SkuVaultTenantToken,
-                            SkuVaultUserToken = request.SkuVaultUserToken
+                            SkuVaultTenantToken = !string.IsNullOrEmpty(request.SkuVaultTenantToken) ? _encryptionService.Encrypt(request.SkuVaultTenantToken) : null,
+                            SkuVaultUserToken = !string.IsNullOrEmpty(request.SkuVaultUserToken) ? _encryptionService.Encrypt(request.SkuVaultUserToken) : null
                         };
                         _context.Tenants.Add(tenant);
                         await _context.SaveChangesAsync();
@@ -263,8 +266,8 @@ namespace SkuVaultSaaS.Api.Controllers
                 else
                 {
                     // Update existing tenant tokens
-                    customer.Tenant.SkuVaultTenantToken = request.SkuVaultTenantToken;
-                    customer.Tenant.SkuVaultUserToken = request.SkuVaultUserToken;
+                    customer.Tenant.SkuVaultTenantToken = !string.IsNullOrEmpty(request.SkuVaultTenantToken) ? _encryptionService.Encrypt(request.SkuVaultTenantToken) : customer.Tenant.SkuVaultTenantToken;
+                    customer.Tenant.SkuVaultUserToken = !string.IsNullOrEmpty(request.SkuVaultUserToken) ? _encryptionService.Encrypt(request.SkuVaultUserToken) : customer.Tenant.SkuVaultUserToken;
                 }
 
                 // Update customer

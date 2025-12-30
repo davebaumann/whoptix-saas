@@ -8,6 +8,7 @@ using SkuVaultSaaS.Core.Models;
 using SkuVaultSaaS.Infrastructure.Data;
 using SkuVaultSaaS.Infrastructure.Services;
 using SkuVaultSaaS.Api.Models;
+using SkuVaultSaaS.Api.Services;
 using System.Text.Json.Serialization;
 
 namespace SkuVaultSaaS.Api.Controllers
@@ -21,15 +22,20 @@ namespace SkuVaultSaaS.Api.Controllers
         private readonly ILogger<CustomersController> _logger;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly ISkuVaultSyncService _syncService;
+        private readonly IEncryptionService _encryptionService;
 
-        public CustomersController(ApplicationDbContext context, ILogger<CustomersController> logger, UserManager<ApplicationUser> userManager, ISkuVaultSyncService syncService)
+        public CustomersController(
+            ApplicationDbContext context, 
+            ILogger<CustomersController> logger, 
+            UserManager<ApplicationUser> userManager, 
+            ISkuVaultSyncService syncService,
+            IEncryptionService encryptionService)
         {
             _context = context;
             _logger = logger;
             _userManager = userManager;
             _syncService = syncService;
-            _logger = logger;
-            _userManager = userManager;
+            _encryptionService = encryptionService;
         }
 
         // GET: api/customers
@@ -184,12 +190,12 @@ namespace SkuVaultSaaS.Api.Controllers
 
                 _logger.LogInformation("Successfully retrieved SkuVault tokens. AccountId: {AccountId}", tokens.AccountId);
 
-                // Update tenant with credentials and tokens
+                // Update tenant with encrypted credentials and tokens
                 tenant.SkuVaultEmail = request.Email;
-                tenant.SkuVaultPassword = request.Password;
+                tenant.SkuVaultPassword = _encryptionService.Encrypt(request.Password);
                 tenant.SkuVaultAccountId = tokens.AccountId;
-                tenant.SkuVaultTenantToken = tokens.TenantToken;
-                tenant.SkuVaultUserToken = tokens.UserToken;
+                tenant.SkuVaultTenantToken = _encryptionService.Encrypt(tokens.TenantToken);
+                tenant.SkuVaultUserToken = _encryptionService.Encrypt(tokens.UserToken);
 
                 _context.Tenants.Update(tenant);
                 await _context.SaveChangesAsync();
@@ -358,7 +364,7 @@ namespace SkuVaultSaaS.Api.Controllers
 
                 var tenant = customer.Tenant;
                 tenant.SkuVaultEmail = request.Email;
-                tenant.SkuVaultPassword = request.Password;
+                tenant.SkuVaultPassword = _encryptionService.Encrypt(request.Password);
 
                 _context.Tenants.Update(tenant);
                 await _context.SaveChangesAsync();
@@ -409,17 +415,20 @@ namespace SkuVaultSaaS.Api.Controllers
                     return BadRequest(new { message = "SkuVault credentials not configured" });
                 }
 
+                // Decrypt the stored password for SkuVault API call
+                var decryptedPassword = _encryptionService.Decrypt(tenant.SkuVaultPassword);
+
                 // Call GetSkuVaultTokens to refresh the tokens
-                var tokens = await GetSkuVaultTokens(tenant.SkuVaultEmail, tenant.SkuVaultPassword);
+                var tokens = await GetSkuVaultTokens(tenant.SkuVaultEmail, decryptedPassword);
                 if (tokens == null)
                 {
                     return BadRequest(new { message = "Failed to retrieve SkuVault tokens" });
                 }
 
-                // Update tenant with new tokens
+                // Update tenant with newly encrypted tokens
                 tenant.SkuVaultAccountId = tokens.AccountId;
-                tenant.SkuVaultTenantToken = tokens.TenantToken;
-                tenant.SkuVaultUserToken = tokens.UserToken;
+                tenant.SkuVaultTenantToken = _encryptionService.Encrypt(tokens.TenantToken);
+                tenant.SkuVaultUserToken = _encryptionService.Encrypt(tokens.UserToken);
 
                 _context.Tenants.Update(tenant);
                 await _context.SaveChangesAsync();

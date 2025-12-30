@@ -35,6 +35,9 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 // Two-Factor Authentication Service
 builder.Services.AddScoped<ITwoFactorService, TwoFactorService>();
 
+// Encryption Service for sensitive credentials (SkuVault passwords/tokens)
+builder.Services.AddScoped<IEncryptionService, AesEncryptionService>();
+
 // User Context Service for tenant isolation
 builder.Services.AddScoped<UserContextService>();
 

@@ -3,12 +3,6 @@ using System.Text;
 
 namespace SkuVaultSaaS.Api.Services
 {
-    public interface IEncryptionService
-    {
-        string Encrypt(string plainText);
-        string Decrypt(string cipherText);
-    }
-
     public class AesEncryptionService : IEncryptionService
     {
         private readonly string _key;

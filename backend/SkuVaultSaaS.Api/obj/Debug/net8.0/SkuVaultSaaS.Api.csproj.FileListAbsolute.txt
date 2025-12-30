@@ -1,3 +1,11 @@
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\obj\Debug\net8.0\SkuVaultSaaS.Api.csproj.AssemblyReference.cache
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\obj\Debug\net8.0\SkuVaultSaaS.Api.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\obj\Debug\net8.0\SkuVaultSaaS.Api.AssemblyInfoInputs.cache
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\obj\Debug\net8.0\SkuVaultSaaS.Api.AssemblyInfo.cs
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\obj\Debug\net8.0\SkuVaultSaaS.Api.csproj.CoreCompileInputs.cache
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\obj\Debug\net8.0\SkuVaultSaaS.Api.MvcApplicationPartsAssemblyInfo.cs
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\obj\Debug\net8.0\SkuVaultSaaS.Api.MvcApplicationPartsAssemblyInfo.cache
+C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\obj\Debug\net8.0\SkuVaultSaaS.Api.sourcelink.json
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\bin\Debug\net8.0\publish\publish\publish\publish\publish\publish\web.config
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\bin\Debug\net8.0\publish\publish\publish\publish\publish\web.config
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\bin\Debug\net8.0\publish\publish\publish\publish\web.config
@@ -173,14 +181,6 @@ C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\bin\Debug\net8.0\SkuVa
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\bin\Debug\net8.0\SkuVaultSaaS.Infrastructure.dll
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\bin\Debug\net8.0\SkuVaultSaaS.Core.pdb
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\bin\Debug\net8.0\SkuVaultSaaS.Infrastructure.pdb
-C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\obj\Debug\net8.0\SkuVaultSaaS.Api.csproj.AssemblyReference.cache
-C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\obj\Debug\net8.0\SkuVaultSaaS.Api.GeneratedMSBuildEditorConfig.editorconfig
-C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\obj\Debug\net8.0\SkuVaultSaaS.Api.AssemblyInfoInputs.cache
-C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\obj\Debug\net8.0\SkuVaultSaaS.Api.AssemblyInfo.cs
-C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\obj\Debug\net8.0\SkuVaultSaaS.Api.csproj.CoreCompileInputs.cache
-C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\obj\Debug\net8.0\SkuVaultSaaS.Api.MvcApplicationPartsAssemblyInfo.cs
-C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\obj\Debug\net8.0\SkuVaultSaaS.Api.MvcApplicationPartsAssemblyInfo.cache
-C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\obj\Debug\net8.0\SkuVaultSaaS.Api.sourcelink.json
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\obj\Debug\net8.0\staticwebassets.build.json
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\obj\Debug\net8.0\staticwebassets.development.json
 C:\Users\dcbau\Code\SkuVaultSaaS\backend\SkuVaultSaaS.Api\obj\Debug\net8.0\staticwebassets\msbuild.SkuVaultSaaS.Api.Microsoft.AspNetCore.StaticWebAssets.props
