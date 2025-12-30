@@ -80,16 +80,40 @@ namespace SkuVaultSaaS.Tools
         {
             _logger.LogInformation("Clearing existing data for customer {CustomerId}", customerId);
             
-            // Delete in reverse dependency order
-            await _context.Transactions.Where(t => t.CustomerId == customerId).ExecuteDeleteAsync();
-            await _context.InventoryMovements.Where(im => im.CustomerId == customerId).ExecuteDeleteAsync();
-            await _context.Sales.Where(s => s.CustomerId == customerId).ExecuteDeleteAsync();
-            await _context.Shipments.Where(s => s.CustomerId == customerId).ExecuteDeleteAsync();
-            await _context.InventoryLevels.Where(il => il.CustomerId == customerId).ExecuteDeleteAsync();
-            await _context.Products.Where(p => p.CustomerId == customerId).ExecuteDeleteAsync();
-            await _context.Locations.Where(l => l.CustomerId == customerId).ExecuteDeleteAsync();
-            
-            await _context.SaveChangesAsync();
+            try
+            {
+                // Delete in reverse dependency order
+                var txnCount = await _context.Transactions.Where(t => t.CustomerId == customerId).ExecuteDeleteAsync();
+                _logger.LogInformation("Deleted {Count} transactions", txnCount);
+                
+                var movCount = await _context.InventoryMovements.Where(im => im.CustomerId == customerId).ExecuteDeleteAsync();
+                _logger.LogInformation("Deleted {Count} inventory movements", movCount);
+                
+                var saleCount = await _context.Sales.Where(s => s.CustomerId == customerId).ExecuteDeleteAsync();
+                _logger.LogInformation("Deleted {Count} sales", saleCount);
+                
+                var shipCount = await _context.Shipments.Where(s => s.CustomerId == customerId).ExecuteDeleteAsync();
+                _logger.LogInformation("Deleted {Count} shipments", shipCount);
+                
+                var invCount = await _context.InventoryLevels.Where(il => il.CustomerId == customerId).ExecuteDeleteAsync();
+                _logger.LogInformation("Deleted {Count} inventory levels", invCount);
+                
+                var prodCount = await _context.Products.Where(p => p.CustomerId == customerId).ExecuteDeleteAsync();
+                _logger.LogInformation("Deleted {Count} products", prodCount);
+                
+                var locCount = await _context.Locations.Where(l => l.CustomerId == customerId).ExecuteDeleteAsync();
+                _logger.LogInformation("Deleted {Count} locations", locCount);
+                
+                // Clear the context to remove any tracked entities from memory
+                _context.ChangeTracker.Clear();
+                
+                _logger.LogInformation("Data cleared successfully for customer {CustomerId}", customerId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error clearing data for customer {CustomerId}", customerId);
+                throw;
+            }
         }
 
         private async Task GenerateLocationsAsync(int customerId, int count)
@@ -249,6 +273,12 @@ namespace SkuVaultSaaS.Tools
             var products = await _context.Products.Where(p => p.CustomerId == customerId).ToListAsync();
             var locations = await _context.Locations.Where(l => l.CustomerId == customerId).ToListAsync();
             
+            // Detach products and locations to avoid navigation issues
+            foreach (var product in products)
+                _context.Entry(product).State = Microsoft.EntityFrameworkCore.EntityState.Detached;
+            foreach (var location in locations)
+                _context.Entry(location).State = Microsoft.EntityFrameworkCore.EntityState.Detached;
+            
             var startDate = DateTime.UtcNow.AddDays(-days);
             
             for (int day = 0; day < days; day++)
@@ -265,15 +295,12 @@ namespace SkuVaultSaaS.Tools
                 await GenerateDailySalesAsync(customerId, products, currentDate, dailyTransactions);
                 await GenerateDailyShipmentsAsync(customerId, currentDate, dailyTransactions);
                 
-                // Save every 7 days to avoid memory issues
-                if (day % 7 == 0)
-                {
-                    await _context.SaveChangesAsync();
-                    _logger.LogInformation("Processed {Day}/{Days} days", day, days);
-                }
+                // Save every day to avoid memory issues and context tracking conflicts
+                await _context.SaveChangesAsync();
+                _context.ChangeTracker.Clear();
             }
             
-            await _context.SaveChangesAsync();
+            _logger.LogInformation("Historical data generation completed");
         }
 
         private async Task GenerateDailyTransactionsAsync(int customerId, List<Product> products, List<Location> locations, DateTime date, int count)
@@ -290,14 +317,13 @@ namespace SkuVaultSaaS.Tools
                 
                 var quantity = transactionType switch
                 {
-                    "Pick" or "Remove" => -_random.Next(1, 10), // Negative for outbound
-                    "Add" or "Create" => _random.Next(1, 50), // Positive for inbound
+                    "Pick" or "Remove" => -_random.Next(1, 10),
+                    "Add" or "Create" => _random.Next(1, 50),
                     _ => _random.Next(-5, 5)
                 };
                 
                 var transactionTime = date.AddHours(_random.Next(8, 18)).AddMinutes(_random.Next(0, 60));
                 
-                // Generate transaction
                 transactions.Add(new Transaction
                 {
                     CustomerId = customerId,
@@ -317,7 +343,6 @@ namespace SkuVaultSaaS.Tools
                     CreatedAtUtc = DateTime.UtcNow
                 });
                 
-                // Generate corresponding inventory movement
                 movements.Add(new InventoryMovement
                 {
                     CustomerId = customerId,
@@ -335,6 +360,12 @@ namespace SkuVaultSaaS.Tools
             
             _context.Transactions.AddRange(transactions);
             _context.InventoryMovements.AddRange(movements);
+        }
+        
+        private string EscapeSql(string? value)
+        {
+            if (string.IsNullOrEmpty(value)) return "";
+            return value.Replace("'", "''");
         }
 
         private async Task GenerateDailySalesAsync(int customerId, List<Product> products, DateTime date, int baseCount)

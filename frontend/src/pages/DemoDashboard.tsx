@@ -41,163 +41,132 @@ export default function DemoDashboard() {
         setLoading(true)
         const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '') || 'http://localhost:5239'
         
-        // Fetch dashboard-related data (doesn't change with date range in this case, but keep for consistency)
-        const dashboardResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/dashboard?dateRange=${dateRange}`, {
-          headers: { 'Content-Type': 'application/json' }
-        })
-        if (dashboardResponse.ok) {
-          const dashboardData = await dashboardResponse.json()
-          setData(dashboardData)
-        }
+        // Only fetch data for the currently selected report
+        switch (currentReport) {
+          case 'dashboard':
+            // Fetch dashboard and top performers
+            const dashboardResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/dashboard?dateRange=${dateRange}`, {
+              headers: { 'Content-Type': 'application/json' }
+            })
+            if (dashboardResponse.ok) {
+              const dashboardData = await dashboardResponse.json()
+              console.log('Dashboard data loaded:', dashboardData)
+              setData(dashboardData)
+            }
 
-        const topPerformersResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/top-performers`, {
-          headers: { 'Content-Type': 'application/json' }
-        })
-        if (topPerformersResponse.ok) {
-          const tpData = await topPerformersResponse.json()
-          setTopPerformers(tpData)
-        }
+            const topPerformersResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/top-performers?dateRange=${dateRange}`, {
+              headers: { 'Content-Type': 'application/json' }
+            })
+            if (topPerformersResponse.ok) {
+              const tpData = await topPerformersResponse.json()
+              setTopPerformers(tpData)
+            }
+            break
 
-        const inventoryResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/inventory`, {
-          headers: { 'Content-Type': 'application/json' }
-        })
-        if (inventoryResponse.ok) {
-          const invData = await inventoryResponse.json()
-          setInventoryData(invData)
-        }
+          case 'inventory':
+            if (!inventoryData) {
+              const inventoryResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/inventory?dateRange=${dateRange}`, {
+                headers: { 'Content-Type': 'application/json' }
+              })
+              if (inventoryResponse.ok) {
+                const invData = await inventoryResponse.json()
+                setInventoryData(invData)
+              }
+            }
+            break
 
-        const lowStockResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/low-stock`, {
-          headers: { 'Content-Type': 'application/json' }
-        })
-        if (lowStockResponse.ok) {
-          const lsData = await lowStockResponse.json()
-          setLowStockData(lsData)
-        }
+          case 'low-stock':
+            if (!lowStockData) {
+              const lowStockResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/low-stock?dateRange=${dateRange}`, {
+                headers: { 'Content-Type': 'application/json' }
+              })
+              if (lowStockResponse.ok) {
+                const lsData = await lowStockResponse.json()
+                setLowStockData(lsData)
+              }
+            }
+            break
 
-        const agingResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/aging-inventory`, {
-          headers: { 'Content-Type': 'application/json' }
-        })
-        if (agingResponse.ok) {
-          const agingData = await agingResponse.json()
-          setAgingInventoryData(agingData)
+          case 'aging-inventory':
+            if (!agingInventoryData) {
+              const agingResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/aging-inventory?dateRange=${dateRange}`, {
+                headers: { 'Content-Type': 'application/json' }
+              })
+              if (agingResponse.ok) {
+                const agingData = await agingResponse.json()
+                setAgingInventoryData(agingData)
+              }
+            }
+            break
+
+          case 'profitability':
+            const profitabilityResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/profitability?dateRange=${dateRange}`, {
+              headers: { 'Content-Type': 'application/json' }
+            })
+            if (profitabilityResponse.ok) {
+              const profData = await profitabilityResponse.json()
+              setProfitabilityData(profData)
+            }
+            break
+
+          case 'demand-forecast':
+            const demandForecastResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/demand-forecast?forecastPeriod=${forecastPeriod}`, {
+              headers: { 'Content-Type': 'application/json' }
+            })
+            if (demandForecastResponse.ok) {
+              const dfData = await demandForecastResponse.json()
+              setDemandForecastData(dfData)
+            }
+            break
+
+          case 'financial-warehouse':
+            if (!financialData) {
+              const financialResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/financial?dateRange=${dateRange}`, {
+                headers: { 'Content-Type': 'application/json' }
+              })
+              if (financialResponse.ok) {
+                const finData = await financialResponse.json()
+                setFinancialData(finData)
+              }
+            }
+            break
+
+          case 'locations':
+            if (!locationData) {
+              const locationResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/locations`, {
+                headers: { 'Content-Type': 'application/json' }
+              })
+              if (locationResponse.ok) {
+                const locData = await locationResponse.json()
+                setLocationData(locData)
+              }
+            }
+            break
+
+          case 'performance-metrics':
+            if (!performanceMetricsData) {
+              const metricsResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/performance-metrics`, {
+                headers: { 'Content-Type': 'application/json' }
+              })
+              if (metricsResponse.ok) {
+                const metData = await metricsResponse.json()
+                setPerformanceMetricsData(metData)
+              }
+            }
+            break
         }
 
         setError(null)
       } catch (err) {
         console.error('Failed to fetch demo data:', err)
-        setError('Unable to load demo data')
+        setError('Unable to load demo data: ' + (err instanceof Error ? err.message : String(err)))
       } finally {
         setLoading(false)
       }
     }
 
     fetchDemoData()
-  }, [])
-
-  // Fetch profitability data when date range changes
-  useEffect(() => {
-    const fetchProfitability = async () => {
-      try {
-        const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '') || 'http://localhost:5239'
-        
-        const profitabilityResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/profitability?dateRange=${dateRange}`, {
-          headers: { 'Content-Type': 'application/json' }
-        })
-        if (profitabilityResponse.ok) {
-          const profData = await profitabilityResponse.json()
-          setProfitabilityData(profData)
-        }
-      } catch (err) {
-        console.error('Failed to fetch profitability data:', err)
-      }
-    }
-
-    fetchProfitability()
-  }, [dateRange])
-
-  // Fetch demand forecast when forecast period changes
-  useEffect(() => {
-    const fetchDemandForecast = async () => {
-      try {
-        const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '') || 'http://localhost:5239'
-        
-        const demandForecastResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/demand-forecast?forecastPeriod=${forecastPeriod}`, {
-          headers: { 'Content-Type': 'application/json' }
-        })
-        if (demandForecastResponse.ok) {
-          const dfData = await demandForecastResponse.json()
-          setDemandForecastData(dfData)
-        }
-      } catch (err) {
-        console.error('Failed to fetch demand forecast data:', err)
-      }
-    }
-
-    fetchDemandForecast()
-  }, [forecastPeriod])
-
-  // Fetch financial data when date range changes
-  useEffect(() => {
-    const fetchFinancial = async () => {
-      try {
-        const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '') || 'http://localhost:5239'
-        
-        const financialResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/financial?dateRange=${dateRange}`, {
-          headers: { 'Content-Type': 'application/json' }
-        })
-        if (financialResponse.ok) {
-          const finData = await financialResponse.json()
-          setFinancialData(finData)
-        }
-      } catch (err) {
-        console.error('Failed to fetch financial data:', err)
-      }
-    }
-
-    fetchFinancial()
-  }, [dateRange])
-
-  // Fetch location data (no date range needed for location analysis)
-  useEffect(() => {
-    const fetchLocations = async () => {
-      try {
-        const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '') || 'http://localhost:5239'
-        
-        const locationResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/locations`, {
-          headers: { 'Content-Type': 'application/json' }
-        })
-        if (locationResponse.ok) {
-          const locData = await locationResponse.json()
-          setLocationData(locData)
-        }
-      } catch (err) {
-        console.error('Failed to fetch location data:', err)
-      }
-    }
-
-    fetchLocations()
-  }, [])
-
-  // Fetch performance metrics
-  useEffect(() => {
-    const fetchPerformanceMetrics = async () => {
-      try {
-        const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '') || 'http://localhost:5239'
-        
-        const metricsResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/performance-metrics`, {
-          headers: { 'Content-Type': 'application/json' }
-        })
-        if (metricsResponse.ok) {
-          const metricsData = await metricsResponse.json()
-          setPerformanceMetricsData(metricsData)
-        }
-      } catch (err) {
-        console.error('Failed to fetch performance metrics:', err)
-      }
-    }
-
-    fetchPerformanceMetrics()
-  }, [])
+  }, [currentReport, dateRange, forecastPeriod, inventoryData, lowStockData, agingInventoryData, financialData, locationData, performanceMetricsData])
 
   // Load tier configuration and report access from backend
   useEffect(() => {
@@ -376,17 +345,24 @@ export default function DemoDashboard() {
 
             {/* KPI Stats */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              {displayData.kpis.map((kpi: any, idx: number) => (
-                <div key={idx} className="bg-white rounded-lg shadow p-6">
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">{kpi.label}</h3>
-                  <p className="text-3xl font-bold text-gray-900 mb-2">
-                    {typeof kpi.value === 'number' ? kpi.value.toLocaleString() : kpi.value}
-                  </p>
-                  <p className={`text-sm font-medium ${kpi.trend && kpi.trend.startsWith('+') ? 'text-green-600' : 'text-gray-600'}`}>
-                    {kpi.trend}
-                  </p>
+              {displayData?.kpis && Array.isArray(displayData.kpis) ? (
+                displayData.kpis.map((kpi: any, idx: number) => (
+                  <div key={idx} className="bg-white rounded-lg shadow p-6">
+                    <h3 className="text-sm font-medium text-gray-500 mb-2">{kpi.label}</h3>
+                    <p className="text-3xl font-bold text-gray-900 mb-2">
+                      {typeof kpi.value === 'number' ? kpi.value.toLocaleString() : kpi.value}
+                    </p>
+                    <p className={`text-sm font-medium ${kpi.trend && kpi.trend.startsWith('+') ? 'text-green-600' : 'text-gray-600'}`}>
+                      {kpi.trend}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <div className="col-span-4 text-center py-8 text-gray-500">
+                  <p>No KPI data available. Check console for details.</p>
+                  <p className="text-xs mt-2">{displayData ? `Data structure: ${JSON.stringify(displayData).substring(0, 200)}` : 'No data'}</p>
                 </div>
-              ))}
+              )}
             </div>
 
             {/* Main Content Grid */}
