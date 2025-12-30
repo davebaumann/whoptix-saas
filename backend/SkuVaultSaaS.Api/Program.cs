@@ -38,6 +38,9 @@ builder.Services.AddScoped<ITwoFactorService, TwoFactorService>();
 // Encryption Service for sensitive credentials (SkuVault passwords/tokens)
 builder.Services.AddScoped<IEncryptionService, AesEncryptionService>();
 
+// Data Migration Service for one-time migrations (e.g., encrypting plaintext credentials)
+builder.Services.AddScoped<DataMigrationService>();
+
 // User Context Service for tenant isolation
 builder.Services.AddScoped<UserContextService>();
 
@@ -245,21 +248,20 @@ builder.Services.AddSwaggerGen(c =>
 // the provider schema is missing optional columns). Enabled so we can reseed on startup.
 builder.Services.AddHostedService<SkuVaultSaaS.Infrastructure.Data.SeedHostedService>();
 
-// CORS for frontend
+// CORS for frontend - configured per environment
 builder.Services.AddCors(options =>
 {
+    // Get allowed origins from configuration (environment-specific)
+    var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() 
+        ?? new[] { "http://localhost:5173" };
+
     options.AddPolicy("FrontendDev", policy =>
     {
-        policy.WithOrigins(
-            "http://localhost:5173", // Vite default
-            "http://127.0.0.1:5173",
-            "https://lemon-coast-0de10660f-preview.eastus2.3.azurestaticapps.net", // Azure Static Web App
-            "https://*.azurestaticapps.net", // Azure Static Web Apps pattern
-            "https://riva-nymphean-followingly.ngrok-free.dev" // ngrok tunnel
-        )
-        .AllowAnyHeader()
-        .AllowAnyMethod()
-        .AllowCredentials();
+        policy
+            .WithOrigins(allowedOrigins)
+            .AllowCredentials()
+            .WithMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+            .WithHeaders("Content-Type", "Authorization", "Accept");
     });
 });
 
@@ -267,6 +269,7 @@ var app = builder.Build();
 
 Console.WriteLine($"=== JUSTSKU API Startup ===");
 Console.WriteLine($"Environment: {app.Environment.EnvironmentName}");
+Console.WriteLine($"CORS Origins: {string.Join(", ", builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? new[] { "localhost:5173" })}");
 
 // Configure static file serving for React app
 // In production, files are in wwwroot; in development, they're in frontend/dist
@@ -313,6 +316,13 @@ app.UseCors("FrontendDev");
 
 // Enable response caching
 app.UseResponseCaching();
+
+// Run data migration to encrypt plaintext credentials (one-time, idempotent)
+using (var scope = app.Services.CreateScope())
+{
+    var dataMigrationService = scope.ServiceProvider.GetRequiredService<DataMigrationService>();
+    await dataMigrationService.EncryptPlaintextSkuVaultCredentialsAsync();
+}
 
 // Enable HTTPS redirection
 if (app.Environment.IsDevelopment())
