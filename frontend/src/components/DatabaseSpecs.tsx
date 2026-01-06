@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { Database, HardDrive, Table, Clock } from 'lucide-react';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5239';
+
 interface TableInfo {
   tableName: string;
   rowCount: number;
@@ -21,7 +23,7 @@ interface DatabaseSpecsData {
 
 const fetchDatabaseSpecs = async (): Promise<DatabaseSpecsData> => {
   const token = localStorage.getItem('token');
-  const response = await fetch('/api/admin/database-specs', {
+  const response = await fetch(`${API_BASE_URL}/api/admin/database-specs`, {
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',

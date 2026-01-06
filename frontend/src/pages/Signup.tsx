@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5239';
+
 interface SignupForm {
   email: string
   password: string
@@ -96,7 +98,7 @@ export default function Signup() {
     }
 
     try {
-      const response = await fetch('/api/auth/signup', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/signup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

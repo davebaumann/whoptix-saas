@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Users, Shield, UserPlus, Edit, Trash2, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5239';
+
 interface User {
   id: string;
   email: string;
@@ -71,7 +73,7 @@ const fetchUsers = async (page: number = 1, pageSize: number = 10, isSystemAdmin
 };
 
 const fetchCustomerUsers = async (): Promise<CustomerUser[]> => {
-  const response = await fetch('/api/userinvitation/customer-users', {
+  const response = await fetch(`${API_BASE_URL}/api/userinvitation/customer-users`, {
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',

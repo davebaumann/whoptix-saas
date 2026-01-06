@@ -12,6 +12,8 @@ using System.Text;
 using System.Text.Json.Serialization;
 using SkuVaultSaaS.Api.Services;
 using SkuVaultSaaS.Core.Models;
+using Amazon.SimpleSystemsManagement;
+using Amazon.SimpleSystemsManagement.Model;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -98,18 +100,97 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
     ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
 // Replace environment variable placeholders
-connectionString = connectionString.Replace("${DB_NAME}", Environment.GetEnvironmentVariable("DB_NAME"));
-connectionString = connectionString.Replace("${DB_USER}", Environment.GetEnvironmentVariable("DB_USER"));
-connectionString = connectionString.Replace("${DB_PASSWORD}", Environment.GetEnvironmentVariable("DB_PASSWORD"));
+var dbHost = Environment.GetEnvironmentVariable("DB_HOST");
+var dbName = Environment.GetEnvironmentVariable("DB_NAME");
+var dbUser = Environment.GetEnvironmentVariable("DB_USER");
+var dbPassword = Environment.GetEnvironmentVariable("DB_PASSWORD");
+
+Console.WriteLine($"[DEBUG] DB_HOST env var: {dbHost}");
+Console.WriteLine($"[DEBUG] DB_NAME env var: {dbName}");
+Console.WriteLine($"[DEBUG] DB_USER env var: {dbUser}");
+Console.WriteLine($"[DEBUG] DB_PASSWORD env var: {(string.IsNullOrEmpty(dbPassword) ? "NOT SET" : "***")}");
+
+connectionString = connectionString.Replace("${DB_HOST}", dbHost);
+connectionString = connectionString.Replace("${DB_NAME}", dbName);
+connectionString = connectionString.Replace("${DB_USER}", dbUser);
+connectionString = connectionString.Replace("${DB_PASSWORD}", dbPassword);
 
 // Log the final connection string for debugging (DO NOT log passwords in production)
-//Console.WriteLine($"[DEBUG] Final DB Connection String: {connectionString}");
+Console.WriteLine($"[DEBUG] Final DB Connection String: Server=***;Database={dbName};User={dbUser};Password=***;...");
 
-// Also handle other configuration substitutions
+// Also handle other configuration substitutions for AllowedHosts
+var allowedHostsEnv = Environment.GetEnvironmentVariable("ALLOWED_HOSTS");
 var allowedHosts = builder.Configuration["AllowedHosts"];
+Console.WriteLine($"[DEBUG] ALLOWED_HOSTS env var: {allowedHostsEnv}");
+Console.WriteLine($"[DEBUG] AllowedHosts config before: {allowedHosts}");
+
 if (!string.IsNullOrEmpty(allowedHosts) && allowedHosts.Contains("${ALLOWED_HOSTS}"))
 {
-    builder.Configuration["AllowedHosts"] = allowedHosts.Replace("${ALLOWED_HOSTS}", Environment.GetEnvironmentVariable("ALLOWED_HOSTS"));
+    var replacement = allowedHostsEnv ?? "justsku.com;*.justsku.com";
+    var newAllowedHosts = allowedHosts.Replace("${ALLOWED_HOSTS}", replacement);
+    builder.Configuration["AllowedHosts"] = newAllowedHosts;
+    Console.WriteLine($"[DEBUG] AllowedHosts config after: {newAllowedHosts}");
+}
+
+// Handle SeedAdmin environment variable substitution
+var adminEmail = Environment.GetEnvironmentVariable("ADMIN_EMAIL");
+var adminPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD");
+Console.WriteLine($"[DEBUG] ADMIN_EMAIL env var: {adminEmail ?? "NOT_SET"}");
+Console.WriteLine($"[DEBUG] ADMIN_PASSWORD env var: {(string.IsNullOrEmpty(adminPassword) ? "NOT_SET" : "SET")}");
+if (!string.IsNullOrEmpty(adminEmail))
+{
+    builder.Configuration["SeedAdmin:Email"] = adminEmail;
+    Console.WriteLine($"[DEBUG] Set SeedAdmin:Email = {adminEmail}");
+}
+if (!string.IsNullOrEmpty(adminPassword))
+{
+    builder.Configuration["SeedAdmin:Password"] = adminPassword;
+    Console.WriteLine($"[DEBUG] Set SeedAdmin:Password");
+}
+var seedDatabaseConfig = builder.Configuration["SeedDatabase"];
+Console.WriteLine($"[DEBUG] SeedDatabase config: {seedDatabaseConfig}");
+
+// Fetch Stripe keys from AWS Parameter Store
+Console.WriteLine("[INFO] Attempting to fetch Stripe keys from AWS Parameter Store...");
+try
+{
+    var ssm = new AmazonSimpleSystemsManagementClient();
+    
+    // Fetch Stripe Secret Key
+    try
+    {
+        var secretKeyParam = ssm.GetParameterAsync(new GetParameterRequest 
+        { 
+            Name = "stripe-secret-key", 
+            WithDecryption = true 
+        }).GetAwaiter().GetResult();
+        builder.Configuration["Stripe:SecretKey"] = secretKeyParam.Parameter.Value;
+        Console.WriteLine("[INFO] Stripe Secret Key loaded from Parameter Store");
+    }
+    catch (Exception ex) when (ex.Message.Contains("ParameterNotFound") || ex is Amazon.SimpleSystemsManagement.AmazonSimpleSystemsManagementException)
+    {
+        Console.WriteLine("[WARN] Stripe Secret Key not found in Parameter Store, using environment/config value");
+    }
+    
+    // Fetch Stripe Webhook Secret
+    try
+    {
+        var webhookParam = ssm.GetParameterAsync(new GetParameterRequest 
+        { 
+            Name = "stripe-webhook-secret", 
+            WithDecryption = true 
+        }).GetAwaiter().GetResult();
+        builder.Configuration["Stripe:WebhookSecret"] = webhookParam.Parameter.Value;
+        Console.WriteLine("[INFO] Stripe Webhook Secret loaded from Parameter Store");
+    }
+    catch (Exception ex) when (ex.Message.Contains("ParameterNotFound") || ex is Amazon.SimpleSystemsManagement.AmazonSimpleSystemsManagementException)
+    {
+        Console.WriteLine("[WARN] Stripe Webhook Secret not found in Parameter Store, using environment/config value");
+    }
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"[WARN] Error fetching from Parameter Store: {ex.Message}. Continuing with environment variables.");
 }
 
 // Add DbContext with optimized connection pooling
@@ -297,6 +378,30 @@ app.UseSwaggerUI(c =>
     c.RoutePrefix = "swagger";
 });
 
+// Add global exception handler for generic error responses (security hardening)
+app.UseExceptionHandler(exceptionHandlerApp =>
+{
+    exceptionHandlerApp.Run(async context =>
+    {
+        var exception = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
+        var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+        
+        logger.LogError(exception, "Unhandled exception in request");
+        
+        context.Response.ContentType = "application/json";
+        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        
+        var isDevelopment = app.Environment.IsDevelopment();
+        var errorResponse = SkuVaultSaaS.Api.Models.ErrorResponse.InternalError(
+            message: "An error occurred processing your request.",
+            details: isDevelopment ? exception?.Message : null,
+            stackTrace: isDevelopment ? exception?.StackTrace : null
+        );
+        
+        await context.Response.WriteAsJsonAsync(errorResponse);
+    });
+});
+
 // Add security headers
 app.Use(async (context, next) =>
 {
@@ -313,6 +418,14 @@ app.Use(async (context, next) =>
 });
 
 app.UseCors("FrontendDev");
+
+// Rate limiting middleware (prevent DOS and brute force attacks)
+app.UseMiddleware<SkuVaultSaaS.Api.Middleware.RateLimitingMiddleware>(
+    new SkuVaultSaaS.Api.Middleware.RateLimitOptions 
+    { 
+        WindowSeconds = 60,        // 1 minute window
+        MaxRequests = 100          // 100 requests per minute per user/IP
+    });
 
 // Enable response caching
 app.UseResponseCaching();

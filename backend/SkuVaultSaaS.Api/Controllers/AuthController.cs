@@ -451,7 +451,7 @@ namespace SkuVaultSaaS.Api.Controllers
 
             // Generate email confirmation token
             var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-            var confirmationLink = $"{Request.Scheme}://{Request.Host}/api/auth/confirm-email?userId={user.Id}&token={Uri.EscapeDataString(token)}";
+            var confirmationLink = $"{Request.Scheme}://api.justsku.com/api/auth/confirm-email?userId={user.Id}&token={Uri.EscapeDataString(token)}";
 
             // Send verification email (don't await to avoid blocking signup)
             _ = Task.Run(async () =>
@@ -490,7 +490,7 @@ namespace SkuVaultSaaS.Api.Controllers
             if (user.EmailConfirmed)
             {
                 // Already confirmed, redirect to account setup (tier selection)
-                return Redirect("/app/account-setup");
+                return Redirect("https://justsku.com/app/account-setup");
             }
 
             var result = await _userManager.ConfirmEmailAsync(user, token);
@@ -504,7 +504,7 @@ namespace SkuVaultSaaS.Api.Controllers
             
             // Redirect to frontend account setup page with token
             // Frontend will store the token and show tier selection
-            return Redirect($"/app/account-setup?token={Uri.EscapeDataString(jwtToken)}");
+            return Redirect($"https://justsku.com/app/account-setup?token={Uri.EscapeDataString(jwtToken)}");
         }
 
         [HttpPost("resend-verification")]
@@ -529,7 +529,7 @@ namespace SkuVaultSaaS.Api.Controllers
 
             // Generate new email confirmation token
             var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-            var confirmationLink = $"{Request.Scheme}://{Request.Host}/api/auth/confirm-email?userId={user.Id}&token={Uri.EscapeDataString(token)}";
+            var confirmationLink = $"{Request.Scheme}://api.justsku.com/api/auth/confirm-email?userId={user.Id}&token={Uri.EscapeDataString(token)}";
 
             // Send verification email (don't await to avoid blocking)
             _ = Task.Run(async () =>

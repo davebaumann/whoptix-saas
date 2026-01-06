@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { Trash2, AlertTriangle, Clock } from 'lucide-react';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5239';
+
 interface PurgeEligibleCustomer {
   id: number;
   name: string;
@@ -11,7 +13,7 @@ interface PurgeEligibleCustomer {
 
 const fetchPurgeEligibleCustomers = async (): Promise<PurgeEligibleCustomer[]> => {
   const token = localStorage.getItem('token');
-  const response = await fetch('/api/admin/purge-eligible', {
+  const response = await fetch(`${API_BASE_URL}/api/admin/purge-eligible`, {
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',

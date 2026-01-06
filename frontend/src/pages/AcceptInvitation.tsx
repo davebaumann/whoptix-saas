@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertCircle, CheckCircle } from 'lucide-react';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5239';
+
 export default function AcceptInvitation() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -81,7 +83,7 @@ export default function AcceptInvitation() {
     setLoading(true);
 
     try {
-      const response = await fetch('/api/userinvitation/complete', {
+      const response = await fetch(`${API_BASE_URL}/api/userinvitation/complete`, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -115,7 +117,7 @@ export default function AcceptInvitation() {
     setLoading(true);
 
     try {
-      const response = await fetch('/api/userinvitation/complete', {
+      const response = await fetch(`${API_BASE_URL}/api/userinvitation/complete`, {
         method: 'POST',
         credentials: 'include',
         headers: {

@@ -1,0 +1,90 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REGISTRY: 324152623799.dkr.ecr.us-east-1.amazonaws.com
+  IMAGE_NAME: justsku-api
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build Docker image
+        working-directory: ./backend
+        run: |
+          docker build -t ${{ env.ECR_REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+            -t ${{ env.ECR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} .
+
+      - name: Push image to ECR
+        run: |
+          docker push ${{ env.ECR_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          docker push ${{ env.ECR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+      - name: Update EC2 instance
+        run: |
+          # Get EC2 instance ID from AWS
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=justsku-api" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text)
+          
+          # Send command to pull new image and restart
+          aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=[
+              "docker pull ${{ env.ECR_REGISTRY }}/${{ env.IMAGE_NAME }}:latest",
+              "docker stop justsku-api || true",
+              "docker rm justsku-api || true",
+              "docker run -d --name justsku-api \
+                -p 127.0.0.1:8080:8080 \
+                --env-file /home/ubuntu/.env.production \
+                --restart always \
+                ${{ env.ECR_REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+            ]'
+
+      - name: Build and deploy frontend
+        if: success()
+        working-directory: ./frontend
+        run: |
+          npm ci
+          npm run build
+          aws s3 sync dist/ s3://justsku-frontend --delete
+          
+          # Invalidate CloudFront cache
+          DISTRIBUTION_ID=$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?DefaultCacheBehavior.TargetOriginId=='justsku-frontend-s3'].Id" \
+            --output text)
+          
+          if [ ! -z "$DISTRIBUTION_ID" ]; then
+            aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths "/*"
+          fi
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          STATUS=${{ job.status }}
+          echo "Deployment $STATUS"

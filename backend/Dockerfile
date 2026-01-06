@@ -3,7 +3,7 @@ WORKDIR /src
 
 # Copy project files
 COPY ["SkuVaultSaaS.Api/SkuVaultSaaS.Api.csproj", "SkuVaultSaaS.Api/"]
-COPY ["SkuVaultSaas.Core/SkuVaultSaas.Core.csproj", "SkuVaultSaas.Core/"]
+COPY ["SkuVaultSaas.Core/SkuVaultSaaS.Core.csproj", "SkuVaultSaas.Core/"]
 COPY ["SkuVaultSaaS.Infrastructure/SkuVaultSaaS.Infrastructure.csproj", "SkuVaultSaaS.Infrastructure/"]
 
 # Restore dependencies
