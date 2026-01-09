@@ -26,12 +26,16 @@ namespace SkuVaultSaaS.Api.Middleware
             _logger.LogInformation("DemoAuthMiddleware: Processing request to {Path} with query string: {QueryString}", 
                 context.Request.Path, context.Request.QueryString);
 
-            // Check if this is a demo request with demo=true query parameter
-            var isDemoRequest = context.Request.Query.TryGetValue("demo", out var demoValue) 
+            // Check if this is a demo request:
+            // 1. Path starts with /api/demo/ (dedicated demo endpoints)
+            // 2. OR demo=true query parameter is present
+            var isDemoPath = context.Request.Path.StartsWithSegments("/api/demo");
+            var isDemoQuery = context.Request.Query.TryGetValue("demo", out var demoValue) 
                 && demoValue == "true";
+            var isDemoRequest = isDemoPath || isDemoQuery;
 
-            _logger.LogInformation("DemoAuthMiddleware: isDemoRequest={IsDemoRequest}, demoValue={DemoValue}", 
-                isDemoRequest, demoValue.ToString());
+            _logger.LogInformation("DemoAuthMiddleware: isDemoRequest={IsDemoRequest}, isDemoPath={IsDemoPath}, isDemoQuery={isDemoQuery}, demoValue={DemoValue}", 
+                isDemoRequest, isDemoPath, isDemoQuery, demoValue.ToString());
 
             if (isDemoRequest)
             {

@@ -4,6 +4,8 @@ export interface MembershipLevel {
   Enterprise: 4;
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5239';
+
 export interface MembershipTier {
   level: number;
   name: string;
@@ -42,7 +44,7 @@ export const MEMBERSHIP_LEVELS = {
 
 export const membershipService = {
   async getMembershipInfo(customerId: number): Promise<MembershipInfo> {
-    const url = `/api/membership/customer/${customerId}`;
+    const url = `${API_BASE_URL}/api/membership/customer/${customerId}`;
     console.log('membershipService: Fetching from', url);
     const response = await fetch(url, {
       credentials: 'include'
@@ -111,7 +113,7 @@ export const membershipService = {
   },
 
   async getAllCustomersWithMembership(): Promise<CustomerWithMembership[]> {
-    const response = await fetch(`/api/membership/admin/customers`, {
+    const response = await fetch(`${API_BASE_URL}/api/membership/admin/customers`, {
       credentials: 'include'
     });
     
@@ -123,7 +125,7 @@ export const membershipService = {
   },
 
   async updateMembership(customerId: number, newLevel: number, reason?: string) {
-    const response = await fetch(`/api/membership/admin/update`, {
+    const response = await fetch(`${API_BASE_URL}/api/membership/admin/update`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

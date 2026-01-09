@@ -1,0 +1,16 @@
+{
+  "routes": [
+    {
+      "route": "/*",
+      "serve": "index.html",
+      "statusCode": 200
+    }
+  ],
+  "responseOverrides": {
+    "400": "/index.html",
+    "404": "/index.html"
+  },
+  "globalHeaders": {
+    "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.justsku.com https://uat-api.justsku.com https://api.stripe.com https://m.stripe.network https://m.stripe.com; frame-src https://js.stripe.com"
+  }
+}

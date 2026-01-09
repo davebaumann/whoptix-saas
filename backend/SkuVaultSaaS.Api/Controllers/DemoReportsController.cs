@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SkuVaultSaaS.Infrastructure.Data;
+using SkuVaultSaaS.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace SkuVaultSaaS.Api.Controllers
@@ -17,11 +18,30 @@ namespace SkuVaultSaaS.Api.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly ILogger<DemoReportsController> _logger;
+        private readonly IDemoConnectionService _demoConnectionService;
+        private readonly IConfiguration _configuration;
 
-        public DemoReportsController(ApplicationDbContext context, ILogger<DemoReportsController> logger)
+        public DemoReportsController(
+            ApplicationDbContext context, 
+            ILogger<DemoReportsController> logger,
+            IDemoConnectionService demoConnectionService,
+            IConfiguration configuration)
         {
             _context = context;
             _logger = logger;
+            _demoConnectionService = demoConnectionService;
+            _configuration = configuration;
+        }
+
+        /// <summary>
+        /// Get the demo database context
+        /// </summary>
+        private ApplicationDbContext GetDemoContext()
+        {
+            var connectionString = _demoConnectionService.GetConnectionString(null); // Demo users have no User principal
+            var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
+            optionsBuilder.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
+            return new ApplicationDbContext(optionsBuilder.Options);
         }
 
         /// <summary>
@@ -33,6 +53,7 @@ namespace SkuVaultSaaS.Api.Controllers
             _logger.LogInformation($"DemoReportsController.GetDemoDashboard: Called with dateRange={dateRange}");
             try
             {
+                var demoContext = GetDemoContext();
                 var customerId = 2; // Hard-coded demo customer
 
                 var now = DateTime.UtcNow;
@@ -46,12 +67,12 @@ namespace SkuVaultSaaS.Api.Controllers
                     ? now.AddDays(-1).Date.AddDays(1).AddTicks(-1) 
                     : now;
 
-                var transactions = await _context.Transactions
+                var transactions = await demoContext.Transactions
                     .Where(t => t.CustomerId == customerId && t.TransactionDate >= startDate && t.TransactionDate <= endDate)
                     .Select(t => new { t.Id, t.Quantity })
                     .ToListAsync();
 
-                var recentTransactions = await _context.Transactions
+                var recentTransactions = await demoContext.Transactions
                     .Where(t => t.CustomerId == customerId && t.TransactionDate >= startDate && t.TransactionDate <= endDate)
                     .OrderByDescending(t => t.TransactionDate)
                     .Take(10)
@@ -66,7 +87,7 @@ namespace SkuVaultSaaS.Api.Controllers
                     })
                     .ToListAsync();
 
-                var movements = await _context.InventoryMovements
+                var movements = await demoContext.InventoryMovements
                     .Where(im => im.CustomerId == customerId && im.OccurredAtUtc >= startDate && im.OccurredAtUtc <= endDate)
                     .Select(im => new { im.QuantityChange, im.TransactionType, im.PerformedBy })
                     .ToListAsync();
@@ -140,10 +161,11 @@ namespace SkuVaultSaaS.Api.Controllers
         {
             try
             {
+                var demoContext = GetDemoContext();
                 var customerId = 2;
 
                 // Only select needed columns to reduce memory usage
-                var inventoryLevels = await _context.InventoryLevels
+                var inventoryLevels = await demoContext.InventoryLevels
                     .Where(il => il.CustomerId == customerId && il.QuantityAvailable > 0)
                     .Select(il => new
                     {
@@ -159,7 +181,7 @@ namespace SkuVaultSaaS.Api.Controllers
                     })
                     .ToListAsync();
 
-                var lowStockThresholds = await _context.LowStockThresholds
+                var lowStockThresholds = await demoContext.LowStockThresholds
                     .Where(lst => lst.CustomerId == customerId && lst.IsActive)
                     .Select(lst => new { lst.ProductId, lst.LocationId, lst.ThresholdQuantity })
                     .ToListAsync();
@@ -218,10 +240,11 @@ namespace SkuVaultSaaS.Api.Controllers
         {
             try
             {
+                var demoContext = GetDemoContext();
                 var customerId = 2;
 
                 // Only select needed columns to reduce memory usage
-                var inventoryLevels = await _context.InventoryLevels
+                var inventoryLevels = await demoContext.InventoryLevels
                     .Where(il => il.CustomerId == customerId)
                     .Select(il => new
                     {
@@ -235,7 +258,7 @@ namespace SkuVaultSaaS.Api.Controllers
                     })
                     .ToListAsync();
 
-                var lowStockThresholds = await _context.LowStockThresholds
+                var lowStockThresholds = await demoContext.LowStockThresholds
                     .Where(lst => lst.CustomerId == customerId && lst.IsActive)
                     .Select(lst => new { lst.ProductId, lst.LocationId, lst.ThresholdQuantity })
                     .ToListAsync();
@@ -306,9 +329,10 @@ namespace SkuVaultSaaS.Api.Controllers
         {
             try
             {
+                var demoContext = GetDemoContext();
                 var customerId = 2;
 
-                var inventoryLevels = await _context.InventoryLevels
+                var inventoryLevels = await demoContext.InventoryLevels
                     .Where(il => il.CustomerId == customerId)
                     .Include(il => il.Product)
                     .Include(il => il.Location)
@@ -366,6 +390,7 @@ namespace SkuVaultSaaS.Api.Controllers
         {
             try
             {
+                var demoContext = GetDemoContext();
                 var customerId = 2;
                 var now = DateTime.UtcNow;
                 
@@ -393,7 +418,7 @@ namespace SkuVaultSaaS.Api.Controllers
                 _logger.LogInformation($"DemoProfitability: fetching for range {dateRange}, startDate={startDate}, endDate={endDate}");
 
                 // First, let's see what transaction types exist for customer 2
-                var allTransactions = await _context.Transactions
+                var allTransactions = await demoContext.Transactions
                     .Where(t => t.CustomerId == customerId && t.TransactionDate >= startDate && t.TransactionDate < endDate)
                     .ToListAsync();
                 
@@ -405,9 +430,9 @@ namespace SkuVaultSaaS.Api.Controllers
                 }
 
                 // Get sales data with products
-                var transactions = await _context.Transactions
+                var transactions = await demoContext.Transactions
                     .Where(t => t.CustomerId == customerId && t.TransactionType == "Sale" && t.TransactionDate >= startDate && t.TransactionDate < endDate)
-                    .Join(_context.Products,
+                    .Join(demoContext.Products,
                         t => t.ProductId,
                         p => p.Id,
                         (t, p) => new { Transaction = t, Product = p })
@@ -506,6 +531,7 @@ namespace SkuVaultSaaS.Api.Controllers
             _logger.LogInformation("DemoReportsController.GetDemoTopPerformers: Called with dateRange={DateRange}", dateRange);
             try
             {
+                var demoContext = GetDemoContext();
                 var customerId = 2;
                 var now = DateTime.UtcNow;
                 
@@ -520,7 +546,7 @@ namespace SkuVaultSaaS.Api.Controllers
                     : now;
 
                 // Filter in database query, not in memory
-                var movements = await _context.InventoryMovements
+                var movements = await demoContext.InventoryMovements
                     .Where(im => im.CustomerId == customerId && im.OccurredAtUtc >= startDate && im.OccurredAtUtc <= endDate)
                     .Select(m => new { m.PerformedBy, m.TransactionType, m.OccurredAtUtc })
                     .ToListAsync();

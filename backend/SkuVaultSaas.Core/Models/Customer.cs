@@ -23,5 +23,9 @@ namespace SkuVaultSaaS.Core.Models
         public bool IsActive { get; set; } = true;
         public DateTime? CancelledAt { get; set; }
         public DateTime? ScheduledForDeletion { get; set; }
+        
+        // Audit timestamps
+        public DateTime CreatedAtUtc { get; set; }
+        public DateTime UpdatedAtUtc { get; set; }
     }
 }

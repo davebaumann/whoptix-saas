@@ -29,4 +29,11 @@
     <ProjectReference Include="..\SkuVaultSaaS.Infrastructure\SkuVaultSaaS.Infrastructure.csproj" />
   </ItemGroup>
 
+  <!-- Include appsettings files in publish output -->
+  <ItemGroup>
+    <None Update="appsettings*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

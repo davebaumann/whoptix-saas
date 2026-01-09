@@ -100,15 +100,9 @@ export default function LandingPageAB() {
                 Enhance My SkuVault
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Link>
-              <a 
-                href="#proof" 
-                className="border border-gray-300 text-gray-700 hover:border-gray-400 px-8 py-4 rounded-lg text-lg font-semibold transition-colors"
-              >
-                See Customer Results
-              </a>
             </div>
             <p className="text-sm text-gray-500 mt-4">
-              ✓ Works with your existing SkuVault ✓ 30-day money back guarantee
+              ✓ Works with your existing SkuVault ✓ 14-day money back guarantee
             </p>
           </div>
         </div>
@@ -175,10 +169,6 @@ export default function LandingPageAB() {
               Real Results from Real SkuVault Users
             </h2>
             <div className="flex justify-center items-center space-x-8 mb-8">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-green-600">847+</div>
-                <div className="text-sm text-gray-600">SkuVault Users</div>
-              </div>
               <div className="text-center">
                 <div className="text-3xl font-bold text-blue-600">23%</div>
                 <div className="text-sm text-gray-600">Avg Efficiency Gain</div>
@@ -486,7 +476,7 @@ export default function LandingPageAB() {
               </p>
             </div>
             <p className="text-gray-600 mb-4">
-              ✓ 30-day money back guarantee ✓ Cancel anytime
+              ✓ 14-day money back guarantee ✓ Cancel anytime
             </p>
           </div>
         </div>
@@ -499,7 +489,7 @@ export default function LandingPageAB() {
             Ready to Enhance Your SkuVault Experience?
           </h2>
           <p className="text-xl text-blue-100 mb-8">
-            Join 847+ SkuVault users who've added powerful reporting and analytics to their warehouse operations.
+            Join innovative warehouse teams taking control of their data with powerful reporting and analytics.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link 
@@ -511,7 +501,7 @@ export default function LandingPageAB() {
             </Link>
           </div>
           <p className="text-sm text-blue-100 mt-4">
-            ⚡ Setup in 5 minutes ⚡ See results immediately ⚡ 30-day money-back guarantee
+            ⚡ Setup in 5 minutes ⚡ See results immediately ⚡ 14-day money-back guarantee
           </p>
         </div>
       </section>

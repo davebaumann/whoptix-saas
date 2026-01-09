@@ -9,6 +9,9 @@ namespace SkuVaultSaaS.Infrastructure.Services
     public interface IEmailService
     {
         Task SendLowStockNotificationAsync(string toEmail, string customerName, List<LowStockEmailItem> lowStockItems);
+        Task SendSuggestionEmailAsync(string userEmail, string message);
+        Task SendContactInquiryAsync(string userEmail, string subject, string message);
+        Task SendTechSupportRequestAsync(string userEmail, string priority, string category, string subject, string message);
     }
 
     public class EmailService : IEmailService
@@ -22,12 +25,206 @@ namespace SkuVaultSaaS.Infrastructure.Services
             _logger = logger;
         }
 
-        public async Task SendLowStockNotificationAsync(string toEmail, string customerName, List<LowStockEmailItem> lowStockItems)
+        private async Task SendEmailAsync(MimeMessage mimeMessage)
+        {
+            using var client = new SmtpClient();
+            
+            // ZeptoMail specific configuration
+            client.SslProtocols = System.Security.Authentication.SslProtocols.Tls12;
+            await client.ConnectAsync(_emailSettings.SmtpHost, _emailSettings.SmtpPort, false);
+            await client.AuthenticateAsync(_emailSettings.Username, _emailSettings.Password);
+            await client.SendAsync(mimeMessage);
+            await client.DisconnectAsync(true);
+        }
+
+        public async Task SendContactInquiryAsync(string userEmail, string subject, string message)
         {
             try
             {
+                var mimeMessage = new MimeMessage();
+                var fromEmail = _emailSettings.GetEmailAddress("Support");
+                mimeMessage.From.Add(new MailboxAddress(_emailSettings.FromName, fromEmail));
+                mimeMessage.To.Add(new MailboxAddress("JUSTSKU Support", _emailSettings.ReplyToEmail));
+                mimeMessage.Subject = $"Contact Inquiry from {userEmail}";
+
+                var bodyBuilder = new BodyBuilder
+                {
+                    HtmlBody = $@"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <title>Contact Inquiry</title>
+</head>
+<body style='font-family: Arial, sans-serif; line-height: 1.6; margin: 0; padding: 0; background-color: #f4f4f4;'>
+    <div style='max-width: 600px; margin: 0 auto; background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1);'>
+        <div style='text-align: center; margin-bottom: 30px; border-bottom: 3px solid #2ecc71; padding-bottom: 20px;'>
+            <h1 style='color: #2ecc71; margin: 0;'>📧 Contact Inquiry</h1>
+        </div>
+        
+        <div style='margin-bottom: 20px;'>
+            <p style='margin: 0 0 10px 0; color: #333;'><strong>From:</strong> {userEmail}</p>
+            <p style='margin: 0 0 10px 0; color: #333;'><strong>Subject:</strong> {subject}</p>
+            <p style='margin: 0 0 20px 0; color: #333;'><strong>Received:</strong> {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC</p>
+        </div>
+
+        <div style='background-color: #ecf0f1; border: 1px solid #bdc3c7; padding: 15px; border-radius: 4px; margin: 20px 0;'>
+            <p style='margin: 0; color: #2c3e50; white-space: pre-wrap; word-wrap: break-word;'>{message}</p>
+        </div>
+
+        <div style='text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;'>
+            <p style='color: #888; font-size: 12px; margin: 0;'>
+                This is an automated notification from your JUSTSKU contact form.
+            </p>
+        </div>
+    </div>
+</body>
+</html>"
+                };
+                mimeMessage.Body = bodyBuilder.ToMessageBody();
+
+                await SendEmailAsync(mimeMessage);
+                
+                _logger.LogInformation("Contact inquiry email sent from {Email}", userEmail);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send contact inquiry email from {Email}", userEmail);
+                throw;
+            }
+        }
+
+        public async Task SendTechSupportRequestAsync(string userEmail, string priority, string category, string subject, string message)
+        {
+            try
+            {
+                var mimeMessage = new MimeMessage();
+                var fromEmail = _emailSettings.GetEmailAddress("Support");
+                mimeMessage.From.Add(new MailboxAddress(_emailSettings.FromName, fromEmail));
+                mimeMessage.To.Add(new MailboxAddress("JUSTSKU Tech Support", _emailSettings.ReplyToEmail));
+                mimeMessage.Subject = $"[{priority.ToUpper()}] Tech Support: {category} - {subject}";
+
+                var bodyBuilder = new BodyBuilder
+                {
+                    HtmlBody = $@"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <title>Tech Support Request</title>
+</head>
+<body style='font-family: Arial, sans-serif; line-height: 1.6; margin: 0; padding: 0; background-color: #f4f4f4;'>
+    <div style='max-width: 600px; margin: 0 auto; background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1);'>
+        <div style='text-align: center; margin-bottom: 30px; border-bottom: 3px solid #e74c3c; padding-bottom: 20px;'>
+            <h1 style='color: #e74c3c; margin: 0;'>🔧 Tech Support Request</h1>
+        </div>
+        
+        <div style='margin-bottom: 20px;'>
+            <p style='margin: 0 0 10px 0; color: #333;'><strong>From:</strong> {userEmail}</p>
+            <p style='margin: 0 0 10px 0; color: #333;'><strong>Priority:</strong> <span style='color: {(priority.ToLower() == "critical" ? "red" : priority.ToLower() == "high" ? "orange" : "green")};'>{priority.ToUpper()}</span></p>
+            <p style='margin: 0 0 10px 0; color: #333;'><strong>Category:</strong> {category}</p>
+            <p style='margin: 0 0 10px 0; color: #333;'><strong>Subject:</strong> {subject}</p>
+            <p style='margin: 0 0 20px 0; color: #333;'><strong>Received:</strong> {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC</p>
+        </div>
+
+        <div style='background-color: #ecf0f1; border: 1px solid #bdc3c7; padding: 15px; border-radius: 4px; margin: 20px 0;'>
+            <p style='margin: 0; color: #2c3e50; white-space: pre-wrap; word-wrap: break-word;'>{message}</p>
+        </div>
+
+        <div style='text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;'>
+            <p style='color: #888; font-size: 12px; margin: 0;'>
+                This is an automated notification from your JUSTSKU support system.
+            </p>
+        </div>
+    </div>
+</body>
+</html>"
+                };
+                mimeMessage.Body = bodyBuilder.ToMessageBody();
+
+                await SendEmailAsync(mimeMessage);
+                
+                _logger.LogInformation("Tech support request email sent from {Email}", userEmail);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send tech support request email from {Email}", userEmail);
+                throw;
+            }
+        }
+
+        public async Task SendSuggestionEmailAsync(string userEmail, string message)
+        {
+            try
+            {
+                var mimeMessage = new MimeMessage();
+                var fromEmail = _emailSettings.GetEmailAddress("Support");
+                mimeMessage.From.Add(new MailboxAddress(_emailSettings.FromName, fromEmail));
+                mimeMessage.To.Add(new MailboxAddress("JUSTSKU Support", _emailSettings.ReplyToEmail));
+                mimeMessage.Subject = $"New Suggestion from {userEmail}";
+
+                var bodyBuilder = new BodyBuilder
+                {
+                    HtmlBody = $@"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <title>New Suggestion</title>
+</head>
+<body style='font-family: Arial, sans-serif; line-height: 1.6; margin: 0; padding: 0; background-color: #f4f4f4;'>
+    <div style='max-width: 600px; margin: 0 auto; background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1);'>
+        <div style='text-align: center; margin-bottom: 30px; border-bottom: 3px solid #3498db; padding-bottom: 20px;'>
+            <h1 style='color: #3498db; margin: 0;'>💡 New Suggestion Received</h1>
+        </div>
+        
+        <div style='margin-bottom: 20px;'>
+            <p style='margin: 0 0 10px 0; color: #333;'><strong>From:</strong> {userEmail}</p>
+            <p style='margin: 0 0 20px 0; color: #333;'><strong>Received:</strong> {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC</p>
+        </div>
+
+        <div style='background-color: #ecf0f1; border: 1px solid #bdc3c7; padding: 15px; border-radius: 4px; margin: 20px 0;'>
+            <p style='margin: 0; color: #2c3e50; white-space: pre-wrap; word-wrap: break-word;'>{message}</p>
+        </div>
+
+        <div style='text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;'>
+            <p style='color: #888; font-size: 12px; margin: 0;'>
+                This is an automated notification from your JUSTSKU feedback system.
+            </p>
+        </div>
+    </div>
+</body>
+</html>"
+                };
+                mimeMessage.Body = bodyBuilder.ToMessageBody();
+
+                await SendEmailAsync(mimeMessage);
+                
+                _logger.LogInformation("Suggestion email sent from {Email}", userEmail);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send suggestion email from {Email}", userEmail);
+                throw;
+            }
+        }
+
+        public async Task SendLowStockNotificationAsync(string toEmail, string customerName, List<LowStockEmailItem> lowStockItems)
+        {
+            _logger.LogDebug("Starting to send low stock notification to {Email} for {CustomerName}", toEmail, customerName);
+            
+            try
+            {
                 var message = new MimeMessage();
-                message.From.Add(new MailboxAddress(_emailSettings.FromName, _emailSettings.FromEmail));
+                var fromEmail = _emailSettings.GetEmailAddress("LowStockNotification");
+                
+                message.From.Add(new MailboxAddress(_emailSettings.FromName, fromEmail));
+                
+                if (_emailSettings.ShouldAddReplyTo(fromEmail))
+                {
+                    message.ReplyTo.Add(new MailboxAddress(_emailSettings.FromName, _emailSettings.ReplyToEmail));
+                }
+                
                 message.To.Add(new MailboxAddress(customerName, toEmail));
                 message.Subject = $"Low Stock Alert for {customerName}";
 
@@ -37,21 +234,7 @@ namespace SkuVaultSaaS.Infrastructure.Services
                 };
                 message.Body = bodyBuilder.ToMessageBody();
 
-                using var client = new SmtpClient();
-                
-                // Determine the correct security options based on port
-                var secureSocketOptions = _emailSettings.SmtpPort switch
-                {
-                    465 => SecureSocketOptions.SslOnConnect, // SMTPS
-                    587 => SecureSocketOptions.StartTls,     // SMTP with STARTTLS
-                    25 => SecureSocketOptions.Auto,          // Plain SMTP (auto-detect)
-                    _ => SecureSocketOptions.Auto
-                };
-
-                await client.ConnectAsync(_emailSettings.SmtpHost, _emailSettings.SmtpPort, secureSocketOptions);
-                await client.AuthenticateAsync(_emailSettings.Username, _emailSettings.Password);
-                await client.SendAsync(message);
-                await client.DisconnectAsync(true);
+                await SendEmailAsync(message);
                 
                 _logger.LogInformation("Low stock notification email sent to {Email} for customer {CustomerName}", 
                     toEmail, customerName);
@@ -80,7 +263,6 @@ namespace SkuVaultSaaS.Infrastructure.Services
 <html>
 <head>
     <meta charset='utf-8'>
-    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
     <title>Low Stock Alert</title>
 </head>
 <body style='font-family: Arial, sans-serif; line-height: 1.6; margin: 0; padding: 0; background-color: #f4f4f4;'>
@@ -132,7 +314,6 @@ namespace SkuVaultSaaS.Infrastructure.Services
         }
     }
 
-    // Configuration class for email settings
     public class EmailSettings
     {
         public string SmtpHost { get; set; } = "";
@@ -140,11 +321,32 @@ namespace SkuVaultSaaS.Infrastructure.Services
         public bool UseSsl { get; set; } = true;
         public string Username { get; set; } = "";
         public string Password { get; set; } = "";
-        public string FromEmail { get; set; } = "";
         public string FromName { get; set; } = "JUSTSKU";
+        public string ReplyToEmail { get; set; } = "info@justsku.com";
+        public string FromEmail { get; set; } = "";
+        
+        public Dictionary<string, string> Emails { get; set; } = new()
+        {
+            { "Verification", "noreply@justsku.com" },
+            { "LowStockNotification", "notifications@justsku.com" },
+            { "Support", "support@justsku.com" }
+        };
+        
+        public string GetEmailAddress(string emailType)
+        {
+            if (Emails != null && Emails.TryGetValue(emailType, out var email))
+            {
+                return email;
+            }
+            return FromEmail;
+        }
+        
+        public bool ShouldAddReplyTo(string fromEmail)
+        {
+            return !fromEmail.Contains("noreply");
+        }
     }
 
-    // Email item DTO
     public class LowStockEmailItem
     {
         public string ProductSku { get; set; } = "";

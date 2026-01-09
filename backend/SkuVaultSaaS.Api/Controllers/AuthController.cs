@@ -451,7 +451,7 @@ namespace SkuVaultSaaS.Api.Controllers
 
             // Generate email confirmation token
             var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-            var confirmationLink = $"{Request.Scheme}://api.justsku.com/api/auth/confirm-email?userId={user.Id}&token={Uri.EscapeDataString(token)}";
+            var confirmationLink = $"{Request.Scheme}://justsku.com/api/auth/confirm-email?userId={user.Id}&token={Uri.EscapeDataString(token)}";
 
             // Send verification email (don't await to avoid blocking signup)
             _ = Task.Run(async () =>
@@ -529,7 +529,7 @@ namespace SkuVaultSaaS.Api.Controllers
 
             // Generate new email confirmation token
             var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-            var confirmationLink = $"{Request.Scheme}://api.justsku.com/api/auth/confirm-email?userId={user.Id}&token={Uri.EscapeDataString(token)}";
+            var confirmationLink = $"{Request.Scheme}://justsku.com/api/auth/confirm-email?userId={user.Id}&token={Uri.EscapeDataString(token)}";
 
             // Send verification email (don't await to avoid blocking)
             _ = Task.Run(async () =>

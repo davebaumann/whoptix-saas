@@ -540,9 +540,21 @@ namespace SkuVaultSaaS.Infrastructure.SkuVaultSaaSApi
                 {
                     try
                     {
+                        // Parse Context object if present
+                        string? contextType = null;
+                        string? contextId = null;
+                        if (item.TryGetProperty("Context", out var contextElement) && contextElement.ValueKind == JsonValueKind.Object)
+                        {
+                            contextType = GetStringProperty(contextElement, "Type");
+                            contextId = GetStringProperty(contextElement, "ID");
+                        }
+
                         var movement = new SkuVaultInventoryMovementDto
                         {
                             Sku = GetStringProperty(item, "Sku") ?? string.Empty,
+                            Code = GetStringProperty(item, "Code"),
+                            ScannedCode = GetStringProperty(item, "ScannedCode"),
+                            Title = GetStringProperty(item, "Title"),
                             Location = GetStringProperty(item, "Location"),
                             Quantity = GetIntProperty(item, "Quantity"),
                             QuantityBefore = GetIntProperty(item, "QuantityBefore"),
@@ -551,7 +563,8 @@ namespace SkuVaultSaaS.Infrastructure.SkuVaultSaaSApi
                             TransactionNote = GetStringProperty(item, "TransactionNote"),
                             User = GetStringProperty(item, "User"),
                             TransactionType = GetStringProperty(item, "TransactionType"),
-                            Context = GetStringProperty(item, "Context"),
+                            ContextType = contextType,
+                            ContextId = contextId,
                             TransactionDate = GetDateTimeProperty(item, "TransactionDate")
                         };
                         result.Add(movement);

@@ -650,7 +650,13 @@ namespace SkuVaultSaaS.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bigint");
 
-                    b.Property<string>("Context")
+                    b.Property<string>("Code")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("ContextId")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("ContextType")
                         .HasColumnType("longtext");
 
                     b.Property<DateTime>("CreatedAtUtc")
@@ -677,6 +683,9 @@ namespace SkuVaultSaaS.Infrastructure.Migrations
                     b.Property<int>("QuantityBefore")
                         .HasColumnType("int");
 
+                    b.Property<string>("ScannedCode")
+                        .HasColumnType("longtext");
+
                     b.Property<string>("Sku")
                         .IsRequired()
                         .HasColumnType("longtext");
@@ -690,6 +699,9 @@ namespace SkuVaultSaaS.Infrastructure.Migrations
 
                     b.Property<DateTime>("TransactionDate")
                         .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Title")
+                        .HasColumnType("longtext");
 
                     b.Property<string>("TransactionNote")
                         .HasColumnType("longtext");

@@ -20,6 +20,12 @@ namespace SkuVaultSaaS.Api.Controllers
         [HttpGet("customer/{customerId}/summary")]
         public async Task<IActionResult> GetPickerSummary(int customerId, [FromQuery] string period = "today")
         {
+            // Validate customer ID to prevent injection
+            if (!SkuVaultSaaS.Api.Utilities.ValidationHelper.ValidateCustomerId(customerId))
+            {
+                return BadRequest(SkuVaultSaaS.Api.Models.ErrorResponse.BadRequest("Invalid customer ID."));
+            }
+
             var fromDate = period switch
             {
                 "today" => DateTime.UtcNow.Date,
@@ -107,8 +113,24 @@ namespace SkuVaultSaaS.Api.Controllers
             [FromQuery] string? to = null,
             [FromQuery] string period = "day")
         {
+            // Validate customer ID to prevent injection
+            if (!SkuVaultSaaS.Api.Utilities.ValidationHelper.ValidateCustomerId(customerId))
+            {
+                return BadRequest(SkuVaultSaaS.Api.Models.ErrorResponse.BadRequest("Invalid customer ID."));
+            }
+
             var fromDate = DateTime.TryParse(from, out var f) ? f : DateTime.UtcNow.AddDays(-60);
             var toDate = DateTime.TryParse(to, out var t) ? t : DateTime.UtcNow.AddDays(30);
+
+            // Validate date range if both are provided
+            if (DateTime.TryParse(from, out _) && DateTime.TryParse(to, out _))
+            {
+                var (isValid, errorMessage) = SkuVaultSaaS.Api.Utilities.ValidationHelper.ValidateDateRange(fromDate, toDate);
+                if (!isValid)
+                {
+                    return BadRequest(SkuVaultSaaS.Api.Models.ErrorResponse.BadRequest(errorMessage));
+                }
+            }
 
             // Adjust date range based on period to get meaningful data
             if (period == "week")

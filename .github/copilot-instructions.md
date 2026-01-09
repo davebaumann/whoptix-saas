@@ -150,6 +150,19 @@ public class MyController : BaseController
 - MySQL: 3306
 - ngrok webhook: varies
 
+## Deployment
+
+**Frontend (S3 + CloudFront):**
+- Build: `npm run build` (creates `dist/` folder)
+- Deploy to S3: `aws s3 sync dist/ s3://justsku-uat-frontend/ --delete`
+- Invalidate cache: `aws cloudfront create-invalidation --distribution-id EXXXXXXXXXX --paths "/*"`
+- See `S3-CLOUDFRONT-DEPLOYMENT.md` for full setup
+
+**Backend:**
+- Publish: `dotnet publish -c Release -o ./publish`
+- Docker: Build and push to ECR/registry
+- See `UAT-DEPLOYMENT-CHECKLIST.md` for full steps
+
 ## Tips for Agents
 
 1. **Before adding endpoints:** Check if similar pattern exists in existing controller (e.g., payment handling in StripeController)
@@ -158,3 +171,5 @@ public class MyController : BaseController
 4. **TypeScript strict mode:** Frontend uses `strict: true` - check type compatibility before assuming nulls/optionals
 5. **Cache invalidation:** After updating cached data (e.g., SkuVault tokens), call `InvalidateCacheAsync()` with appropriate pattern
 6. **Reverse lookups essential:** Never assume Stripe price ID → tier mapping is bidirectional - always implement reverse lookup pattern seen in `GetPriceAmount()`
+7. For all terminal commands, ensure you are using powershell syntax.
+8. For all terminal commands, use full file paths where applicable.

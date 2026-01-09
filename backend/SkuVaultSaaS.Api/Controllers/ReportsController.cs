@@ -292,6 +292,12 @@ namespace SkuVaultSaaS.Api.Controllers
         [Authorize]
         public async Task<IActionResult> GetInventoryReport(int customerId)
         {
+            // Validate customer ID to prevent injection
+            if (!SkuVaultSaaS.Api.Utilities.ValidationHelper.ValidateCustomerId(customerId))
+            {
+                return BadRequest(SkuVaultSaaS.Api.Models.ErrorResponse.BadRequest("Invalid customer ID."));
+            }
+
             // Check tenant access and membership level
             var accessCheck = await CheckReportAccessAsync(customerId, "inventory");
             if (accessCheck != null) return accessCheck;
@@ -371,6 +377,12 @@ namespace SkuVaultSaaS.Api.Controllers
         [Authorize]
         public async Task<IActionResult> GetAgingInventoryReport(int customerId)
         {
+            // Validate customer ID to prevent injection
+            if (!SkuVaultSaaS.Api.Utilities.ValidationHelper.ValidateCustomerId(customerId))
+            {
+                return BadRequest(SkuVaultSaaS.Api.Models.ErrorResponse.BadRequest("Invalid customer ID."));
+            }
+
             // Check tenant access and membership level
             var accessCheck = await CheckReportAccessAsync(customerId, "aging-inventory");
             if (accessCheck != null) return accessCheck;
@@ -490,6 +502,12 @@ namespace SkuVaultSaaS.Api.Controllers
         [HttpGet("customer/{customerId}/inventory-turnover")]
         public async Task<IActionResult> GetInventoryTurnoverReport(int customerId, [FromQuery] int days = 90)
         {
+            // Validate customer ID to prevent injection
+            if (!SkuVaultSaaS.Api.Utilities.ValidationHelper.ValidateCustomerId(customerId))
+            {
+                return BadRequest(SkuVaultSaaS.Api.Models.ErrorResponse.BadRequest("Invalid customer ID."));
+            }
+
             // Check tenant isolation
             if (!await CanAccessCustomerAsync(customerId))
             {
@@ -552,6 +570,12 @@ namespace SkuVaultSaaS.Api.Controllers
         [Authorize]
         public async Task<IActionResult> GetFinancialWarehouseReport(int customerId, [FromQuery] string period = "current")
         {
+            // Validate customer ID to prevent injection
+            if (!SkuVaultSaaS.Api.Utilities.ValidationHelper.ValidateCustomerId(customerId))
+            {
+                return BadRequest(SkuVaultSaaS.Api.Models.ErrorResponse.BadRequest("Invalid customer ID."));
+            }
+
             // Check tenant access and membership level
             var accessCheck = await CheckReportAccessAsync(customerId, "financial-warehouse");
             if (accessCheck != null) return accessCheck;
@@ -669,6 +693,12 @@ namespace SkuVaultSaaS.Api.Controllers
         [Authorize]
         public async Task<IActionResult> GetLocationsReport(int customerId)
         {
+            // Validate customer ID to prevent injection
+            if (!SkuVaultSaaS.Api.Utilities.ValidationHelper.ValidateCustomerId(customerId))
+            {
+                return BadRequest(SkuVaultSaaS.Api.Models.ErrorResponse.BadRequest("Invalid customer ID."));
+            }
+
             // Check tenant access and membership level
             var accessCheck = await CheckReportAccessAsync(customerId, "locations");
             if (accessCheck != null) return accessCheck;
@@ -777,6 +807,12 @@ namespace SkuVaultSaaS.Api.Controllers
         [ResponseCache(NoStore = true, Duration = 0)]
         public async Task<IActionResult> GetPerformanceReport(int customerId, [FromQuery] string timeframe = "30days")
         {
+            // Validate customer ID to prevent injection
+            if (!SkuVaultSaaS.Api.Utilities.ValidationHelper.ValidateCustomerId(customerId))
+            {
+                return BadRequest(SkuVaultSaaS.Api.Models.ErrorResponse.BadRequest("Invalid customer ID."));
+            }
+
             // Check tenant access and membership level
             var accessCheck = await CheckReportAccessAsync(customerId, "performance");
             if (accessCheck != null) return accessCheck;
@@ -919,6 +955,12 @@ namespace SkuVaultSaaS.Api.Controllers
         [Authorize]
         public async Task<IActionResult> GetProfitabilityReport(int customerId, [FromQuery] string? from = null, [FromQuery] string? to = null)
         {
+            // Validate customer ID to prevent injection
+            if (!SkuVaultSaaS.Api.Utilities.ValidationHelper.ValidateCustomerId(customerId))
+            {
+                return BadRequest(SkuVaultSaaS.Api.Models.ErrorResponse.BadRequest("Invalid customer ID."));
+            }
+
             // Check tenant access and membership level
             var accessCheck = await CheckReportAccessAsync(customerId, "profitability");
             if (accessCheck != null) return accessCheck;
@@ -952,6 +994,16 @@ namespace SkuVaultSaaS.Api.Controllers
                     else if (DateTime.TryParse(to, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsedTo2))
                     {
                         toDate = parsedTo2;
+                    }
+                }
+
+                // Validate date range if both provided
+                if (fromDate.HasValue && toDate.HasValue)
+                {
+                    var (isValid, errorMessage) = SkuVaultSaaS.Api.Utilities.ValidationHelper.ValidateDateRange(fromDate, toDate);
+                    if (!isValid)
+                    {
+                        return BadRequest(SkuVaultSaaS.Api.Models.ErrorResponse.BadRequest(errorMessage));
                     }
                 }
 

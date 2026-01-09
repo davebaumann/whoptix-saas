@@ -12,6 +12,8 @@ namespace SkuVaultSaaS.Api.Services
         Task SendWelcomeEmailAsync(string email, string customerName, string temporaryPassword);
         Task SendEmailVerificationAsync(string email, string confirmationLink);
         Task SendInvitationEmailAsync(string email, string invitedBy, string customerName, string inviteLink);
+        Task SendSuggestionEmailAsync(string userEmail, string message);
+        Task SendContactMessageAsync(string userEmail, string subject, string message);
     }
 
     public class EmailService : IEmailService
@@ -23,6 +25,40 @@ namespace SkuVaultSaaS.Api.Services
         {
             _logger = logger;
             _configuration = configuration;
+            
+            // Log email configuration on startup
+            var emailSettings = _configuration.GetSection("EmailSettings");
+            var smtpHost = emailSettings["SmtpHost"];
+            var smtpPort = emailSettings["SmtpPort"];
+            var username = emailSettings["Username"];
+            var password = emailSettings["Password"];
+            
+            _logger.LogInformation("=== EmailService Initialized ===");
+            _logger.LogInformation("SmtpHost: {Host}", smtpHost ?? "NOT SET");
+            _logger.LogInformation("SmtpPort: {Port}", smtpPort ?? "NOT SET");
+            _logger.LogInformation("Username: {Username}", username ?? "NOT SET");
+            _logger.LogInformation("Password provided: {PasswordProvided}", !string.IsNullOrEmpty(password));
+        }
+
+        /// <summary>
+        /// Helper method to get the appropriate email address for a given purpose
+        /// </summary>
+        private string GetEmailAddress(string emailType = "Verification")
+        {
+            var emailSettings = _configuration.GetSection("EmailSettings");
+            var emailsSection = emailSettings.GetSection("Emails");
+            
+            if (emailsSection.Exists())
+            {
+                var email = emailsSection[emailType];
+                if (!string.IsNullOrEmpty(email))
+                {
+                    return email;
+                }
+            }
+            
+            // Fallback to FromEmail for backward compatibility
+            return emailSettings["FromEmail"] ?? "noreply@justsku.com";
         }
 
         public async Task SendPasswordResetEmailAsync(string email, string resetToken, string resetUrl)
@@ -38,9 +74,12 @@ namespace SkuVaultSaaS.Api.Services
                 var smtpPort = int.Parse(emailSettings["SmtpPort"] ?? "587");
                 var username = emailSettings["Username"];
                 var password = emailSettings["Password"];
-                var fromEmail = emailSettings["FromEmail"];
+                var fromEmail = GetEmailAddress("Verification");
                 var fromName = emailSettings["FromName"];
                 var useSsl = bool.Parse(emailSettings["UseSsl"] ?? "true");
+
+                _logger.LogInformation("SendPasswordResetEmailAsync: Config loaded - Host={Host}, Port={Port}, Username={Username}, FromEmail={FromEmail}, PasswordProvided={PasswordProvided}",
+                    smtpHost, smtpPort, username, fromEmail, !string.IsNullOrEmpty(password));
 
                 var message = new MimeMessage();
                 message.From.Add(new MailboxAddress(fromName, fromEmail));
@@ -63,16 +102,25 @@ namespace SkuVaultSaaS.Api.Services
                     _ => SecureSocketOptions.Auto
                 };
 
+                _logger.LogInformation("SendPasswordResetEmailAsync: Connecting to {Host}:{Port}", smtpHost, smtpPort);
                 await client.ConnectAsync(smtpHost, smtpPort, secureSocketOptions);
+                _logger.LogInformation("SendPasswordResetEmailAsync: Connected");
+                
+                _logger.LogInformation("SendPasswordResetEmailAsync: Authenticating with {Username}", username);
                 await client.AuthenticateAsync(username, password);
+                _logger.LogInformation("SendPasswordResetEmailAsync: Authenticated");
+                
+                _logger.LogInformation("SendPasswordResetEmailAsync: Sending email to {Email}", email);
                 await client.SendAsync(message);
+                _logger.LogInformation("SendPasswordResetEmailAsync: Email sent");
+                
                 await client.DisconnectAsync(true);
                 
                 _logger.LogInformation("Password reset email sent successfully to {Email}", email);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to send password reset email to {Email}", email);
+                _logger.LogError(ex, "Failed to send password reset email to {Email}. Exception: {Message}", email, ex.Message);
                 throw;
             }
         }
@@ -89,9 +137,12 @@ namespace SkuVaultSaaS.Api.Services
                 var smtpPort = int.Parse(emailSettings["SmtpPort"] ?? "587");
                 var username = emailSettings["Username"];
                 var password = emailSettings["Password"];
-                var fromEmail = emailSettings["FromEmail"];
+                var fromEmail = GetEmailAddress("Verification");
                 var fromName = emailSettings["FromName"];
                 var useSsl = bool.Parse(emailSettings["UseSsl"] ?? "true");
+
+                _logger.LogInformation("SendWelcomeEmailAsync: Config loaded - Host={Host}, Port={Port}, Username={Username}, FromEmail={FromEmail}, PasswordProvided={PasswordProvided}",
+                    smtpHost, smtpPort, username, fromEmail, !string.IsNullOrEmpty(password));
 
                 var message = new MimeMessage();
                 message.From.Add(new MailboxAddress(fromName, fromEmail));
@@ -114,16 +165,25 @@ namespace SkuVaultSaaS.Api.Services
                     _ => SecureSocketOptions.Auto
                 };
 
+                _logger.LogInformation("SendWelcomeEmailAsync: Connecting to {Host}:{Port}", smtpHost, smtpPort);
                 await client.ConnectAsync(smtpHost, smtpPort, secureSocketOptions);
+                _logger.LogInformation("SendWelcomeEmailAsync: Connected");
+                
+                _logger.LogInformation("SendWelcomeEmailAsync: Authenticating with {Username}", username);
                 await client.AuthenticateAsync(username, password);
+                _logger.LogInformation("SendWelcomeEmailAsync: Authenticated");
+                
+                _logger.LogInformation("SendWelcomeEmailAsync: Sending email to {Email}", email);
                 await client.SendAsync(message);
+                _logger.LogInformation("SendWelcomeEmailAsync: Email sent");
+                
                 await client.DisconnectAsync(true);
                 
                 _logger.LogInformation("Welcome email sent successfully to {Email}", email);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to send welcome email to {Email}", email);
+                _logger.LogError(ex, "Failed to send welcome email to {Email}. Exception: {Message}", email, ex.Message);
                 throw;
             }
         }
@@ -140,7 +200,7 @@ namespace SkuVaultSaaS.Api.Services
                 var smtpPort = int.Parse(emailSettings["SmtpPort"] ?? "465");
                 var username = emailSettings["Username"];
                 var password = emailSettings["Password"];
-                var fromEmail = emailSettings["FromEmail"];
+                var fromEmail = GetEmailAddress("Verification");
                 var fromName = emailSettings["FromName"];
                 var useSsl = bool.Parse(emailSettings["UseSsl"] ?? "true");
 
@@ -152,7 +212,8 @@ namespace SkuVaultSaaS.Api.Services
                     _logger.LogInformation("Environment variable EMAIL_PASSWORD found: {Found}", !string.IsNullOrEmpty(envPassword));
                 }
 
-
+                _logger.LogInformation("SendEmailVerificationAsync: Config loaded - Host={Host}, Port={Port}, Username={Username}, FromEmail={FromEmail}, PasswordProvided={PasswordProvided}",
+                    smtpHost, smtpPort, username, fromEmail, !string.IsNullOrEmpty(password));
 
                 var message = new MimeMessage();
                 message.From.Add(new MailboxAddress(fromName, fromEmail));
@@ -175,21 +236,25 @@ namespace SkuVaultSaaS.Api.Services
                     _ => SecureSocketOptions.Auto
                 };
 
-                _logger.LogInformation("Connecting to SMTP server {Host}:{Port}", smtpHost, smtpPort);
+                _logger.LogInformation("SendEmailVerificationAsync: Connecting to {Host}:{Port}", smtpHost, smtpPort);
                 await client.ConnectAsync(smtpHost, smtpPort, secureSocketOptions);
+                _logger.LogInformation("SendEmailVerificationAsync: Connected");
                 
-                _logger.LogInformation("Authenticating with username {Username}", username);
+                _logger.LogInformation("SendEmailVerificationAsync: Authenticating with {Username}", username);
                 await client.AuthenticateAsync(username, password);
+                _logger.LogInformation("SendEmailVerificationAsync: Authenticated");
                 
-                _logger.LogInformation("Sending email to {Email}", email);
+                _logger.LogInformation("SendEmailVerificationAsync: Sending email to {Email}", email);
                 await client.SendAsync(message);
+                _logger.LogInformation("SendEmailVerificationAsync: Email sent");
+                
                 await client.DisconnectAsync(true);
                 
                 _logger.LogInformation("Verification email sent successfully to {Email}", email);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to send verification email to {Email}", email);
+                _logger.LogError(ex, "Failed to send verification email to {Email}. Exception: {Message}", email, ex.Message);
                 throw;
             }
         }
@@ -299,9 +364,12 @@ namespace SkuVaultSaaS.Api.Services
                 var smtpPort = int.Parse(emailSettings["SmtpPort"] ?? "587");
                 var username = emailSettings["Username"];
                 var password = emailSettings["Password"];
-                var fromEmail = emailSettings["FromEmail"];
+                var fromEmail = GetEmailAddress("Verification");
                 var fromName = emailSettings["FromName"];
                 var useSsl = bool.Parse(emailSettings["UseSsl"] ?? "true");
+
+                _logger.LogInformation("SendInvitationEmailAsync: Config loaded - Host={Host}, Port={Port}, Username={Username}, FromEmail={FromEmail}, PasswordProvided={PasswordProvided}",
+                    smtpHost, smtpPort, username, fromEmail, !string.IsNullOrEmpty(password));
 
                 var message = new MimeMessage();
                 message.From.Add(new MailboxAddress(fromName, fromEmail));
@@ -324,16 +392,25 @@ namespace SkuVaultSaaS.Api.Services
                     _ => SecureSocketOptions.Auto
                 };
 
+                _logger.LogInformation("SendInvitationEmailAsync: Connecting to {Host}:{Port}", smtpHost, smtpPort);
                 await client.ConnectAsync(smtpHost, smtpPort, secureSocketOptions);
+                _logger.LogInformation("SendInvitationEmailAsync: Connected");
+                
+                _logger.LogInformation("SendInvitationEmailAsync: Authenticating with {Username}", username);
                 await client.AuthenticateAsync(username, password);
+                _logger.LogInformation("SendInvitationEmailAsync: Authenticated");
+                
+                _logger.LogInformation("SendInvitationEmailAsync: Sending email to {Email}", email);
                 await client.SendAsync(message);
+                _logger.LogInformation("SendInvitationEmailAsync: Email sent");
+                
                 await client.DisconnectAsync(true);
                 
                 _logger.LogInformation("Invitation email sent successfully to {Email}", email);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to send invitation email to {Email}", email);
+                _logger.LogError(ex, "Failed to send invitation email to {Email}. Exception: {Message}", email, ex.Message);
                 throw;
             }
         }
@@ -426,6 +503,189 @@ namespace SkuVaultSaaS.Api.Services
         <div style='text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;'>
             <p style='color: #888; font-size: 12px; margin: 0;'>
                 Thank you for choosing JUSTSKU for your inventory management needs.
+            </p>
+        </div>
+    </div>
+</body>
+</html>";
+        }
+
+        public async Task SendSuggestionEmailAsync(string userEmail, string message)
+        {
+            _logger.LogInformation("Suggestion email from: {UserEmail}", userEmail);
+
+            try
+            {
+                var emailSettings = _configuration.GetSection("EmailSettings");
+                var smtpHost = emailSettings["SmtpHost"];
+                var smtpPort = int.Parse(emailSettings["SmtpPort"] ?? "587");
+                var username = emailSettings["Username"];
+                var password = emailSettings["Password"];
+                var fromEmail = GetEmailAddress("Verification");
+                var supportEmail = GetEmailAddress("Support") ?? "support@justsku.com";
+                var fromName = emailSettings["FromName"];
+
+                _logger.LogInformation("SendSuggestionEmailAsync: Config loaded - Host={Host}, Port={Port}, Username={Username}, FromEmail={FromEmail}",
+                    smtpHost, smtpPort, username, fromEmail);
+
+                var emailMessage = new MimeMessage();
+                emailMessage.From.Add(new MailboxAddress(fromName, fromEmail));
+                emailMessage.To.Add(new MailboxAddress("", supportEmail));
+                emailMessage.Subject = "New Suggestion from User";
+
+                var bodyBuilder = new BodyBuilder
+                {
+                    HtmlBody = GenerateSuggestionEmailBody(userEmail, message)
+                };
+                emailMessage.Body = bodyBuilder.ToMessageBody();
+
+                using var client = new SmtpClient();
+                
+                var secureSocketOptions = smtpPort switch
+                {
+                    465 => SecureSocketOptions.SslOnConnect,
+                    587 => SecureSocketOptions.StartTls,
+                    25 => SecureSocketOptions.Auto,
+                    _ => SecureSocketOptions.Auto
+                };
+
+                _logger.LogInformation("SendSuggestionEmailAsync: Connecting to {Host}:{Port}", smtpHost, smtpPort);
+                await client.ConnectAsync(smtpHost, smtpPort, secureSocketOptions);
+                _logger.LogInformation("SendSuggestionEmailAsync: Authenticating with {Username}", username);
+                await client.AuthenticateAsync(username, password);
+                _logger.LogInformation("SendSuggestionEmailAsync: Sending email");
+                await client.SendAsync(emailMessage);
+                await client.DisconnectAsync(true);
+                
+                _logger.LogInformation("Suggestion email sent successfully from {UserEmail}", userEmail);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send suggestion email from {UserEmail}. Exception: {Message}", userEmail, ex.Message);
+                throw;
+            }
+        }
+
+        public async Task SendContactMessageAsync(string userEmail, string subject, string message)
+        {
+            _logger.LogInformation("Contact message from: {UserEmail} - Subject: {Subject}", userEmail, subject);
+
+            try
+            {
+                var emailSettings = _configuration.GetSection("EmailSettings");
+                var smtpHost = emailSettings["SmtpHost"];
+                var smtpPort = int.Parse(emailSettings["SmtpPort"] ?? "587");
+                var username = emailSettings["Username"];
+                var password = emailSettings["Password"];
+                var fromEmail = GetEmailAddress("Verification");
+                var supportEmail = GetEmailAddress("Support") ?? "support@justsku.com";
+                var fromName = emailSettings["FromName"];
+
+                _logger.LogInformation("SendContactMessageAsync: Config loaded - Host={Host}, Port={Port}, Username={Username}, FromEmail={FromEmail}",
+                    smtpHost, smtpPort, username, fromEmail);
+
+                var emailMessage = new MimeMessage();
+                emailMessage.From.Add(new MailboxAddress(fromName, fromEmail));
+                emailMessage.To.Add(new MailboxAddress("", supportEmail));
+                emailMessage.Subject = $"Contact Message: {subject}";
+
+                var bodyBuilder = new BodyBuilder
+                {
+                    HtmlBody = GenerateContactMessageEmailBody(userEmail, subject, message)
+                };
+                emailMessage.Body = bodyBuilder.ToMessageBody();
+
+                using var client = new SmtpClient();
+                
+                var secureSocketOptions = smtpPort switch
+                {
+                    465 => SecureSocketOptions.SslOnConnect,
+                    587 => SecureSocketOptions.StartTls,
+                    25 => SecureSocketOptions.Auto,
+                    _ => SecureSocketOptions.Auto
+                };
+
+                _logger.LogInformation("SendContactMessageAsync: Connecting to {Host}:{Port}", smtpHost, smtpPort);
+                await client.ConnectAsync(smtpHost, smtpPort, secureSocketOptions);
+                _logger.LogInformation("SendContactMessageAsync: Authenticating with {Username}", username);
+                await client.AuthenticateAsync(username, password);
+                _logger.LogInformation("SendContactMessageAsync: Sending email");
+                await client.SendAsync(emailMessage);
+                await client.DisconnectAsync(true);
+                
+                _logger.LogInformation("Contact message email sent successfully from {UserEmail}", userEmail);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send contact message email from {UserEmail}. Exception: {Message}", userEmail, ex.Message);
+                throw;
+            }
+        }
+
+        private string GenerateSuggestionEmailBody(string userEmail, string message)
+        {
+            return $@"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <title>New Suggestion</title>
+</head>
+<body style='font-family: Arial, sans-serif; line-height: 1.6; margin: 0; padding: 0; background-color: #f4f4f4;'>
+    <div style='max-width: 600px; margin: 0 auto; background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1);'>
+        <div style='text-align: center; margin-bottom: 30px; border-bottom: 3px solid #3B82F6; padding-bottom: 20px;'>
+            <h1 style='color: #3B82F6; margin: 0;'>New Suggestion</h1>
+            <p style='color: #666; margin: 5px 0 0 0;'>From: {userEmail}</p>
+        </div>
+        
+        <div style='margin-bottom: 20px;'>
+            <p style='margin: 0 0 20px 0; color: #555;'>
+                {System.Net.WebUtility.HtmlEncode(message).Replace(Environment.NewLine, "<br>")}
+            </p>
+        </div>
+
+        <div style='background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; border-radius: 4px; margin: 20px 0;'>
+            <p style='margin: 0; font-size: 12px; color: #666;'>
+                <strong>User Email:</strong> {userEmail}
+            </p>
+        </div>
+    </div>
+</body>
+</html>";
+        }
+
+        private string GenerateContactMessageEmailBody(string userEmail, string subject, string message)
+        {
+            return $@"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <title>Contact Message: {subject}</title>
+</head>
+<body style='font-family: Arial, sans-serif; line-height: 1.6; margin: 0; padding: 0; background-color: #f4f4f4;'>
+    <div style='max-width: 600px; margin: 0 auto; background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1);'>
+        <div style='text-align: center; margin-bottom: 30px; border-bottom: 3px solid #3B82F6; padding-bottom: 20px;'>
+            <h1 style='color: #3B82F6; margin: 0;'>Contact Message</h1>
+            <p style='color: #666; margin: 5px 0 0 0;'>From: {userEmail}</p>
+        </div>
+        
+        <div style='margin-bottom: 20px;'>
+            <p style='margin: 0 0 10px 0; font-weight: bold; color: #333;'>Subject:</p>
+            <p style='margin: 0 0 20px 0; color: #555;'>{System.Net.WebUtility.HtmlEncode(subject)}</p>
+            
+            <p style='margin: 0 0 10px 0; font-weight: bold; color: #333;'>Message:</p>
+            <p style='margin: 0 0 20px 0; color: #555;'>
+                {System.Net.WebUtility.HtmlEncode(message).Replace(Environment.NewLine, "<br>")}
+            </p>
+        </div>
+
+        <div style='background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; border-radius: 4px; margin: 20px 0;'>
+            <p style='margin: 0; font-size: 12px; color: #666;'>
+                <strong>User Email:</strong> {userEmail}<br>
+                <strong>Submitted:</strong> {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC
             </p>
         </div>
     </div>

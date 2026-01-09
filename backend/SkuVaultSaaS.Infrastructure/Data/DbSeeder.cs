@@ -28,69 +28,32 @@ namespace SkuVaultSaaS.Infrastructure.Data
             var loggerFactory = scope.ServiceProvider.GetService<ILoggerFactory>();
             var logger = loggerFactory?.CreateLogger("DbSeeder");
 
-            // Basic tenant/customer seeding (safe and idempotent)
-            if (!await context.Tenants.AnyAsync())
+            // Apply all pending migrations
+            try
             {
-                try
+                await context.Database.MigrateAsync();
+                logger?.LogInformation("Database migrations applied successfully.");
+            }
+            catch (Exception ex)
+            {
+                // If tables already exist, that's OK - just log and continue
+                if (ex.Message.Contains("already exists"))
                 {
-                    // Try EF-based seeding first (preferred when schema matches models)
-                    /*
-                    var tenant = new Tenant 
-                    { 
-                        Name = "Test Tenant",
-                        SkuVaultTenantToken = "oEFB0JjwPPfxFlQdrWnM1CZoGsTWDzL0M+HN76zdwUY=",
-                        SkuVaultUserToken = "WKJm9VseLAo6bPER7RAQdaSzFdu6uJewguZ9HHZcpqM="
-                    };
-                    context.Tenants.Add(tenant);
-                    context.Customers.Add(new Customer { Name = "Customer 1", Tenant = tenant, ExternalId = "EXT001", Email = "Kim.baumann@skuvault.com", LastSyncedAt = DateTime.UtcNow });
-                    await context.SaveChangesAsync();
-                    */
+                    logger?.LogWarning("Database tables already exist. Skipping migrations. Error: {Message}", ex.Message);
                 }
-                catch (DbUpdateException ex)
+                else
                 {
-                    // Schema mismatch with remote DB (missing columns) — fall back to raw SQL inserts that target
-                    // only the columns we know exist in the managed DB. This allows reseeding without altering the
-                    // provider-managed schema.
-                    logger?.LogWarning("EF seeding failed, falling back to raw SQL seeding: {Message}", ex.Message);
-
-                    // Insert tenant using only the Name column
-                    await context.Database.ExecuteSqlRawAsync("INSERT INTO Tenants (`Name`) VALUES ({0})", "Test Tenant");
-
-                    // Retrieve the newly inserted tenant id using a raw SQL scalar query to avoid EF mapping
-                    // attempting to read missing columns.
-                    var connection = context.Database.GetDbConnection();
-                    // Connection logging removed for security
-                    try
-                    {
-                        if (connection.State != System.Data.ConnectionState.Open)
-                            await connection.OpenAsync();
-
-                        using var cmd = connection.CreateCommand();
-                        cmd.CommandText = "SELECT Id FROM Tenants WHERE Name = @name ORDER BY Id DESC LIMIT 1";
-                        var p = cmd.CreateParameter();
-                        p.ParameterName = "@name";
-                        p.Value = "Test Tenant";
-                        cmd.Parameters.Add(p);
-
-                        var result = await cmd.ExecuteScalarAsync();
-                        if (result != null && int.TryParse(result.ToString(), out var tenantId))
-                        {
-                            // Insert customer with the known columns: ExternalId, Name, Email, TenantId
-                            await context.Database.ExecuteSqlRawAsync(
-                                "INSERT INTO Customers (`ExternalId`, `Name`, `Email`, `TenantId`, `LastSyncedAt`) VALUES ({0}, {1}, {2}, {3}, {4})",
-                                "EXT001", "Customer 1", "Kim.baumann@skuvault.com", tenantId, DateTime.UtcNow);
-                        }
-                        else
-                        {
-                            logger?.LogError("Could not determine tenant id after raw insert; reseed aborted.");
-                        }
-                    }
-                    finally
-                    {
-                        if (connection.State == System.Data.ConnectionState.Open)
-                            await connection.CloseAsync();
-                    }
+                    logger?.LogError(ex, "Failed to apply database migrations.");
+                    throw;
                 }
+            }
+
+            // Check if seeding is disabled
+            var seedingEnabled = config?.GetValue<bool>("Seeding:Enabled") ?? (env != null && !env.IsProduction());
+            if (!seedingEnabled)
+            {
+                logger?.LogInformation("Seeding is disabled. Skipping identity seeding.");
+                return;
             }
 
             // Identity seeding: create roles and users when appropriate.
@@ -106,55 +69,37 @@ namespace SkuVaultSaaS.Infrastructure.Data
             // If running in Production and seeding was requested, require explicit seed credentials.
             if (env != null && env.IsProduction())
             {
-                // Validate required secrets are present in configuration. These can come from appsettings or env vars
-                // but in Production we treat missing values as an operator error.
-                // Prefer secrets from the secret provider when available; fall back to configuration.
+                // Validate required admin credentials are present
                 var adminEmail = secretProvider?.GetSecret("SeedAdmin:Email") ?? config.GetValue<string>("SeedAdmin:Email");
                 var adminPassword = secretProvider?.GetSecret("SeedAdmin:Password") ?? config.GetValue<string>("SeedAdmin:Password");
-                var defaultUserEmail = secretProvider?.GetSecret("SeedDefaultUser:Email") ?? config.GetValue<string>("SeedDefaultUser:Email");
-                var defaultUserPassword = secretProvider?.GetSecret("SeedDefaultUser:Password") ?? config.GetValue<string>("SeedDefaultUser:Password");
 
-                if (string.IsNullOrWhiteSpace(adminEmail) || string.IsNullOrWhiteSpace(adminPassword) ||
-                    string.IsNullOrWhiteSpace(defaultUserEmail) || string.IsNullOrWhiteSpace(defaultUserPassword))
+                if (string.IsNullOrWhiteSpace(adminEmail) || string.IsNullOrWhiteSpace(adminPassword))
                 {
-                    var msg = "Production seeding requested but required seed credentials are missing. " +
-                              "Provide SeedAdmin:Email, SeedAdmin:Password, SeedDefaultUser:Email and SeedDefaultUser:Password " +
-                              "via environment variables or a secure configuration provider to proceed.";
+                    var msg = "Production seeding requested but required admin credentials are missing. " +
+                              "Provide SeedAdmin:Email and SeedAdmin:Password via environment variables or configuration.";
                     logger?.LogError(msg);
                     throw new InvalidOperationException(msg);
                 }
 
-                // Use provided production credentials (no defaults).
-                await EnsureRolesAndUsersAsync(context, userManager, roleManager, logger, defaultUserEmail, defaultUserPassword, adminEmail, adminPassword);
+                // Create only admin user in production
+                await EnsureAdminUserAsync(context, userManager, roleManager, logger, adminEmail, adminPassword);
                 return;
             }
 
-            // Non-production: read seed values with sensible defaults for local dev convenience.
-            // In non-production prefer secret provider values first (env vars, key vault wiring etc.), then config, then safe defaults for dev.
-            var safeDefaultUserEmail = secretProvider?.GetSecret("SeedDefaultUser:Email") ?? config.GetValue<string>("SeedDefaultUser:Email") ?? "Kim.baumann@skuvault.com";
-            var safeDefaultUserPassword = secretProvider?.GetSecret("SeedDefaultUser:Password") ?? config.GetValue<string>("SeedDefaultUser:Password") ?? "P@ssw0rd!";
+            // Non-production: use sensible defaults for local dev convenience
             var safeAdminEmail = secretProvider?.GetSecret("SeedAdmin:Email") ?? config.GetValue<string>("SeedAdmin:Email") ?? "admin@example.com";
             var safeAdminPassword = secretProvider?.GetSecret("SeedAdmin:Password") ?? config.GetValue<string>("SeedAdmin:Password") ?? "P@ssw0rd!";
 
-            await EnsureRolesAndUsersAsync(context, userManager, roleManager, logger, safeDefaultUserEmail, safeDefaultUserPassword, safeAdminEmail, safeAdminPassword);
+            await EnsureAdminUserAsync(context, userManager, roleManager, logger, safeAdminEmail, safeAdminPassword);
         }
 
-        private static async Task EnsureRolesAndUsersAsync(ApplicationDbContext context,
+        private static async Task EnsureAdminUserAsync(ApplicationDbContext context,
             UserManager<ApplicationUser> userManager,
             RoleManager<IdentityRole> roleManager,
             ILogger? logger,
-            string defaultUserEmail,
-            string defaultUserPassword,
             string adminEmail,
             string adminPassword)
         {
-            const string roleName = "CustomerUser";
-            if (!await roleManager.RoleExistsAsync(roleName))
-            {
-                await roleManager.CreateAsync(new IdentityRole(roleName));
-                logger?.LogInformation("Created role {Role}", roleName);
-            }
-
             const string adminRole = "Admin";
             if (!await roleManager.RoleExistsAsync(adminRole))
             {
@@ -162,114 +107,17 @@ namespace SkuVaultSaaS.Infrastructure.Data
                 logger?.LogInformation("Created role {Role}", adminRole);
             }
 
-            // Default/non-admin user
-            var user = await userManager.FindByEmailAsync(defaultUserEmail);
-            if (user == null)
-            {
-                user = new ApplicationUser { UserName = defaultUserEmail, Email = defaultUserEmail, EmailConfirmed = true };
-                var createResult = await userManager.CreateAsync(user, defaultUserPassword);
-                if (createResult.Succeeded)
-                {
-                    await userManager.AddToRoleAsync(user, roleName);
-                    
-                    // Set kim.baumann@skuvault.com as account admin (Owner role)
-                    if (defaultUserEmail.Equals("Kim.baumann@skuvault.com", StringComparison.OrdinalIgnoreCase))
-                    {
-                        user.CustomerRole = CustomerRole.Owner;
-                        await userManager.UpdateAsync(user);
-                        logger?.LogInformation("Set CustomerRole.Owner for {Email}", defaultUserEmail);
-                    }
-                    
-                    logger?.LogInformation("Created seeded user {Email} and added to role {Role}", defaultUserEmail, roleName);
-
-                    // Associate user with customer
-                    var connection = context.Database.GetDbConnection();
-                    try
-                    {
-                        if (connection.State != System.Data.ConnectionState.Open)
-                            await connection.OpenAsync();
-
-                        // Find customer by email
-                        using var checkCmd = connection.CreateCommand();
-                        checkCmd.CommandText = "SELECT Id FROM Customers WHERE Email = @email LIMIT 1";
-                        var p = checkCmd.CreateParameter();
-                        p.ParameterName = "@email";
-                        p.Value = user.Email ?? string.Empty;
-                        checkCmd.Parameters.Add(p);
-
-                        var customerId = await checkCmd.ExecuteScalarAsync();
-                        if (customerId != null && int.TryParse(customerId.ToString(), out var cId))
-                        {
-                            // Update user with CustomerId
-                            user.CustomerId = cId;
-                            await userManager.UpdateAsync(user);
-                            logger?.LogInformation("Associated user {Email} with customer {CustomerId}", user.Email, cId);
-                        }
-                        else
-                        {
-                            // Create customer if none exists
-                            using var tenantCmd = connection.CreateCommand();
-                            tenantCmd.CommandText = "SELECT Id FROM Tenants LIMIT 1";
-                            var tRes = await tenantCmd.ExecuteScalarAsync();
-                            if (tRes != null && int.TryParse(tRes.ToString(), out var tenantId))
-                            {
-                                await context.Database.ExecuteSqlRawAsync(
-                                    "INSERT INTO Customers (`ExternalId`, `Name`, `Email`, `TenantId`, `LastSyncedAt`) VALUES ({0}, {1}, {2}, {3}, {4})",
-                                    "TEST_EXT_001", "Test Customer from Seeder", user.Email ?? string.Empty, tenantId, DateTime.UtcNow);
-                                
-                                // Get the new customer ID
-                                var newCustomerId = await checkCmd.ExecuteScalarAsync();
-                                if (newCustomerId != null && int.TryParse(newCustomerId.ToString(), out var newCId))
-                                {
-                                    user.CustomerId = newCId;
-                                    await userManager.UpdateAsync(user);
-                                    logger?.LogInformation("Created customer and associated user {Email} with customer {CustomerId}", user.Email, newCId);
-                                }
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        logger?.LogError(ex, "Failed to associate customer for user {Email}", user?.Email);
-                    }
-                    finally
-                    {
-                        if (connection.State == System.Data.ConnectionState.Open)
-                            await connection.CloseAsync();
-                    }
-                }
-                else
-                {
-                    logger?.LogWarning("Failed to create seeded user {Email}: {Errors}", defaultUserEmail, string.Join(';', createResult.Errors));
-                }
-            }
-            else
-            {
-                // User exists, ensure kim.baumann@skuvault.com has account admin role
-                if (defaultUserEmail.Equals("Kim.baumann@skuvault.com", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (user.CustomerRole != CustomerRole.Owner)
-                    {
-                        user.CustomerRole = CustomerRole.Owner;
-                        await userManager.UpdateAsync(user);
-                        logger?.LogInformation("Updated CustomerRole.Owner for existing user {Email}", defaultUserEmail);
-                    }
-                    
-                    // Remove system Admin role if they have it
-                    var userRoles = await userManager.GetRolesAsync(user);
-                    if (userRoles.Contains(adminRole))
-                    {
-                        await userManager.RemoveFromRoleAsync(user, adminRole);
-                        logger?.LogInformation("Removed system Admin role from {Email}", defaultUserEmail);
-                    }
-                }
-            }
-
             // Admin user
             var adminUser = await userManager.FindByEmailAsync(adminEmail);
             if (adminUser == null)
             {
-                adminUser = new ApplicationUser { UserName = adminEmail, Email = adminEmail, EmailConfirmed = true };
+                adminUser = new ApplicationUser 
+                { 
+                    UserName = adminEmail, 
+                    Email = adminEmail, 
+                    EmailConfirmed = true,
+                    CustomerRole = SkuVaultSaaS.Core.Enums.CustomerRole.Admin
+                };
                 var adminResult = await userManager.CreateAsync(adminUser, adminPassword);
                 if (adminResult.Succeeded)
                 {
@@ -280,6 +128,10 @@ namespace SkuVaultSaaS.Infrastructure.Data
                 {
                     logger?.LogWarning("Failed to create admin user {Email}: {Errors}", adminEmail, string.Join(';', adminResult.Errors));
                 }
+            }
+            else
+            {
+                logger?.LogInformation("Admin user {Email} already exists", adminEmail);
             }
         }
     }

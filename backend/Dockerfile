@@ -27,6 +27,9 @@ WORKDIR /app
 # Copy published application
 COPY --from=publish /app/publish .
 
+# Copy appsettings files from the build stage to ensure they're current
+COPY --from=build /src/SkuVaultSaaS.Api/appsettings*.json ./
+
 # Expose port (App Runner uses 8080 by default)
 EXPOSE 8080
 
@@ -34,9 +37,9 @@ EXPOSE 8080
 ENV ASPNETCORE_URLS=http://+:8080
 ENV ASPNETCORE_ENVIRONMENT=Production
 
-# Health check
+# Health check - use Host header to bypass AllowedHosts validation
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8080/api/health || exit 1
+    CMD curl -f http://127.0.0.1:8080/api/health -H "Host: justsku.com" || exit 1
 
 # Entry point
 ENTRYPOINT ["dotnet", "SkuVaultSaaS.Api.dll"]

@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="..\build\SkuVaultSaaS.Api.props" />
-</Project>

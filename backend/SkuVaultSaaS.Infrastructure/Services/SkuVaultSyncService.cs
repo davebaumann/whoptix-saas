@@ -454,7 +454,7 @@ namespace SkuVaultSaaS.Infrastructure.Services
                         Reference = apiMovement.TransactionNote, // Use note as reference since no explicit transaction ID
                         PerformedBy = apiMovement.User,
                         TransactionType = apiMovement.TransactionType,
-                        Context = apiMovement.Context,
+                        Context = apiMovement.ContextId,
                         OccurredAtUtc = apiMovement.TransactionDate,
                         CreatedAtUtc = DateTime.UtcNow
                     };
@@ -575,7 +575,7 @@ namespace SkuVaultSaaS.Infrastructure.Services
                     }
 
                     // Create a unique identifier for this transaction
-                    var skuVaultId = $"{apiTransaction.Sku}_{apiTransaction.TransactionDate:yyyyMMddHHmmss}_{apiTransaction.User}_{apiTransaction.Context ?? "unknown"}_{apiTransaction.Quantity}";
+                    var skuVaultId = $"{apiTransaction.Sku}_{apiTransaction.TransactionDate:yyyyMMddHHmmss}_{apiTransaction.User}_{apiTransaction.ContextId ?? "unknown"}_{apiTransaction.Quantity}";
 
                     // Check if transaction already exists
                     var existingTransaction = await _context.Transactions
@@ -609,13 +609,17 @@ namespace SkuVaultSaaS.Infrastructure.Services
                         ProductId = productId,
                         LocationId = locationId,
                         Sku = apiTransaction.Sku,
+                        Code = apiTransaction.Code,
+                        ScannedCode = apiTransaction.ScannedCode,
+                        Title = apiTransaction.Title,
                         Quantity = apiTransaction.Quantity,
                         QuantityBefore = apiTransaction.QuantityBefore,
                         QuantityAfter = apiTransaction.QuantityAfter,
                         TransactionType = apiTransaction.TransactionType,
                         TransactionReason = apiTransaction.TransactionReason,
                         TransactionNote = apiTransaction.TransactionNote,
-                        Context = apiTransaction.Context,
+                        ContextType = apiTransaction.ContextType,
+                        ContextId = apiTransaction.ContextId,
                         User = apiTransaction.User,
                         PerformedBy = ExtractNameFromUser(apiTransaction.User),
                         TransactionDate = apiTransaction.TransactionDate,

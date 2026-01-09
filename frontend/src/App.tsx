@@ -31,7 +31,8 @@ import LandingPage from './pages/LandingPage'
 import LandingPageAB from './pages/LandingPageAB'
 import TermsOfService from './pages/TermsOfService'
 import PrivacyPolicy from './pages/PrivacyPolicy'
-import ContactUs from './pages/ContactUs'
+import TestContact from './pages/TestContact'
+import ContactUs from './pages/ContactUsNew'
 import Support from './pages/Support'
 import Status from './pages/Status'
 import About from './pages/About'
@@ -63,6 +64,7 @@ function App() {
           <Route path="/terms" element={<TermsOfService />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/contact" element={<ContactUs />} />
+          <Route path="/test-contact" element={<TestContact />} />
           <Route path="/support" element={<Support />} />
           <Route path="/status" element={<Status />} />
           <Route path="/about" element={<About />} />

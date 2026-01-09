@@ -18,7 +18,7 @@ namespace SkuVaultSaaS.Api.Services
             _iv = Encoding.UTF8.GetBytes(ivString);
         }
 
-        public string Encrypt(string plainText)
+        public string? Encrypt(string? plainText)
         {
             if (string.IsNullOrEmpty(plainText))
                 return plainText;
@@ -38,7 +38,7 @@ namespace SkuVaultSaaS.Api.Services
             return Convert.ToBase64String(ms.ToArray());
         }
 
-        public string Decrypt(string cipherText)
+        public string? Decrypt(string? cipherText)
         {
             if (string.IsNullOrEmpty(cipherText))
                 return cipherText;

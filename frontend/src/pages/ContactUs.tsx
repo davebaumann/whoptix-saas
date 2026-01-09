@@ -22,12 +22,31 @@ export default function ContactUs() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Contact form submitted', formData);
     setIsSubmitting(true);
 
     try {
-      // TODO: Implement actual email sending via backend API
-      // For now, simulate submission
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log('Making fetch request to /api/contact');
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          subject: formData.subject,
+          message: `Name: ${formData.name}\nEmail: ${formData.email}\nCompany: ${formData.company || 'Not provided'}\n\nMessage:\n${formData.message}`,
+          userEmail: formData.email
+        })
+      });
+
+      console.log('Response received:', response.status, response.statusText);
+      
+      if (!response.ok) {
+        throw new Error('Failed to send message');
+      }
+      
+      const result = await response.json();
+      console.log('Response data:', result);
       
       setIsSubmitted(true);
       setFormData({
@@ -39,6 +58,7 @@ export default function ContactUs() {
       });
     } catch (error) {
       console.error('Error submitting form:', error);
+      alert('Failed to send message. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -239,6 +259,7 @@ export default function ContactUs() {
                   <button
                     type="submit"
                     disabled={isSubmitting}
+                    onClick={() => console.log('Submit button clicked')}
                     className="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
                   >
                     {isSubmitting ? (

@@ -209,53 +209,106 @@ docker push 123456789012.dkr.ecis.us-east-1.amazonaws.com/justsku-api:latest
 
 ---
 
-## Phase 4: Deploy App Runner
+## Phase 4: Deploy to EC2 t2.micro (Free Tier)
 
-### 4.1 Create App Runner Service
+### 4.1 Launch EC2 Instance
 ```
-AWS Console → App Runner → Create service
+AWS Console → EC2 → Launch instances
 
-Source:
-├─ Container registry source: Amazon ECR
-├─ Amazon ECR repository: justsku-api
-├─ Tag: latest
-└─ ECR access role: Create new role
+Configuration:
+├─ Name: justsku-api
+├─ AMI: Ubuntu Server 24.04 LTS
+├─ Instance type: t2.micro (free tier eligible)
+├─ Key pair: Create new (justsku-api-key)
+├─ Download .pem file to safe location
+└─ Click "Launch instance"
 
-Deployment Configuration:
-├─ Port: 8080 (what .NET listens on)
-├─ CPU: 1 vCPU
-├─ Memory: 2 GB
-├─ Concurrency: 100
-└─ Health check path: /api/health
-
-Service name: justsku-api
+Cost: FREE (first 12 months, 750 hours/month)
 ```
 
-### 4.2 Add Environment Variables
+### 4.2 Configure Security Group
 ```
-After service creates, go to Configuration tab
+EC2 → Security Groups → Find instance security group
 
-Environment variables (add these):
+Inbound Rules (add these):
+├─ SSH (22) from My IP
+├─ HTTP (80) from 0.0.0.0/0
+├─ Custom TCP (8080) from 0.0.0.0/0
+└─ Save
 
-Name                          Value
-────────────────────────────  ──────────────────────────────
-ASPNETCORE_ENVIRONMENT        Production
-DB_NAME                       skuvault_prod
-DB_USER                       admin
-DB_PASSWORD                   [Your RDS password]
-DB_HOST                       [RDS endpoint]
-ENCRYPTION_KEY                [Generate: 32 random chars]
-ENCRYPTION_IV                 1234567890123456
-STRIPE_PUBLISHABLE_KEY        [From Stripe dashboard]
-STRIPE_SECRET_KEY             [From Stripe dashboard]
-STRIPE_WEBHOOK_SECRET         [From Stripe dashboard]
+Outbound Rules:
+└─ HTTPS (443) to 0.0.0.0/0 (for ECR pull)
 ```
 
-### 4.3 Get App Runner URL
+### 4.3 SSH into Instance
+```powershell
+# From your local machine
+cd C:\path\to\your\keys
+ssh -i justsku-api-key.pem ubuntu@YOUR_PUBLIC_IP
 ```
-After deployment completes:
-App Runner → Services → justsku-api
-Copy the default domain (e.g., abcd1234xyz.us-east-1.apprunner.aws.com)
+
+### 4.4 Install Docker on Instance
+```bash
+# On the EC2 instance
+sudo apt-get update
+sudo apt-get upgrade -y
+sudo apt-get install -y docker.io awscli
+sudo usermod -aG docker ubuntu
+
+# Reconnect to apply group changes
+exit
+```
+
+Then SSH back in.
+
+### 4.5 Configure ECR Access & Pull Image
+```bash
+# On the EC2 instance
+aws configure
+# Enter your AWS Access Key ID and Secret Access Key
+
+# Login to ECR
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 324152623799.dkr.ecr.us-east-1.amazonaws.com
+
+# Pull your image
+docker pull 324152623799.dkr.ecr.us-east-1.amazonaws.com/justsku-api:latest
+```
+
+### 4.6 Run Docker Container
+```bash
+docker run -d \
+  --name justsku-api \
+  --restart always \
+  -p 8080:8080 \
+  -e ASPNETCORE_ENVIRONMENT=Production \
+  -e DB_NAME=justsku_prod \
+  -e DB_USER=admin \
+  -e DB_PASSWORD=YOUR_RDS_PASSWORD \
+  -e DB_HOST=justsku-db.c9akciq32.us-east-1.rds.amazonaws.com \
+  -e ENCRYPTION_KEY=YOUR_32_CHAR_KEY \
+  -e ENCRYPTION_IV=1234567890123456 \
+  -e STRIPE_PUBLISHABLE_KEY=YOUR_STRIPE_KEY \
+  -e STRIPE_SECRET_KEY=YOUR_STRIPE_SECRET \
+  -e STRIPE_WEBHOOK_SECRET=YOUR_WEBHOOK_SECRET \
+  324152623799.dkr.ecr.us-east-1.amazonaws.com/justsku-api:latest
+```
+
+### 4.7 Verify Container is Running
+```bash
+# Check status
+docker ps
+
+# View logs
+docker logs justsku-api
+
+# Test health endpoint
+curl http://localhost:8080/api/health
+```
+
+### 4.8 Get Your API URL
+```
+API accessible at: http://YOUR_PUBLIC_IP:8080
+Example: http://54.123.45.67:8080
 ```
 
 ---
@@ -623,15 +676,26 @@ jobs:
 
 ## Cost Estimates (Monthly)
 
+**Year 1 (Free Tier):**
 ```
-RDS t3.micro:        $10-15 (1 year free if new account)
-App Runner:          $40-100 (based on traffic)
-CloudFront:          $10-50 (CDN transfer)
-Route 53:            $0.50 (hosted zone) + $0.40/million queries
-S3:                  $1-10 (storage + transfer)
-ALB:                 $20-30 (per hour + data processing)
+RDS t4g.micro:       $0 (12 months free)
+EC2 t2.micro:        $0 (750 hours/month free)
+CloudFront:          $0-10 (minimal CDN transfer)
+Route 53:            $0.50 (optional DNS)
+S3:                  $0-5 (minimal storage)
 ────────────────────────────
-Total:               $80-240/month (first year likely much lower with free tier)
+Total:               ~$0-5/month
+```
+
+**Year 2+ (Post-Free Tier):**
+```
+RDS t4g.micro:       $10-15/month
+EC2 t2.micro:        $10-15/month
+CloudFront:          $5-20/month (based on traffic)
+Route 53:            $0.50/month (optional)
+S3:                  $1-5/month
+────────────────────────────
+Total:               $25-50/month
 ```
 
 ---
@@ -654,14 +718,30 @@ Total:               $80-240/month (first year likely much lower with free tier)
 
 ## Next Steps
 
-1. **Create AWS Account** (Phase 1)
-2. **Set up RDS Database** (Phase 2)
-3. **Build Docker image & push to ECR** (Phase 3)
-4. **Deploy App Runner** (Phase 4)
+1. **Create AWS Account** (Phase 1) ✅
+2. **Set up RDS Database** (Phase 2) ✅
+3. **Build Docker image & push to ECR** (Phase 3) ✅
+4. **Deploy to EC2 t2.micro** (Phase 4) ← START HERE
 5. **Deploy Frontend to S3/CloudFront** (Phase 5)
-6. **Create ALB** (Phase 6)
-7. **Configure DNS & SSL** (Phase 7-8)
+6. **(Optional) Create ALB** (Phase 6)
+7. **(Optional) Configure DNS & SSL** (Phase 7-8)
 8. **Test everything** (Phase 9)
 9. **Monitor & optimize** (Phase 10)
 
-Need help with any specific phase?
+## Cost Summary (2025)
+
+```
+Year 1 (Free Tier):
+├─ RDS t4g.micro:     $0 (12 months free)
+├─ EC2 t2.micro:      $0 (750 hours/month free)
+├─ S3:                $0 (minimal with free tier)
+├─ CloudFront:        $0 (minimal with free tier)
+├─ Route 53:          $0.50/month (optional)
+└─ Total:             ~$0-5/month
+
+Year 2+:
+├─ RDS t4g.micro:     $10-15/month
+├─ EC2 t2.micro:      $10-15/month
+├─ S3/CloudFront:     $5-20/month
+└─ Total:             $25-50/month (very affordable)
+```

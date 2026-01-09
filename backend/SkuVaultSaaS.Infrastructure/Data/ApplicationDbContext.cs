@@ -20,6 +20,7 @@ namespace SkuVaultSaaS.Infrastructure.Data
         public DbSet<Sale> Sales => Set<Sale>();
         public DbSet<Shipment> Shipments => Set<Shipment>();
         public DbSet<UserInvitation> UserInvitations => Set<UserInvitation>();
+        public DbSet<Suggestion> Suggestions => Set<Suggestion>();
 
         protected override void OnModelCreating(ModelBuilder builder)
         {

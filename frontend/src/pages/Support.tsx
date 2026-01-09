@@ -26,8 +26,24 @@ export default function Support() {
     setIsSubmitting(true);
 
     try {
-      // TODO: Send to techsupport@justsku.com
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await fetch('/api/contact/support', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userEmail: formData.email,
+          priority: formData.priority,
+          category: formData.category,
+          subject: formData.subject,
+          message: formData.message
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to send support request');
+      }
+      
       setIsSubmitted(true);
       setFormData({
         name: '',
@@ -39,6 +55,7 @@ export default function Support() {
       });
     } catch (error) {
       console.error('Error submitting support request:', error);
+      alert('Failed to send support request. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

@@ -49,6 +49,10 @@ builder.Services.AddScoped<UserContextService>();
 // Caching Service for reducing database connections
 builder.Services.AddScoped<SkuVaultSaaS.Api.Services.ICachingService, SkuVaultSaaS.Api.Services.CachingService>();
 
+// Demo Connection Service for routing demo users to demo database
+// This will be registered after demoConnectionString is built below
+// builder.Services.AddScoped<SkuVaultSaaS.Infrastructure.Services.IDemoConnectionService, SkuVaultSaaS.Infrastructure.Services.DemoConnectionService>();
+
 // Report Access Service for membership-based report authorization
 builder.Services.AddScoped<SkuVaultSaaS.Core.Services.IReportAccessService, SkuVaultSaaS.Core.Services.ReportAccessService>();
 
@@ -63,16 +67,18 @@ builder.Services.Configure<SkuVaultSaaS.Infrastructure.Services.EmailSettings>(o
     emailSection.Bind(options);
     
     // Replace environment variable placeholders
-    if (options.Password.Contains("${EMAIL_PASSWORD}"))
+    if (!string.IsNullOrEmpty(options.Password) && options.Password.Contains("${EMAIL_PASSWORD}"))
     {
-        options.Password = options.Password.Replace("${EMAIL_PASSWORD}", Environment.GetEnvironmentVariable("EMAIL_PASSWORD"));
+        var envPassword = Environment.GetEnvironmentVariable("EMAIL_PASSWORD");
+        options.Password = string.IsNullOrEmpty(envPassword) ? options.Password : envPassword;
     }
 
-    // Add this after the email configuration is loaded
-    var emailPassword = builder.Configuration["EmailSettings:Password"];
-    Console.WriteLine($"Email Password loaded: {(string.IsNullOrEmpty(emailPassword) ? "NOT SET" : "SET")}");
-
-
+    Console.WriteLine($"[STARTUP] EmailSettings loaded:");
+    Console.WriteLine($"  SmtpHost: {options.SmtpHost}");
+    Console.WriteLine($"  SmtpPort: {options.SmtpPort}");
+    Console.WriteLine($"  Username: {options.Username}");
+    Console.WriteLine($"  Password: {(string.IsNullOrEmpty(options.Password) ? "NOT SET" : "SET")}");
+    Console.WriteLine($"  FromName: {options.FromName}");
 });
 builder.Services.Configure<SkuVaultSaaS.Infrastructure.HostedServices.LowStockNotificationSettings>(
     builder.Configuration.GetSection("LowStockNotificationSettings"));
@@ -96,7 +102,7 @@ builder.Services.AddHostedService<SkuVaultSaaS.Infrastructure.HostedServices.Cus
 
 
 // MySQL connection string with environment variable substitution
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+var connectionStringTemplate = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
 // Replace environment variable placeholders
@@ -110,13 +116,28 @@ Console.WriteLine($"[DEBUG] DB_NAME env var: {dbName}");
 Console.WriteLine($"[DEBUG] DB_USER env var: {dbUser}");
 Console.WriteLine($"[DEBUG] DB_PASSWORD env var: {(string.IsNullOrEmpty(dbPassword) ? "NOT SET" : "***")}");
 
-connectionString = connectionString.Replace("${DB_HOST}", dbHost);
+var connectionString = connectionStringTemplate.Replace("${DB_HOST}", dbHost);
 connectionString = connectionString.Replace("${DB_NAME}", dbName);
 connectionString = connectionString.Replace("${DB_USER}", dbUser);
 connectionString = connectionString.Replace("${DB_PASSWORD}", dbPassword);
 
-// Log the final connection string for debugging (DO NOT log passwords in production)
+// Also build the demo connection string (uses same credentials but different database name)
+var demoConnectionStringTemplate = builder.Configuration.GetConnectionString("DemoConnection")
+    ?? throw new InvalidOperationException("Connection string 'DemoConnection' not found.");
+var demoConnectionString = demoConnectionStringTemplate.Replace("${DB_HOST}", dbHost);
+demoConnectionString = demoConnectionString.Replace("${DB_USER}", dbUser);
+demoConnectionString = demoConnectionString.Replace("${DB_PASSWORD}", dbPassword);
+// DemoConnection hardcodes justsku_demo as the database name, so no need to replace ${DB_NAME}
+
+// Log the final connection strings for debugging (DO NOT log passwords in production)
 Console.WriteLine($"[DEBUG] Final DB Connection String: Server=***;Database={dbName};User={dbUser};Password=***;...");
+Console.WriteLine($"[DEBUG] Final Demo Connection String: Server=***;Database=justsku_demo;User={dbUser};Password=***;...");
+
+// Now that demoConnectionString is built, register the DemoConnectionService with the substituted demo connection string
+builder.Services.AddScoped<SkuVaultSaaS.Infrastructure.Services.IDemoConnectionService>(provider =>
+{
+    return new SkuVaultSaaS.Infrastructure.Services.DemoConnectionService(demoConnectionString);
+});
 
 // Also handle other configuration substitutions for AllowedHosts
 var allowedHostsEnv = Environment.GetEnvironmentVariable("ALLOWED_HOSTS");
@@ -186,6 +207,38 @@ try
     catch (Exception ex) when (ex.Message.Contains("ParameterNotFound") || ex is Amazon.SimpleSystemsManagement.AmazonSimpleSystemsManagementException)
     {
         Console.WriteLine("[WARN] Stripe Webhook Secret not found in Parameter Store, using environment/config value");
+    }
+    
+    // Fetch Encryption Key
+    try
+    {
+        var encryptionKeyParam = ssm.GetParameterAsync(new GetParameterRequest 
+        { 
+            Name = "/justsku/ENCRYPTION_KEY", 
+            WithDecryption = true 
+        }).GetAwaiter().GetResult();
+        builder.Configuration["Encryption:Key"] = encryptionKeyParam.Parameter.Value;
+        Console.WriteLine("[INFO] Encryption Key loaded from Parameter Store");
+    }
+    catch (Exception ex) when (ex.Message.Contains("ParameterNotFound") || ex is Amazon.SimpleSystemsManagement.AmazonSimpleSystemsManagementException)
+    {
+        Console.WriteLine("[WARN] Encryption Key not found in Parameter Store, using environment/config value");
+    }
+    
+    // Fetch Encryption IV
+    try
+    {
+        var encryptionIvParam = ssm.GetParameterAsync(new GetParameterRequest 
+        { 
+            Name = "/justsku/ENCRYPTION_IV", 
+            WithDecryption = true 
+        }).GetAwaiter().GetResult();
+        builder.Configuration["Encryption:IV"] = encryptionIvParam.Parameter.Value;
+        Console.WriteLine("[INFO] Encryption IV loaded from Parameter Store");
+    }
+    catch (Exception ex) when (ex.Message.Contains("ParameterNotFound") || ex is Amazon.SimpleSystemsManagement.AmazonSimpleSystemsManagementException)
+    {
+        Console.WriteLine("[WARN] Encryption IV not found in Parameter Store, using environment/config value");
     }
 }
 catch (Exception ex)
@@ -350,6 +403,8 @@ var app = builder.Build();
 
 Console.WriteLine($"=== JUSTSKU API Startup ===");
 Console.WriteLine($"Environment: {app.Environment.EnvironmentName}");
+Console.WriteLine($"BUILD TIMESTAMP: {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
+Console.WriteLine($"CONTACT CONTROLLER: Fixed to use Infrastructure EmailService");
 Console.WriteLine($"CORS Origins: {string.Join(", ", builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? new[] { "localhost:5173" })}");
 
 // Configure static file serving for React app
@@ -458,7 +513,8 @@ app.MapGet("/api/health", () =>
     return Results.Ok(new { 
         status = "healthy",
         timestamp = DateTime.UtcNow.ToString("o"),
-        service = "JUSTSKU API"
+        service = "JUSTSKU API",
+        buildTime = "2024-12-18 19:30:00 UTC"
     });
 });
 

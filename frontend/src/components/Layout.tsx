@@ -2,6 +2,7 @@ import { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useMembership } from '../contexts/MembershipContext'
+import Footer from './Footer'
 
 interface LayoutProps {
   children: ReactNode
@@ -49,7 +50,7 @@ export default function Layout({ children }: LayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       <nav className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-2" style={{ minHeight: '56px' }}>
@@ -95,7 +96,7 @@ export default function Layout({ children }: LayoutProps) {
         </div>
       </nav>
 
-      <div className="flex">
+      <div className="flex flex-1">
         <aside className="w-64 bg-white shadow-sm min-h-[calc(100vh-4rem)]">
           <nav className="mt-5 px-2 space-y-1">
             {navItems.map((item) => {
@@ -124,6 +125,8 @@ export default function Layout({ children }: LayoutProps) {
           {children}
         </main>
       </div>
+
+      <Footer />
     </div>
   )
 }

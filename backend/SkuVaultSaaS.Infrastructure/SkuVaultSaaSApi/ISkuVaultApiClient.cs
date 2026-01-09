@@ -59,6 +59,9 @@ namespace SkuVaultSaaS.Infrastructure.SkuVaultSaaSApi
     public class SkuVaultInventoryMovementDto
     {
         public string Sku { get; set; } = string.Empty;
+        public string? Code { get; set; }  // Product code from SkuVault
+        public string? ScannedCode { get; set; }  // Barcode/scan identifier
+        public string? Title { get; set; }  // Product title from SkuVault
         public string? Location { get; set; }  // SkuVault returns full location string like "WAREHOUSE--CODE"
         public int Quantity { get; set; }  // The quantity change (positive or negative)
         public int QuantityBefore { get; set; }
@@ -68,7 +71,8 @@ namespace SkuVaultSaaS.Infrastructure.SkuVaultSaaSApi
         public string? User { get; set; }  // Email of user who performed the transaction
         public DateTime TransactionDate { get; set; }
         public string? TransactionType { get; set; }  // e.g., "Remove", "Add", "Transfer"
-        public string? Context { get; set; }
+        public string? ContextType { get; set; }  // Type of context (e.g., "Sale")
+        public string? ContextId { get; set; }  // ID from context (e.g., sale ID)
     }
 
     public class SkuVaultShipmentDto

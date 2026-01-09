@@ -6,13 +6,17 @@ namespace SkuVaultSaaS.Core.Models
         public string Name { get; set; } = null!;
         public ICollection<Customer> Customers { get; set; } = new List<Customer>();
         
-    // SkuVault API credentials
-    public string? SkuVaultEmail { get; set; }
-    public string? SkuVaultPassword { get; set; }
+        // SkuVault API credentials
+        public string? SkuVaultEmail { get; set; }
+        public string? SkuVaultPassword { get; set; }
         
-    // SkuVault API tokens (retrieved via getTokens)
-    public string? SkuVaultAccountId { get; set; }
-    public string? SkuVaultTenantToken { get; set; }
-    public string? SkuVaultUserToken { get; set; }
+        // SkuVault API tokens (retrieved via getTokens)
+        public string? SkuVaultAccountId { get; set; }
+        public string? SkuVaultTenantToken { get; set; }
+        public string? SkuVaultUserToken { get; set; }
+        
+        // Audit timestamps
+        public DateTime CreatedAtUtc { get; set; }
+        public DateTime UpdatedAtUtc { get; set; }
     }
 }

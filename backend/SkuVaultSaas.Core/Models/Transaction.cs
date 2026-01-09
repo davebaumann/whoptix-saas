@@ -13,6 +13,9 @@ namespace SkuVaultSaaS.Core.Models
 
         // Transaction details
         public string Sku { get; set; } = string.Empty;
+        public string? Code { get; set; } // Product code from SkuVault
+        public string? ScannedCode { get; set; } // Barcode/scan identifier
+        public string? Title { get; set; } // Product title from SkuVault
         public int Quantity { get; set; } // The quantity change (positive or negative)
         public int QuantityBefore { get; set; } // Quantity before transaction
         public int QuantityAfter { get; set; } // Quantity after transaction
@@ -21,7 +24,8 @@ namespace SkuVaultSaaS.Core.Models
         public string? TransactionType { get; set; } // e.g., "Remove", "Add", "Transfer", "Pick", "Pack"
         public string? TransactionReason { get; set; } // Why the transaction occurred
         public string? TransactionNote { get; set; } // Additional notes
-        public string? Context { get; set; } // Sale ID or other context from SkuVault API
+        public string? ContextType { get; set; } // Type of context (e.g., "Sale")
+        public string? ContextId { get; set; } // ID from context (e.g., sale ID)
         
         // User information
         public string? User { get; set; } // Email of user who performed the transaction
