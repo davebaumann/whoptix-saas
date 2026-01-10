@@ -157,6 +157,28 @@ namespace SkuVaultSaaS.Api.Controllers
             return Ok(tiers);
         }
 
+        [HttpGet("pricing-config")]
+        public IActionResult GetPricingConfig()
+        {
+            try
+            {
+                var priceIds = _configuration.GetSection("Stripe:PriceIds");
+                var pricingConfig = new PricingConfigDto();
+                
+                foreach (var child in priceIds.GetChildren())
+                {
+                    pricingConfig.PriceIds[child.Key] = child.Value ?? string.Empty;
+                }
+                
+                return Ok(pricingConfig);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving pricing configuration");
+                return StatusCode(500, "Error retrieving pricing configuration");
+            }
+        }
+
         [HttpGet("admin/report-access-config")]
         [Authorize(Roles = "Admin")]
         public IActionResult GetReportAccessConfig()

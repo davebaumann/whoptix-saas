@@ -29,4 +29,9 @@ namespace SkuVaultSaaS.Api.Models
         public MembershipLevel NewLevel { get; set; }
         public string? Reason { get; set; }
     }
+
+    public class PricingConfigDto
+    {
+        public Dictionary<string, string> PriceIds { get; set; } = new Dictionary<string, string>();
+    }
 }

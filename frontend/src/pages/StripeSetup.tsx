@@ -37,7 +37,7 @@ function PaymentForm({ tier, tierInfo }: { tier: string; tierInfo: { name: strin
       console.log('Creating payment intent for email:', user.email);
       
       // Create payment intent
-      const priceId = stripeService.getPriceIdFromTier(tier);
+      const priceId = await stripeService.getPriceIdFromTier(tier);
       console.log('Price ID:', priceId);
       
       const { clientSecret } = await stripeService.createPaymentIntent({
