@@ -12,6 +12,7 @@ using System.Text;
 using System.Text.Json.Serialization;
 using SkuVaultSaaS.Api.Services;
 using SkuVaultSaaS.Core.Models;
+using SkuVaultSaaS.Core.Services;
 using Amazon.SimpleSystemsManagement;
 using Amazon.SimpleSystemsManagement.Model;
 
@@ -19,6 +20,13 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Load environment variables from .env file
 DotNetEnv.Env.Load();
+
+// Explicitly configure to load environment-specific appsettings
+var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production";
+builder.Configuration
+    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+    .AddJsonFile($"appsettings.{environment}.json", optional: true, reloadOnChange: true)
+    .AddEnvironmentVariables();
 
 // Register a pluggable secret provider. The default implementation reads from IConfiguration
 // which includes environment variables and any other configuration providers registered below.
@@ -94,6 +102,9 @@ builder.Services.AddHostedService<SkuVaultSaaS.Infrastructure.HostedServices.Low
 
 // Enable customer data purge service
 builder.Services.AddHostedService<SkuVaultSaaS.Infrastructure.HostedServices.CustomerDataPurgeService>();
+
+// Enable demo data refresh service (daily at 6 AM ET)
+builder.Services.AddHostedService<DemoDataRefreshService>();
 
 // Note: SkuVaultSyncJob is disabled for local development against the managed remote DB
 // because the hosted DB schema on the provider doesn't match migrations and the sync
@@ -177,6 +188,32 @@ try
 {
     var ssm = new AmazonSimpleSystemsManagementClient();
     
+    // Fetch Stripe Publishable Key
+    try
+    {
+        var pubKeyParam = ssm.GetParameterAsync(new GetParameterRequest 
+        { 
+            Name = "stripe-publishable-key", 
+            WithDecryption = true 
+        }).GetAwaiter().GetResult();
+        builder.Configuration["Stripe:PublishableKey"] = pubKeyParam.Parameter.Value;
+        Console.WriteLine("[INFO] Stripe Publishable Key loaded from Parameter Store");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[WARN] Stripe Publishable Key failed. Exception: {ex.GetType().Name}: {ex.Message}");
+        var pubKeyEnv = Environment.GetEnvironmentVariable("STRIPE_PUBLISHABLE_KEY");
+        if (!string.IsNullOrEmpty(pubKeyEnv))
+        {
+            builder.Configuration["Stripe:PublishableKey"] = pubKeyEnv;
+            Console.WriteLine("[INFO] ✓ Stripe Publishable Key loaded from environment variable");
+        }
+        else
+        {
+            Console.WriteLine("[ERROR] ✗ STRIPE_PUBLISHABLE_KEY env var not set!");
+        }
+    }
+    
     // Fetch Stripe Secret Key
     try
     {
@@ -239,6 +276,27 @@ try
     catch (Exception ex) when (ex.Message.Contains("ParameterNotFound") || ex is Amazon.SimpleSystemsManagement.AmazonSimpleSystemsManagementException)
     {
         Console.WriteLine("[WARN] Encryption IV not found in Parameter Store, using environment/config value");
+    }
+    
+    // Fetch Stripe Price Amounts
+    Console.WriteLine("[DEBUG] Starting to fetch Stripe Price Amounts from Parameter Store...");
+    string[] priceAmountKeys = { "standard_monthly", "premium_monthly", "enterprise_monthly" };
+    foreach (var key in priceAmountKeys)
+    {
+        try
+        {
+            var priceAmountParam = ssm.GetParameterAsync(new GetParameterRequest 
+            { 
+                Name = "/justsku/Stripe/PriceAmounts/" + key, 
+                WithDecryption = false 
+            }).GetAwaiter().GetResult();
+            builder.Configuration["Stripe:PriceAmounts:" + key] = priceAmountParam.Parameter.Value;
+            Console.WriteLine("[INFO] Stripe PriceAmount for " + key + " loaded from Parameter Store: " + priceAmountParam.Parameter.Value);
+        }
+        catch (Exception ex) when (ex.Message.Contains("ParameterNotFound") || ex is Amazon.SimpleSystemsManagement.AmazonSimpleSystemsManagementException)
+        {
+            Console.WriteLine("[WARN] Stripe PriceAmount for " + key + " not found in Parameter Store, using config value");
+        }
     }
 }
 catch (Exception ex)
