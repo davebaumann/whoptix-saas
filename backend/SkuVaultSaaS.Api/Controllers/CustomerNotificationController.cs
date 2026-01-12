@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SkuVaultSaaS.Infrastructure.Data;
 using SkuVaultSaaS.Api.Services;
+using SkuVaultSaaS.Core.Enums;
 
 namespace SkuVaultSaaS.Api.Controllers
 {
@@ -34,11 +35,16 @@ namespace SkuVaultSaaS.Api.Controllers
                 return NotFound();
             }
 
+            // Check if customer has permission to view low stock notification settings
+            bool canEnableNotifications = customer.MembershipLevel >= MembershipLevel.Premium;
+
             return Ok(new
             {
                 lowStockNotificationsEnabled = customer.LowStockNotificationsEnabled,
                 lowStockNotificationEmail = customer.LowStockNotificationEmail,
-                lowStockCheckIntervalMinutes = customer.LowStockCheckIntervalMinutes
+                lowStockCheckIntervalMinutes = customer.LowStockCheckIntervalMinutes,
+                canEnableNotifications = canEnableNotifications,
+                membershipLevel = customer.MembershipLevel.ToString()
             });
         }
 
@@ -54,6 +60,17 @@ namespace SkuVaultSaaS.Api.Controllers
             if (customer == null)
             {
                 return NotFound();
+            }
+
+            // Only Premium tier and above can enable low stock notifications
+            if (request.LowStockNotificationsEnabled && customer.MembershipLevel < MembershipLevel.Premium)
+            {
+                return BadRequest(new 
+                { 
+                    message = "Low stock email notifications require Premium membership tier or higher. Please upgrade your membership to enable this feature.",
+                    requiredTier = "Premium",
+                    currentTier = customer.MembershipLevel.ToString()
+                });
             }
 
             customer.LowStockNotificationsEnabled = request.LowStockNotificationsEnabled;
