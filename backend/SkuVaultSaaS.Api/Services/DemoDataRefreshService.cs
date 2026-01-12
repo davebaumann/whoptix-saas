@@ -25,7 +25,10 @@ namespace SkuVaultSaaS.Api.Services
         {
             _logger.LogInformation("DemoDataRefreshService starting");
 
-            // Schedule to run at 6 AM Eastern Time daily
+            // Run immediately on startup to populate demo data
+            await RefreshDemoDataAsync();
+
+            // Then schedule to run at 6 AM Eastern Time daily
             var nextRun = GetNextRunTime();
             _timer = new Timer(async _ => await RefreshDemoDataAsync(), null, nextRun, TimeSpan.FromHours(24));
 
