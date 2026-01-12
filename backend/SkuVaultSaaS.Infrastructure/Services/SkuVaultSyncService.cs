@@ -87,7 +87,7 @@ namespace SkuVaultSaaS.Infrastructure.Services
             try
             {
                 // Add delays between API calls to avoid rate limiting
-                const int delayBetweenCallsMs = 1000; // Increased from 500ms to reduce rate limiting
+                const int delayBetweenCallsMs = 2000; // Increased from 1000ms to reduce rate limiting
 
                 await SyncProductsAsync(customerId);
                 await Task.Delay(delayBetweenCallsMs);
@@ -149,8 +149,8 @@ namespace SkuVaultSaaS.Infrastructure.Services
             // SkuVault API has a 7-day maximum date range, so chunk the requests
             var allSales = new List<SkuVaultSaleDto>();
             var chunkStart = fromDate;
-            const int daysPerChunk = 7;
-            const int delayBetweenChunksMs = 800; // Increased from 300ms to reduce rate limiting
+            const int daysPerChunk = 6; // Use 6 days to stay under the 7-day limit
+            const int delayBetweenChunksMs = 1500; // Increased to 1.5 seconds to avoid rate limiting
 
             while (chunkStart < toDate)
             {
@@ -161,8 +161,19 @@ namespace SkuVaultSaaS.Infrastructure.Services
                 _logger.LogInformation("Requesting sales chunk: {From} to {To}", chunkStart, chunkEnd);
                 
                 // Use /getsalesbydate endpoint for incremental sales sync
-                var chunkSales = await _apiClient.GetSalesAsync(tenantToken, userToken, chunkStart, chunkEnd);
-                allSales.AddRange(chunkSales);
+                try
+                {
+                    var chunkSales = await _apiClient.GetSalesAsync(tenantToken, userToken, chunkStart, chunkEnd);
+                    allSales.AddRange(chunkSales);
+                }
+                catch (HttpRequestException ex) when (ex.Message.Contains("429"))
+                {
+                    _logger.LogWarning("Rate limited while fetching sales chunk {ChunkStart} to {ChunkEnd}, skipping this chunk", chunkStart, chunkEnd);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to fetch sales for chunk {ChunkStart} to {ChunkEnd}", chunkStart, chunkEnd);
+                }
 
                 chunkStart = chunkEnd;
                 
@@ -478,7 +489,7 @@ namespace SkuVaultSaaS.Infrastructure.Services
             DateTime chunkStart = fromDate;
             while (chunkStart < toDate)
             {
-                DateTime chunkEnd = chunkStart.AddDays(7);
+                DateTime chunkEnd = chunkStart.AddDays(6); // Use 6 days to stay under 7-day limit
                 if (chunkEnd > toDate) chunkEnd = toDate;
                 _logger.LogInformation($"Requesting inventory movements chunk: {chunkStart:u} to {chunkEnd:u}");
                 try
@@ -503,7 +514,7 @@ namespace SkuVaultSaaS.Infrastructure.Services
                 // Add delay between chunks to avoid overwhelming the API
                 if (chunkStart < toDate)
                 {
-                    await Task.Delay(1000); // 1 second between chunks
+                    await Task.Delay(1500); // Increased from 1000ms to reduce rate limiting
                 }
             }
 
@@ -646,12 +657,12 @@ namespace SkuVaultSaaS.Infrastructure.Services
             var tenantToken = DecryptToken(customer.Tenant.SkuVaultTenantToken);
             var userToken = DecryptToken(customer.Tenant.SkuVaultUserToken);
 
-            // Fetch transactions in 7-day chunks
+            // Fetch transactions in 6-day chunks (stay under 7-day limit)
             var allApiTransactions = new List<SkuVaultInventoryMovementDto>();
             DateTime chunkStart = fromDate;
             while (chunkStart < toDate)
             {
-                DateTime chunkEnd = chunkStart.AddDays(7);
+                DateTime chunkEnd = chunkStart.AddDays(6); // Use 6 days to stay under 7-day limit
                 if (chunkEnd > toDate) chunkEnd = toDate;
                 _logger.LogInformation($"Requesting transactions chunk: {chunkStart:u} to {chunkEnd:u}");
                 try
@@ -676,7 +687,7 @@ namespace SkuVaultSaaS.Infrastructure.Services
                 // Add delay between chunks to avoid overwhelming the API
                 if (chunkStart < toDate)
                 {
-                    await Task.Delay(1000); // 1 second between chunks
+                    await Task.Delay(1500); // Increased from 1000ms to reduce rate limiting
                 }
             }
 
