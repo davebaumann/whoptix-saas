@@ -38,7 +38,7 @@ namespace SkuVaultSaaS.Infrastructure.Services
         /// <summary>
         /// Decrypts a token from the database. Handles cases where token is already decrypted or null.
         /// </summary>
-        private string DecryptToken(string encryptedToken)
+        private string? DecryptToken(string? encryptedToken)
         {
             if (string.IsNullOrEmpty(encryptedToken))
                 return encryptedToken;

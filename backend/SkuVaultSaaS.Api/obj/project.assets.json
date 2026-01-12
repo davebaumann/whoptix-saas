@@ -8582,7 +8582,7 @@
   },
   "projectFileDependencyGroups": {
     "net8.0": [
-      "AWSSDK.SimpleSystemsManagement >= 3.7.306.19",
+      "AWSSDK.SimpleSystemsManagement >= 3.7.400",
       "DotNetEnv >= 3.1.1",
       "EFCore.BulkExtensions >= 10.0.0",
       "Microsoft.AspNetCore.Authentication.JwtBearer >= 8.0.8",
@@ -8650,7 +8650,7 @@
         "dependencies": {
           "AWSSDK.SimpleSystemsManagement": {
             "target": "Package",
-            "version": "[3.7.306.19, )"
+            "version": "[3.7.400, )"
           },
           "DotNetEnv": {
             "target": "Package",
@@ -8725,17 +8725,5 @@
         "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.415/PortableRuntimeIdentifierGraph.json"
       }
     }
-  },
-  "logs": [
-    {
-      "code": "NU1603",
-      "level": "Warning",
-      "warningLevel": 1,
-      "message": "SkuVaultSaaS.Api depends on AWSSDK.SimpleSystemsManagement (>= 3.7.306.19) but AWSSDK.SimpleSystemsManagement 3.7.306.19 was not found. An approximate best match of AWSSDK.SimpleSystemsManagement 3.7.400 was resolved.",
-      "libraryId": "AWSSDK.SimpleSystemsManagement",
-      "targetGraphs": [
-        "net8.0"
-      ]
-    }
-  ]
+  }
 }

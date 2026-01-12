@@ -133,7 +133,7 @@ namespace SkuVaultSaaS.Api.Controllers
             return Ok(new TenantTokensDto { TenantToken = tokens.TenantToken, UserToken = tokens.UserToken });
         }
 
-        private string EncryptPassword(string plainText)
+        private string? EncryptPassword(string? plainText)
         {
             if (string.IsNullOrEmpty(plainText))
                 return plainText;
@@ -142,7 +142,7 @@ namespace SkuVaultSaaS.Api.Controllers
             return encryptionService.Encrypt(plainText);
         }
 
-        private string DecryptPassword(string cipherText)
+        private string? DecryptPassword(string? cipherText)
         {
             if (string.IsNullOrEmpty(cipherText))
                 return cipherText;

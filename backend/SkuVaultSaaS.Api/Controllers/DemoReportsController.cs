@@ -38,7 +38,7 @@ namespace SkuVaultSaaS.Api.Controllers
         /// </summary>
         private ApplicationDbContext GetDemoContext()
         {
-            var connectionString = _demoConnectionService.GetConnectionString(null); // Demo users have no User principal
+            var connectionString = _demoConnectionService.GetConnectionString(null!); // Demo users have no ClaimsPrincipal
             var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
             optionsBuilder.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
             return new ApplicationDbContext(optionsBuilder.Options);

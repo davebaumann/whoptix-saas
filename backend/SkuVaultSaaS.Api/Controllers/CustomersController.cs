@@ -428,7 +428,7 @@ namespace SkuVaultSaaS.Api.Controllers
                 var decryptedPassword = _encryptionService.Decrypt(tenant.SkuVaultPassword);
 
                 // Call GetSkuVaultTokens to refresh the tokens
-                var tokens = await GetSkuVaultTokens(tenant.SkuVaultEmail, decryptedPassword);
+                var tokens = await GetSkuVaultTokens(tenant.SkuVaultEmail ?? string.Empty, decryptedPassword ?? string.Empty);
                 if (tokens == null)
                 {
                     return BadRequest(new { message = "Failed to retrieve SkuVault tokens" });

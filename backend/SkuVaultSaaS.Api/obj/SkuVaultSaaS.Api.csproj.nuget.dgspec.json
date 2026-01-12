@@ -52,7 +52,7 @@
           "dependencies": {
             "AWSSDK.SimpleSystemsManagement": {
               "target": "Package",
-              "version": "[3.7.306.19, )"
+              "version": "[3.7.400, )"
             },
             "DotNetEnv": {
               "target": "Package",
