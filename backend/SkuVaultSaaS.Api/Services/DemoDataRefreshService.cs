@@ -104,38 +104,16 @@ namespace SkuVaultSaaS.Api.Services
 
         private async Task InsertSalesBatchAsync(ApplicationDbContext context, List<Sale> sales)
         {
-            // Build parameterized SQL insert for high-performance batch insert
-            const int batchSize = 500;
-            
-            for (int i = 0; i < sales.Count; i += batchSize)
+            // Use AddRange + SaveChangesAsync for simpler, more reliable batch insert
+            try
             {
-                var batch = sales.Skip(i).Take(batchSize).ToList();
-                
-                // Build multi-row INSERT VALUES clause
-                var valuesClauses = new List<string>();
-                var paramList = new List<object>();
-                
-                for (int j = 0; j < batch.Count; j++)
-                {
-                    var sale = batch[j];
-                    valuesClauses.Add($"(@CustomerId{j}, @SaleId{j}, @Sku{j}, @Quantity{j}, @SaleDate{j}, @Channel{j}, @OrderNumber{j}, @Price{j}, @CustomerName{j}, @CustomerEmail{j})");
-                    
-                    paramList.Add(sale.CustomerId);
-                    paramList.Add(sale.SaleId);
-                    paramList.Add(sale.Sku);
-                    paramList.Add(sale.Quantity);
-                    paramList.Add(sale.SaleDate);
-                    paramList.Add(sale.Channel ?? "");
-                    paramList.Add(sale.OrderNumber ?? "");
-                    paramList.Add(sale.Price);
-                    paramList.Add(sale.CustomerName ?? "");
-                    paramList.Add(sale.CustomerEmail ?? "");
-                }
-                
-                var sql = $@"INSERT INTO Sales (CustomerId, SaleId, Sku, Quantity, SaleDate, Channel, OrderNumber, Price, CustomerName, CustomerEmail) 
-                             VALUES {string.Join(",", valuesClauses)}";
-                
-                await context.Database.ExecuteSqlRawAsync(sql, paramList.ToArray());
+                context.Sales.AddRange(sales);
+                await context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during batch insert of demo sales data. Count: {Count}", sales.Count);
+                throw;
             }
         }
 
