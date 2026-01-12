@@ -53,7 +53,7 @@ class StripeService {
     }
 
     this.pricingConfigCache = await response.json();
-    return this.pricingConfigCache;
+    return this.pricingConfigCache!;
   }
 
   async getPriceIdFromTier(tier: string): Promise<string> {

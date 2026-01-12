@@ -38,7 +38,17 @@ namespace SkuVaultSaaS.Api.Services
         private TimeSpan GetNextRunTime()
         {
             var now = DateTime.UtcNow;
-            var easternZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
+            TimeZoneInfo easternZone;
+            try
+            {
+                // Try Windows timezone name first (for development)
+                easternZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
+            }
+            catch
+            {
+                // Fallback to IANA timezone name for Linux containers
+                easternZone = TimeZoneInfo.FindSystemTimeZoneById("America/New_York");
+            }
             var easternNow = TimeZoneInfo.ConvertTime(now, easternZone);
 
             // Target time: 6 AM ET
@@ -66,7 +76,17 @@ namespace SkuVaultSaaS.Api.Services
                 using var scope = _serviceProvider.CreateScope();
                 var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-                var easternZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
+                TimeZoneInfo easternZone;
+                try
+                {
+                    // Try Windows timezone name first (for development)
+                    easternZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
+                }
+                catch
+                {
+                    // Fallback to IANA timezone name for Linux containers
+                    easternZone = TimeZoneInfo.FindSystemTimeZoneById("America/New_York");
+                }
                 var easternNow = TimeZoneInfo.ConvertTime(DateTime.UtcNow, easternZone);
                 
                 bool isWeeklyPurge = easternNow.DayOfWeek == DayOfWeek.Sunday;

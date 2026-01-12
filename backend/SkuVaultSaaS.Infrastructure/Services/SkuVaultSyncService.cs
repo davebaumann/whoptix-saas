@@ -133,13 +133,31 @@ namespace SkuVaultSaaS.Infrastructure.Services
             var tenantToken = DecryptToken(customer.Tenant.SkuVaultTenantToken);
             var userToken = DecryptToken(customer.Tenant.SkuVaultUserToken);
 
-            // Use /getsalesbydate endpoint for incremental sales sync
-            var apiSales = await _apiClient.GetSalesAsync(tenantToken, userToken, fromDate, toDate);
-            _logger.LogInformation("Received {Count} sales from SkuVault API for customer {CustomerId} (from {FromDate} to {ToDate})", apiSales.Count, customerId, fromDate, toDate);
+            // SkuVault API has a 7-day maximum date range, so chunk the requests
+            var allSales = new List<SkuVaultSaleDto>();
+            var chunkStart = fromDate;
+            const int daysPerChunk = 7;
+
+            while (chunkStart < toDate)
+            {
+                var chunkEnd = chunkStart.AddDays(daysPerChunk);
+                if (chunkEnd > toDate)
+                    chunkEnd = toDate;
+
+                _logger.LogInformation("Requesting sales chunk: {From} to {To}", chunkStart, chunkEnd);
+                
+                // Use /getsalesbydate endpoint for incremental sales sync
+                var chunkSales = await _apiClient.GetSalesAsync(tenantToken, userToken, chunkStart, chunkEnd);
+                allSales.AddRange(chunkSales);
+
+                chunkStart = chunkEnd;
+            }
+
+            _logger.LogInformation("Received {Count} sales from SkuVault API for customer {CustomerId} (from {FromDate} to {ToDate})", allSales.Count, customerId, fromDate, toDate);
 
             int added = 0, updated = 0;
             DateTime? latestSaleDate = null;
-            foreach (var apiSale in apiSales)
+            foreach (var apiSale in allSales)
             {
                 var item = apiSale.SaleItems?.FirstOrDefault();
                 if (item == null)

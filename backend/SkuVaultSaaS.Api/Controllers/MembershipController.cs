@@ -158,6 +158,7 @@ namespace SkuVaultSaaS.Api.Controllers
         }
 
         [HttpGet("pricing-config")]
+        [AllowAnonymous]
         public IActionResult GetPricingConfig()
         {
             try

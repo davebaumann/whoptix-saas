@@ -27,8 +27,8 @@ WORKDIR /app
 # Copy published application
 COPY --from=publish /app/publish .
 
-# Copy appsettings files from the build stage to ensure they're current
-COPY --from=build /src/SkuVaultSaaS.Api/appsettings*.json ./
+# Copy appsettings files directly from source context (not from build stage)
+COPY SkuVaultSaaS.Api/appsettings.Production.json ./
 
 # Expose port (App Runner uses 8080 by default)
 EXPOSE 8080

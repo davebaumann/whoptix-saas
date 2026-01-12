@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using SkuVaultSaaS.Core.Services;
 
 namespace SkuVaultSaaS.Api.Services
 {

@@ -1,5 +1,5 @@
 using SkuVaultSaaS.Infrastructure.Data;
-using SkuVaultSaaS.Api.Services;
+using SkuVaultSaaS.Core.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 

@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("SkuVaultSaaS.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+850c911c3bb11a940b67c0bbf0e409432af6042c")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+19f0233e4fae9d3a1a25b582ee6a5d47d6642c32")]
 [assembly: System.Reflection.AssemblyProductAttribute("SkuVaultSaaS.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("SkuVaultSaaS.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

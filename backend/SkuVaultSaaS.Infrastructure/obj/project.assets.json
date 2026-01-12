@@ -15,6 +15,9 @@
           }
         }
       },
+      "EFCore.BulkExtensions/10.0.0": {
+        "type": "package"
+      },
       "MailKit/4.14.1": {
         "type": "package",
         "dependencies": {
@@ -567,6 +570,20 @@
         "lib/netstandard2.0/BouncyCastle.Cryptography.dll",
         "lib/netstandard2.0/BouncyCastle.Cryptography.xml",
         "packageIcon.png"
+      ]
+    },
+    "EFCore.BulkExtensions/10.0.0": {
+      "sha512": "TfwVMj9T0hGnpq9QmsT6TF8X/wXphdhME9JdE0A/G3lrRs86keSXCZwlkhh95dUIFbuZJLvETLs6zGB4nsLVdg==",
+      "type": "package",
+      "path": "efcore.bulkextensions/10.0.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "EFCoreBulk.png",
+        "LICENSE.txt",
+        "README.md",
+        "efcore.bulkextensions.10.0.0.nupkg.sha512",
+        "efcore.bulkextensions.nuspec"
       ]
     },
     "MailKit/4.14.1": {
@@ -1409,6 +1426,7 @@
   },
   "projectFileDependencyGroups": {
     "net8.0": [
+      "EFCore.BulkExtensions >= 10.0.0",
       "MailKit >= 4.14.1",
       "Microsoft.AspNetCore.Identity.EntityFrameworkCore >= 8.0.8",
       "Microsoft.EntityFrameworkCore >= 8.0.8",
@@ -1465,6 +1483,10 @@
       "net8.0": {
         "targetAlias": "net8.0",
         "dependencies": {
+          "EFCore.BulkExtensions": {
+            "target": "Package",
+            "version": "[10.0.0, )"
+          },
           "MailKit": {
             "target": "Package",
             "version": "[4.14.1, )"

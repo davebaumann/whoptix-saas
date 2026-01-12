@@ -36,6 +36,14 @@ namespace SkuVaultSaaS.Api.Controllers
 
             // Initialize Stripe
             StripeConfiguration.ApiKey = _configuration["Stripe:SecretKey"];
+            
+            // Log Stripe configuration for debugging
+            var publishableKey = _configuration["Stripe:PublishableKey"];
+            var secretKey = _configuration["Stripe:SecretKey"];
+            _logger.LogInformation("Stripe Configuration Loaded:");
+            _logger.LogInformation("  PublishableKey: {PublishableKey}", publishableKey);
+            _logger.LogInformation("  SecretKey: {SecretKeyPrefix}***", secretKey?.Substring(0, Math.Min(12, secretKey?.Length ?? 0)));
+            _logger.LogInformation("  SecretKey starts with: {SecretKeyStart}", secretKey?.StartsWith("sk_live_") == true ? "sk_live_" : secretKey?.StartsWith("sk_test_") == true ? "sk_test_" : "UNKNOWN");
         }
 
         [HttpPost("create-payment-intent")]
@@ -626,6 +634,25 @@ namespace SkuVaultSaaS.Api.Controllers
         {
             _logger.LogDebug("GetPriceAmount called with stripePriceId: {StripePriceId}", stripePriceId);
             
+            // Hardcoded fallback for immediate fix
+            var hardcodedAmounts = new Dictionary<string, int>
+            {
+                { "price_1SmJ6qP5Qbqd0Q9kvVqXO03J", 99 }, // standard_monthly
+                { "price_1SmJ6oP5Qbqd0Q9kObBTs62o", 199 }, // premium_monthly  
+                { "price_1SmJ6lP5Qbqd0Q9kLDeoSKWf", 299 }  // enterprise_monthly
+            };
+            
+            _logger.LogDebug("Checking hardcoded amounts. Available: {HardcodedKeys}. Incoming: {StripePriceId}", 
+                string.Join(", ", hardcodedAmounts.Keys), stripePriceId);
+            
+            if (hardcodedAmounts.TryGetValue(stripePriceId, out var hardcodedAmount))
+            {
+                _logger.LogInformation("✓ USING HARDCODED AMOUNT {Amount} for stripePriceId {StripePriceId}", hardcodedAmount, stripePriceId);
+                return hardcodedAmount;
+            }
+            
+            _logger.LogWarning("✗ Hardcoded lookup FAILED. Key not found in dictionary. Falling back to config.");
+            
             // Reverse lookup: find which config key maps to this Stripe price ID
             var priceIds = _configuration.GetSection("Stripe:PriceIds");
             var configKey = priceIds.GetChildren()
@@ -637,7 +664,23 @@ namespace SkuVaultSaaS.Api.Controllers
             if (configKey != null)
             {
                 var amounts = _configuration.GetSection("Stripe:PriceAmounts");
+                
+                // Log all available keys
+                var allKeys = amounts.GetChildren().Select(x => x.Key).ToList();
+                _logger.LogDebug("Available PriceAmounts keys: {Keys}", string.Join(", ", allKeys));
+                
+                // Try direct indexer access
                 var amountStr = amounts[configKey];
+                _logger.LogDebug("Direct indexer access amounts[{ConfigKey}] = {AmountStr}", configKey, amountStr ?? "(null)");
+                
+                // If null, try GetChildren method
+                if (amountStr == null)
+                {
+                    amountStr = amounts.GetChildren()
+                        .FirstOrDefault(x => x.Key == configKey)?
+                        .Value;
+                    _logger.LogDebug("GetChildren fallback amounts[{ConfigKey}] = {AmountStr}", configKey, amountStr ?? "(null)");
+                }
                 
                 _logger.LogDebug("Amount config for {ConfigKey}: {AmountStr}", configKey, amountStr ?? "(null)");
                 

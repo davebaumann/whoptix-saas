@@ -1,19 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CreditCard, CheckCircle } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
-import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { stripeService } from '../api/stripeService';
 import { useAuth } from '../contexts/AuthContext';
 import { getTierInfo } from '../config/membershipTiers.tsx';
 
-function PaymentForm({ tier, tierInfo }: { tier: string; tierInfo: { name: string; price: string } }) {
+function PaymentForm({ tierInfo, clientSecret }: { tierInfo: { name: string; price: string }; clientSecret: string }) {
   const stripe = useStripe();
   const elements = useElements();
-  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const navigate = useNavigate();
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -26,46 +24,31 @@ function PaymentForm({ tier, tierInfo }: { tier: string; tierInfo: { name: strin
     setError(null);
 
     try {
-      // Get user email from authenticated context
-      console.log('StripeSetup - user object:', user);
-      console.log('StripeSetup - user.email:', user?.email);
+      console.log('Confirming payment with clientSecret:', clientSecret);
       
-      if (!user?.email) {
-        throw new Error('User email not found. Please log in first.');
+      // Submit the Payment Element form first
+      const { error: submitError } = await elements.submit();
+      
+      if (submitError) {
+        setError(submitError.message || 'Payment form submission failed');
+        return;
       }
       
-      console.log('Creating payment intent for email:', user.email);
-      
-      // Create payment intent
-      const priceId = await stripeService.getPriceIdFromTier(tier);
-      console.log('Price ID:', priceId);
-      
-      const { clientSecret } = await stripeService.createPaymentIntent({
-        priceId,
-        email: user.email
-      });
-
-      console.log('Payment intent created, clientSecret:', clientSecret);
-
-      // Confirm payment
-      const cardElement = elements.getElement(CardElement);
-      if (!cardElement) {
-        throw new Error('Card element not found');
-      }
-
-      const { error: stripeError } = await stripe.confirmCardPayment(clientSecret, {
-        payment_method: {
-          card: cardElement,
-        }
+      // Then confirm the payment
+      const { error: stripeError } = await stripe.confirmPayment({
+        elements,
+        clientSecret,
+        confirmParams: {
+          return_url: `${window.location.origin}/app/payment-success`,
+        },
       });
 
       if (stripeError) {
         console.error('Stripe error:', stripeError);
         setError(stripeError.message || 'Payment failed');
       } else {
-        console.log('Payment succeeded');
-        // Payment succeeded, redirect to success page
-        navigate('/app/payment-success');
+        console.log('✓ Payment processing started');
+        // Will redirect to return_url on success
       }
     } catch (err) {
       console.error('Error in handleSubmit:', err);
@@ -77,21 +60,7 @@ function PaymentForm({ tier, tierInfo }: { tier: string; tierInfo: { name: strin
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="p-4 border border-gray-300 rounded-md">
-        <CardElement
-          options={{
-            style: {
-              base: {
-                fontSize: '16px',
-                color: '#424770',
-                '::placeholder': {
-                  color: '#aab7c4',
-                },
-              },
-            },
-          }}
-        />
-      </div>
+      <PaymentElement />
       
       {error && (
         <div className="text-red-600 text-sm">
@@ -101,7 +70,7 @@ function PaymentForm({ tier, tierInfo }: { tier: string; tierInfo: { name: strin
 
       <button
         type="submit"
-        disabled={!stripe || isLoading}
+        disabled={!stripe || !elements || isLoading}
         className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {isLoading ? (
@@ -123,17 +92,78 @@ function PaymentForm({ tier, tierInfo }: { tier: string; tierInfo: { name: strin
 export default function StripeSetup() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   const tier = searchParams.get('tier') || '2';
   const tierInfo = getTierInfo(tier);
   
   const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
 
-
+  // Create payment intent on component mount
+  useEffect(() => {
+    const createPaymentIntent = async () => {
+      try {
+        if (!user?.email) {
+          setError('User email not found');
+          return;
+        }
+        
+        const priceId = await stripeService.getPriceIdFromTier(tier);
+        const { clientSecret: secret } = await stripeService.createPaymentIntent({
+          priceId,
+          email: user.email
+        });
+        
+        setClientSecret(secret);
+        setError(null);
+      } catch (err) {
+        console.error('Failed to create payment intent:', err);
+        setError(err instanceof Error ? err.message : 'Failed to initialize payment');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    createPaymentIntent();
+  }, [user?.email, tier]);
 
   const handleSkipForNow = () => {
     navigate('/app/account-settings');
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <svg className="animate-spin h-12 w-12 text-blue-600 mx-auto" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <p className="mt-4 text-gray-600">Initializing payment...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">{error}</p>
+          <button onClick={() => window.location.reload()} className="text-blue-600 hover:underline">
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!clientSecret) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -160,8 +190,8 @@ export default function StripeSetup() {
             </p>
           </div>
 
-          <Elements stripe={stripePromise}>
-            <PaymentForm tier={tier} tierInfo={tierInfo} />
+          <Elements stripe={stripePromise} options={{ clientSecret }}>
+            <PaymentForm tierInfo={tierInfo} clientSecret={clientSecret} />
           </Elements>
           
           <div className="mt-4">

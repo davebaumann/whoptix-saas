@@ -111,6 +111,10 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "dependencies": {
+            "EFCore.BulkExtensions": {
+              "target": "Package",
+              "version": "[10.0.0, )"
+            },
             "MailKit": {
               "target": "Package",
               "version": "[4.14.1, )"

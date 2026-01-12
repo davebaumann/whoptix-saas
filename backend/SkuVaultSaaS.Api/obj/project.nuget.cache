@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "DkGYD5iHiXE=",
+  "dgSpecHash": "YiJSGEsiXRc=",
   "success": true,
   "projectFilePath": "C:\\Users\\dcbau\\Code\\SkuVaultSaaS\\backend\\SkuVaultSaaS.Api\\SkuVaultSaaS.Api.csproj",
   "expectedPackageFiles": [
@@ -8,6 +8,7 @@
     "C:\\Users\\dcbau\\.nuget\\packages\\awssdk.simplesystemsmanagement\\3.7.400\\awssdk.simplesystemsmanagement.3.7.400.nupkg.sha512",
     "C:\\Users\\dcbau\\.nuget\\packages\\bouncycastle.cryptography\\2.6.1\\bouncycastle.cryptography.2.6.1.nupkg.sha512",
     "C:\\Users\\dcbau\\.nuget\\packages\\dotnetenv\\3.1.1\\dotnetenv.3.1.1.nupkg.sha512",
+    "C:\\Users\\dcbau\\.nuget\\packages\\efcore.bulkextensions\\10.0.0\\efcore.bulkextensions.10.0.0.nupkg.sha512",
     "C:\\Users\\dcbau\\.nuget\\packages\\humanizer.core\\2.14.1\\humanizer.core.2.14.1.nupkg.sha512",
     "C:\\Users\\dcbau\\.nuget\\packages\\mailkit\\4.14.1\\mailkit.4.14.1.nupkg.sha512",
     "C:\\Users\\dcbau\\.nuget\\packages\\microsoft.aspnetcore.authentication.jwtbearer\\8.0.8\\microsoft.aspnetcore.authentication.jwtbearer.8.0.8.nupkg.sha512",
