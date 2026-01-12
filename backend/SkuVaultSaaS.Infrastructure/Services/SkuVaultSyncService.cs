@@ -143,8 +143,8 @@ namespace SkuVaultSaaS.Infrastructure.Services
             var toDate = DateTime.UtcNow;
 
             // Decrypt tokens before sending to API
-            var tenantToken = DecryptToken(customer.Tenant.SkuVaultTenantToken);
-            var userToken = DecryptToken(customer.Tenant.SkuVaultUserToken);
+            var tenantToken = DecryptToken(customer.Tenant.SkuVaultTenantToken)!;
+            var userToken = DecryptToken(customer.Tenant.SkuVaultUserToken)!;
 
             // SkuVault API has a 7-day maximum date range, so chunk the requests
             var allSales = new List<SkuVaultSaleDto>();
@@ -253,8 +253,8 @@ namespace SkuVaultSaaS.Infrastructure.Services
 
             _logger.LogInformation("Fetching products from SkuVault API for customer {CustomerId}", customerId);
             // Decrypt tokens before sending to API
-            var tenantToken = DecryptToken(customer.Tenant.SkuVaultTenantToken);
-            var userToken = DecryptToken(customer.Tenant.SkuVaultUserToken);
+            var tenantToken = DecryptToken(customer.Tenant.SkuVaultTenantToken)!;
+            var userToken = DecryptToken(customer.Tenant.SkuVaultUserToken)!;
             
             var apiProducts = await _apiClient.GetProductsAsync(tenantToken, userToken);
             _logger.LogInformation("Received {Count} products from SkuVault API for customer {CustomerId}", apiProducts.Count, customerId);
@@ -330,8 +330,8 @@ namespace SkuVaultSaaS.Infrastructure.Services
             }
 
             // Decrypt tokens before sending to API
-            var tenantToken = DecryptToken(customer.Tenant.SkuVaultTenantToken);
-            var userToken = DecryptToken(customer.Tenant.SkuVaultUserToken);
+            var tenantToken = DecryptToken(customer.Tenant.SkuVaultTenantToken)!;
+            var userToken = DecryptToken(customer.Tenant.SkuVaultUserToken)!;
 
             var apiLocations = await _apiClient.GetLocationsAsync(tenantToken, userToken);
 
@@ -384,8 +384,8 @@ namespace SkuVaultSaaS.Infrastructure.Services
             }
 
             // Decrypt tokens before sending to API
-            var tenantToken = DecryptToken(customer.Tenant.SkuVaultTenantToken);
-            var userToken = DecryptToken(customer.Tenant.SkuVaultUserToken);
+            var tenantToken = DecryptToken(customer.Tenant.SkuVaultTenantToken)!;
+            var userToken = DecryptToken(customer.Tenant.SkuVaultUserToken)!;
 
             var apiInventory = await _apiClient.GetInventoryAsync(tenantToken, userToken);
 
@@ -484,8 +484,8 @@ namespace SkuVaultSaaS.Infrastructure.Services
                 try
                 {
                     var chunkMovements = await _apiClient.GetInventoryMovementsAsync(
-                        tenantToken,
-                        userToken,
+                        tenantToken!,
+                        userToken!,
                         chunkStart,
                         chunkEnd);
                     allApiMovements.AddRange(chunkMovements);
@@ -657,8 +657,8 @@ namespace SkuVaultSaaS.Infrastructure.Services
                 try
                 {
                     var chunkTransactions = await _apiClient.GetInventoryMovementsAsync(
-                        tenantToken,
-                        userToken,
+                        tenantToken!,
+                        userToken!,
                         chunkStart,
                         chunkEnd);
                     allApiTransactions.AddRange(chunkTransactions);
@@ -816,8 +816,8 @@ namespace SkuVaultSaaS.Infrastructure.Services
             var toDate = DateTime.UtcNow;
 
             // Decrypt tokens before sending to API
-            var tenantToken = DecryptToken(customer.Tenant.SkuVaultTenantToken);
-            var userToken = DecryptToken(customer.Tenant.SkuVaultUserToken);
+            var tenantToken = DecryptToken(customer.Tenant.SkuVaultTenantToken)!;
+            var userToken = DecryptToken(customer.Tenant.SkuVaultUserToken)!;
 
             var apiShipments = await _apiClient.GetShipmentsAsync(tenantToken, userToken, fromDate, toDate);
             _logger.LogInformation("Received {Count} shipments from SkuVault API for customer {CustomerId}", apiShipments.Count, customerId);

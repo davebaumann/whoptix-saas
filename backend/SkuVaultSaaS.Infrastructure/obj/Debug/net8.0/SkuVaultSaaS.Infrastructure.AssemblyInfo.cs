@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("SkuVaultSaaS.Infrastructure")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f5076105832b53a6a4206529d6275606a94b616f")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+7f1f11f3d948e4874c76d8c34c28d80a49478625")]
 [assembly: System.Reflection.AssemblyProductAttribute("SkuVaultSaaS.Infrastructure")]
 [assembly: System.Reflection.AssemblyTitleAttribute("SkuVaultSaaS.Infrastructure")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
