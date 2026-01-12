@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SkuVaultSaaS.Api.Models;
 using SkuVaultSaaS.Api.Services;
+using SkuVaultSaaS.Core.Services;
 using SkuVaultSaaS.Core.Models;
 using SkuVaultSaaS.Infrastructure.Data;
 using System.Text;
@@ -652,8 +653,38 @@ namespace SkuVaultSaaS.Api.Controllers
             var dbPart = parts.FirstOrDefault(p => p.Trim().StartsWith("Database=", StringComparison.OrdinalIgnoreCase));
             return dbPart?.Split('=')[1] ?? "Unknown";
         }
+
+        [HttpPost("customers/{id}/trigger-sync")]
+        public async Task<IActionResult> TriggerInitialSync(int id)
+        {
+            try
+            {
+                var customer = await _context.Customers
+                    .Include(c => c.Tenant)
+                    .FirstOrDefaultAsync(c => c.Id == id);
+
+                if (customer == null)
+                {
+                    return NotFound(new { message = "Customer not found" });
+                }
+
+                // Reset LastSyncedAt to trigger initial sync logic
+                customer.LastSyncedAt = default(DateTime);
+                _context.Customers.Update(customer);
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("Triggered initial sync for customer {CustomerId} ({Email})", customer.Id, customer.Email);
+
+                return Ok(new { message = "Initial sync triggered successfully" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error triggering sync for customer {Id}", id);
+                return StatusCode(500, new { message = "Error triggering sync" });
+            }
+        }
     }
-    
+
     // Helper classes for raw SQL queries
     public class DatabaseSizeResult
     {

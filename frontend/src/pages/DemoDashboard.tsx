@@ -4,7 +4,7 @@ import { ArrowLeft, Users, Package, AlertCircle } from 'lucide-react'
 
 export default function DemoDashboard() {
   const navigate = useNavigate()
-  const [currentReport, setCurrentReport] = useState<'dashboard' | 'inventory' | 'low-stock' | 'aging-inventory' | 'profitability' | 'demand-forecast' | 'financial-warehouse' | 'locations' | 'performance-metrics'>('dashboard')
+  const [currentReport, setCurrentReport] = useState<'dashboard' | 'inventory' | 'low-stock' | 'aging-inventory' | 'profitability' | 'demand-forecast' | 'financial-warehouse' | 'locations' | 'performance-metrics' | 'channel-performance'>('dashboard')
   const [data, setData] = useState<any | null>(null)
   const [topPerformers, setTopPerformers] = useState<any | null>(null)
   const [inventoryData, setInventoryData] = useState<any | null>(null)
@@ -15,6 +15,9 @@ export default function DemoDashboard() {
   const [financialData, setFinancialData] = useState<any | null>(null)
   const [locationData, setLocationData] = useState<any | null>(null)
   const [performanceMetricsData, setPerformanceMetricsData] = useState<any | null>(null)
+  const [channelRevenueData, setChannelRevenueData] = useState<any | null>(null)
+  const [channelTopSkusData, setChannelTopSkusData] = useState<any | null>(null)
+  const [channelTrendsData, setChannelTrendsData] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [dateRange, setDateRange] = useState('today')
@@ -32,7 +35,8 @@ export default function DemoDashboard() {
     'demand-forecast': { label: 'Demand Forecast', icon: '🔮' },
     'financial-warehouse': { label: 'Financial Reports', icon: '💰' },
     'locations': { label: 'Location Analysis', icon: '📍' },
-    'performance-metrics': { label: 'Performance Metrics', icon: '📈' }
+    'performance-metrics': { label: 'Performance Metrics', icon: '📈' },
+    'channel-performance': { label: 'Channel Performance', icon: '🌐' }
   }
 
   useEffect(() => {
@@ -154,6 +158,35 @@ export default function DemoDashboard() {
               }
             }
             break
+
+          case 'channel-performance':
+            // Fetch revenue by channel
+            const revenueResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/channel-performance/revenue?from=${dateRange}`, {
+              headers: { 'Content-Type': 'application/json' }
+            })
+            if (revenueResponse.ok) {
+              const revData = await revenueResponse.json()
+              setChannelRevenueData(revData)
+            }
+
+            // Fetch top SKUs by channel
+            const topSkusResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/channel-performance/top-skus?from=${dateRange}&limit=10`, {
+              headers: { 'Content-Type': 'application/json' }
+            })
+            if (topSkusResponse.ok) {
+              const skuData = await topSkusResponse.json()
+              setChannelTopSkusData(skuData)
+            }
+
+            // Fetch trends
+            const trendsResponse = await fetch(`${baseUrl}/api/demo/reports/customer/2/channel-performance/trends?from=${dateRange}`, {
+              headers: { 'Content-Type': 'application/json' }
+            })
+            if (trendsResponse.ok) {
+              const trendData = await trendsResponse.json()
+              setChannelTrendsData(trendData)
+            }
+            break
         }
 
         setError(null)
@@ -166,7 +199,7 @@ export default function DemoDashboard() {
     }
 
     fetchDemoData()
-  }, [currentReport, dateRange, forecastPeriod, inventoryData, lowStockData, agingInventoryData, financialData, locationData, performanceMetricsData])
+  }, [currentReport, dateRange, forecastPeriod, inventoryData, lowStockData, agingInventoryData, financialData, locationData, performanceMetricsData, channelRevenueData, channelTopSkusData, channelTrendsData])
 
   // Load tier configuration and report access from backend
   useEffect(() => {
@@ -184,7 +217,8 @@ export default function DemoDashboard() {
       'demand-forecast': 3,
       'financial-warehouse': 4,
       'locations': 4,
-      'performance-metrics': 4
+      'performance-metrics': 4,
+      'channel-performance': 2
     })
   }, [])
 
@@ -194,6 +228,167 @@ export default function DemoDashboard() {
     const available = requiredLevel ? planTier >= requiredLevel : false
     console.log(`Report: ${reportKey}, Required: ${requiredLevel}, Current Tier: ${planTier}, Available: ${available}`)
     return available
+  }
+
+  // CSV Export Helper Functions
+  const exportInventoryCSV = () => {
+    if (!inventoryData?.products) return
+    
+    const rows: string[] = ['"SKU","PRODUCT","QUANTITY","REORDER LEVEL","STATUS"']
+    inventoryData.products.forEach((item: any) => {
+      rows.push(`"${item.sku}","${item.name}",${item.quantity},${item.reorderLevel},"${item.status}"`)
+    })
+    
+    const csv = rows.join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `inventory-report-${new Date().toISOString().split('T')[0]}.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  const exportLowStockCSV = () => {
+    if (!lowStockData?.items) return
+    
+    const rows: string[] = ['"SKU","PRODUCT","LOCATION","CURRENT STOCK","THRESHOLD","DAYS LEFT"']
+    lowStockData.items.forEach((item: any) => {
+      rows.push(`"${item.sku}","${item.productName}","${item.location}",${item.currentStock},${item.threshold},${item.daysLeft || 'N/A'}"`)
+    })
+    
+    const csv = rows.join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `low-stock-report-${new Date().toISOString().split('T')[0]}.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  const exportAgingInventoryCSV = () => {
+    if (!agingInventoryData?.skus) return
+    
+    const rows: string[] = ['"SKU","PRODUCT","AGE (DAYS)","QUANTITY","VALUE","LOCATION"']
+    agingInventoryData.skus.forEach((item: any) => {
+      rows.push(`"${item.sku}","${item.name}",${item.ageInDays},${item.quantity},${item.value},"${item.location}"`)
+    })
+    
+    const csv = rows.join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `aging-inventory-${new Date().toISOString().split('T')[0]}.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  const exportProfitabilityCSV = () => {
+    if (!profitabilityData?.productProfitability) return
+    
+    const rows: string[] = ['"SKU","PRODUCT","REVENUE","COST","MARGIN","MARGIN %"']
+    profitabilityData.productProfitability.forEach((item: any) => {
+      rows.push(`"${item.sku}","${item.name}",${item.revenue},${item.cost},${item.margin},${item.marginPercentage}"`)
+    })
+    
+    const csv = rows.join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `profitability-report-${new Date().toISOString().split('T')[0]}.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  const exportFinancialCSV = () => {
+    if (!financialData?.inventory) return
+    
+    const rows: string[] = ['"LOCATION","TOTAL VALUE","TOTAL ITEMS","AVG UNIT VALUE"']
+    financialData.inventory.forEach((item: any) => {
+      rows.push(`"${item.location}",${item.totalValue},${item.totalItems},${item.avgUnitValue}"`)
+    })
+    
+    const csv = rows.join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `financial-warehouse-${new Date().toISOString().split('T')[0]}.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  const exportLocationsCSV = () => {
+    if (!locationData?.locations) return
+    
+    const rows: string[] = ['"LOCATION","ITEMS","TOTAL QUANTITY","CAPACITY USED","STATUS"']
+    locationData.locations.forEach((item: any) => {
+      rows.push(`"${item.name}",${item.itemCount},${item.totalQuantity},${item.capacityUsed}%,"${item.status}"`)
+    })
+    
+    const csv = rows.join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `location-details-${new Date().toISOString().split('T')[0]}.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  const exportPerformanceMetricsCSV = () => {
+    if (!performanceMetricsData?.velocityMetrics?.products) return
+    
+    const rows: string[] = ['"SKU","PRODUCT","VELOCITY","TURNOVER","DAYS OF STOCK"']
+    performanceMetricsData.velocityMetrics.products.forEach((item: any) => {
+      rows.push(`"${item.sku}","${item.name}",${item.velocity},${item.turnover},${item.daysOfStock}"`)
+    })
+    
+    const csv = rows.join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `performance-metrics-${new Date().toISOString().split('T')[0]}.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  const exportChannelPerformanceCSV = () => {
+    if (!channelRevenueData) return
+    
+    const rows: string[] = ['"CHANNEL","REVENUE","QUANTITY","TRANSACTIONS"']
+    channelRevenueData.forEach((item: any) => {
+      rows.push(`"${item.channel}",${item.revenue},${item.quantity},${item.transactions}"`)
+    })
+    
+    const csv = rows.join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `channel-performance-${new Date().toISOString().split('T')[0]}.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
   }
 
   // Get the data to display (dashboard section uses real API data)
@@ -556,6 +751,12 @@ export default function DemoDashboard() {
 
             {/* Inventory Items Table */}
             <div className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="px-6 py-4 bg-gray-50 border-b flex items-center justify-between">
+                <h3 className="font-semibold text-gray-900">Inventory Items</h3>
+                <button onClick={exportInventoryCSV} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
+                  ⬇ Export CSV
+                </button>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
@@ -634,6 +835,12 @@ export default function DemoDashboard() {
 
             {/* Low Stock Items Table */}
             <div className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="px-6 py-4 bg-gray-50 border-b flex items-center justify-between">
+                <h3 className="font-semibold text-gray-900">Low Stock Items</h3>
+                <button onClick={exportLowStockCSV} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
+                  ⬇ Export CSV
+                </button>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
@@ -738,6 +945,12 @@ export default function DemoDashboard() {
 
             {/* Aging Inventory Table */}
             <div className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="px-6 py-4 bg-gray-50 border-b flex items-center justify-between">
+                <h3 className="font-semibold text-gray-900">Aging Inventory Details</h3>
+                <button onClick={exportAgingInventoryCSV} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
+                  ⬇ Export CSV
+                </button>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
@@ -856,8 +1069,9 @@ export default function DemoDashboard() {
 
                 {/* Products Table */}
                 <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                  <div className="px-6 py-4 bg-gray-50 border-b">
+                  <div className="px-6 py-4 bg-gray-50 border-b flex items-center justify-between">
                     <h3 className="font-semibold text-gray-900">Top Profitable Products</h3>
+                    <button onClick={exportProfitabilityCSV} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">⬇ Export CSV</button>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
@@ -1150,8 +1364,11 @@ export default function DemoDashboard() {
                 </div>
 
                 {/* Top Products by Revenue */}
-                <div className="bg-white rounded-lg shadow p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Top Products by Revenue</h3>
+                <div className="bg-white rounded-lg shadow overflow-hidden">
+                  <div className="px-6 py-4 bg-gray-50 border-b flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-gray-900">Top Products by Revenue</h3>
+                    <button onClick={exportFinancialCSV} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">⬇ Export CSV</button>
+                  </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
@@ -1237,8 +1454,11 @@ export default function DemoDashboard() {
                 </div>
 
                 {/* Location Performance Table */}
-                <div className="bg-white rounded-lg shadow p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Location Performance</h3>
+                <div className="bg-white rounded-lg shadow overflow-hidden">
+                  <div className="px-6 py-4 bg-gray-50 border-b flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-gray-900">Location Performance</h3>
+                    <button onClick={exportLocationsCSV} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">⬇ Export CSV</button>
+                  </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
@@ -1453,8 +1673,11 @@ export default function DemoDashboard() {
                 </div>
 
                 {/* Top Performers */}
-                <div className="bg-white rounded-lg shadow p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Top Performing SKUs</h3>
+                <div className="bg-white rounded-lg shadow overflow-hidden">
+                  <div className="px-6 py-4 bg-gray-50 border-b flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-gray-900">Top Performing SKUs</h3>
+                    <button onClick={exportPerformanceMetricsCSV} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">⬇ Export CSV</button>
+                  </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
@@ -1544,6 +1767,93 @@ export default function DemoDashboard() {
               </>
             ) : (
               <p className="text-gray-500">Loading performance metrics...</p>
+            )}
+          </div>
+        ) : currentReport === 'channel-performance' ? (
+          <div className="space-y-6">
+            {channelRevenueData && channelTopSkusData ? (
+              <>
+                {/* Title */}
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Channel Performance</h2>
+                  <p className="text-sm text-gray-600 mt-1">Revenue analysis and top SKUs by sales channel</p>
+                </div>
+
+                {/* Revenue by Channel */}
+                <div className="bg-white rounded-lg shadow p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Revenue by Channel</h3>
+                  <div className="space-y-3">
+                    {channelRevenueData.map((item: any) => {
+                      const maxRevenue = Math.max(...channelRevenueData.map((c: any) => c.revenue))
+                      const percentage = (item.revenue / maxRevenue) * 100
+                      return (
+                        <div key={item.channel}>
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-sm font-medium text-gray-900">{item.channel}</span>
+                            <span className="text-sm font-semibold text-gray-900">${item.revenue.toFixed(2)}</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="bg-blue-500 h-2 rounded-full" 
+                              style={{ width: `${percentage}%` }}
+                            ></div>
+                          </div>
+                          <div className="flex justify-between mt-1">
+                            <span className="text-xs text-gray-500">{item.quantity} units</span>
+                            <span className="text-xs text-gray-500">{item.transactions} transactions</span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Top SKUs by Channel */}
+                <div className="bg-white rounded-lg shadow overflow-hidden">
+                  <div className="px-6 py-4 bg-gray-50 border-b flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-gray-900">Top SKUs by Channel</h3>
+                    <button onClick={exportChannelPerformanceCSV} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">⬇ Export CSV</button>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full">
+                      <thead className="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">SKU</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Channel</th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase">Revenue</th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase">Quantity</th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase">Transactions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {channelTopSkusData.map((item: any, idx: number) => (
+                          <tr key={idx} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 text-sm font-medium text-gray-900">{item.sku}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{item.channel}</td>
+                            <td className="px-6 py-4 text-right text-sm font-semibold text-gray-900">${item.revenue.toFixed(2)}</td>
+                            <td className="px-6 py-4 text-right text-sm text-gray-600">{item.quantity}</td>
+                            <td className="px-6 py-4 text-right text-sm text-gray-600">{item.transactions}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Info Banner */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-start">
+                    <AlertCircle className="w-5 h-5 text-blue-600 mr-3 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm text-blue-800">
+                        <strong>Standard Feature:</strong> This demo shows revenue analysis and top performing SKUs across your sales channels (Web, Amazon, Shopify, eBay, Bulk). Identify which channels drive the most revenue and which products perform best on each platform.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p className="text-gray-500">Loading channel performance data...</p>
             )}
           </div>
         ) : (

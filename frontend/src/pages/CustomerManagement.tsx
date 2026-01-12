@@ -94,6 +94,29 @@ export default function AdminDashboard() {
     },
   })
 
+  const syncMutation = useMutation({
+    mutationFn: (customerId: number) => {
+      const token = localStorage.getItem('token')
+      return fetch(`/api/admin/customers/${customerId}/trigger-sync`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      }).then(res => {
+        if (!res.ok) throw new Error('Failed to trigger sync')
+        return res.json()
+      })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adminCustomers'] })
+      alert('Initial sync triggered successfully!')
+    },
+    onError: (error: Error) => {
+      alert(`Failed to trigger sync: ${error.message}`)
+    },
+  })
+
   const handleMembershipEdit = (customer: AdminCustomerResponse) => {
     setSelectedCustomer(customer)
     const membershipCustomer = membershipCustomers?.find(mc => mc.id === customer.id)
@@ -282,6 +305,15 @@ export default function AdminDashboard() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
                         <div className="flex justify-center space-x-2">
+                          <button
+                            onClick={() => syncMutation.mutate(customer.id)}
+                            disabled={syncMutation.isPending}
+                            className="inline-flex items-center px-2 py-1 text-xs font-medium text-purple-600 bg-purple-50 rounded hover:bg-purple-100 disabled:opacity-50"
+                            title="Reset sync to trigger initial sync"
+                          >
+                            <Activity className="w-3 h-3 mr-1" />
+                            {syncMutation.isPending ? 'Syncing...' : 'Sync'}
+                          </button>
                           <button
                             onClick={() => handleViewAsCustomer(customer)}
                             className="inline-flex items-center px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded hover:bg-blue-100"

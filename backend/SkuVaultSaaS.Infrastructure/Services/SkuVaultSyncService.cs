@@ -1,6 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using SkuVaultSaaS.Core.Enums;
 using SkuVaultSaaS.Core.Models;
+using SkuVaultSaaS.Core.Services;
 using SkuVaultSaaS.Infrastructure.Data;
 using SkuVaultSaaS.Infrastructure.SkuVaultSaaSApi;
 using System;
@@ -15,16 +18,67 @@ namespace SkuVaultSaaS.Infrastructure.Services
         private readonly ApplicationDbContext _context;
         private readonly ISkuVaultApiClient _apiClient;
         private readonly ILogger<SkuVaultSyncService> _logger;
+        private readonly IEncryptionService _encryptionService;
+        private readonly IConfiguration _configuration;
 
         public SkuVaultSyncService(
             ApplicationDbContext context,
             ISkuVaultApiClient apiClient,
-            ILogger<SkuVaultSyncService> logger)
+            ILogger<SkuVaultSyncService> logger,
+            IEncryptionService encryptionService,
+            IConfiguration configuration)
         {
             _context = context;
             _apiClient = apiClient;
             _logger = logger;
+            _encryptionService = encryptionService;
+            _configuration = configuration;
         }
+
+        /// <summary>
+        /// Decrypts a token from the database. Handles cases where token is already decrypted or null.
+        /// </summary>
+        private string DecryptToken(string encryptedToken)
+        {
+            if (string.IsNullOrEmpty(encryptedToken))
+                return encryptedToken;
+
+            try
+            {
+                return _encryptionService.Decrypt(encryptedToken);
+            }
+            catch
+            {
+                // If decryption fails, assume it's already decrypted (shouldn't happen in normal flow)
+                return encryptedToken;
+            }
+        }
+
+        /// <summary>
+        /// Gets the historical data range (in days) based on the customer's membership tier.
+        /// Used for initial syncs to retrieve historical transaction data.
+        /// </summary>
+        private int GetHistoricalDataRangeDays(MembershipLevel tier)
+        {
+            var tierName = tier.ToString();
+            var historicalRanges = _configuration.GetSection("SyncSettings:HistoricalDataRangeDays");
+            
+            if (historicalRanges == null || !historicalRanges.Exists())
+            {
+                _logger.LogWarning("HistoricalDataRangeDays configuration not found, defaulting to 60 days");
+                return 60;
+            }
+
+            var rangeValue = historicalRanges[tierName];
+            if (int.TryParse(rangeValue, out int days) && days > 0)
+            {
+                return days;
+            }
+
+            _logger.LogWarning("Invalid or missing historical data range for tier {Tier}, defaulting to 60 days", tierName);
+            return 60;
+        }
+
 
         public async Task SyncCustomerDataAsync(int customerId)
         {
@@ -75,8 +129,12 @@ namespace SkuVaultSaaS.Infrastructure.Services
             var fromDate = customer.LastSyncedAt == default ? DateTime.UtcNow.AddDays(-30) : customer.LastSyncedAt;
             var toDate = DateTime.UtcNow;
 
+            // Decrypt tokens before sending to API
+            var tenantToken = DecryptToken(customer.Tenant.SkuVaultTenantToken);
+            var userToken = DecryptToken(customer.Tenant.SkuVaultUserToken);
+
             // Use /getsalesbydate endpoint for incremental sales sync
-            var apiSales = await _apiClient.GetSalesAsync(customer.Tenant.SkuVaultTenantToken, customer.Tenant.SkuVaultUserToken, fromDate, toDate);
+            var apiSales = await _apiClient.GetSalesAsync(tenantToken, userToken, fromDate, toDate);
             _logger.LogInformation("Received {Count} sales from SkuVault API for customer {CustomerId} (from {FromDate} to {ToDate})", apiSales.Count, customerId, fromDate, toDate);
 
             int added = 0, updated = 0;
@@ -156,7 +214,11 @@ namespace SkuVaultSaaS.Infrastructure.Services
             }
 
             _logger.LogInformation("Fetching products from SkuVault API for customer {CustomerId}", customerId);
-            var apiProducts = await _apiClient.GetProductsAsync(customer.Tenant.SkuVaultTenantToken, customer.Tenant.SkuVaultUserToken);
+            // Decrypt tokens before sending to API
+            var tenantToken = DecryptToken(customer.Tenant.SkuVaultTenantToken);
+            var userToken = DecryptToken(customer.Tenant.SkuVaultUserToken);
+            
+            var apiProducts = await _apiClient.GetProductsAsync(tenantToken, userToken);
             _logger.LogInformation("Received {Count} products from SkuVault API for customer {CustomerId}", apiProducts.Count, customerId);
             
             if (apiProducts.Count == 0)
@@ -229,7 +291,11 @@ namespace SkuVaultSaaS.Infrastructure.Services
                 return;
             }
 
-            var apiLocations = await _apiClient.GetLocationsAsync(customer.Tenant.SkuVaultTenantToken, customer.Tenant.SkuVaultUserToken);
+            // Decrypt tokens before sending to API
+            var tenantToken = DecryptToken(customer.Tenant.SkuVaultTenantToken);
+            var userToken = DecryptToken(customer.Tenant.SkuVaultUserToken);
+
+            var apiLocations = await _apiClient.GetLocationsAsync(tenantToken, userToken);
 
             foreach (var apiLocation in apiLocations)
             {
@@ -279,7 +345,11 @@ namespace SkuVaultSaaS.Infrastructure.Services
                 return;
             }
 
-            var apiInventory = await _apiClient.GetInventoryAsync(customer.Tenant.SkuVaultTenantToken, customer.Tenant.SkuVaultUserToken);
+            // Decrypt tokens before sending to API
+            var tenantToken = DecryptToken(customer.Tenant.SkuVaultTenantToken);
+            var userToken = DecryptToken(customer.Tenant.SkuVaultUserToken);
+
+            var apiInventory = await _apiClient.GetInventoryAsync(tenantToken, userToken);
 
             // Load all products and locations for this customer to map SKU/LocationCode to IDs
             var products = await _context.Products
@@ -358,6 +428,10 @@ namespace SkuVaultSaaS.Infrastructure.Services
                 return;
             }
 
+            // Decrypt tokens before sending to API
+            var tenantToken = DecryptToken(customer.Tenant.SkuVaultTenantToken);
+            var userToken = DecryptToken(customer.Tenant.SkuVaultUserToken);
+
             // Use Customer.LastSyncedAt for incremental sync
             DateTime fromDate = customer.LastSyncedAt == default ? DateTime.UtcNow.AddDays(-7) : customer.LastSyncedAt;
             DateTime toDate = DateTime.UtcNow;
@@ -372,8 +446,8 @@ namespace SkuVaultSaaS.Infrastructure.Services
                 try
                 {
                     var chunkMovements = await _apiClient.GetInventoryMovementsAsync(
-                        customer.Tenant.SkuVaultTenantToken,
-                        customer.Tenant.SkuVaultUserToken,
+                        tenantToken,
+                        userToken,
                         chunkStart,
                         chunkEnd);
                     allApiMovements.AddRange(chunkMovements);
@@ -509,9 +583,30 @@ namespace SkuVaultSaaS.Infrastructure.Services
                 throw new InvalidOperationException($"SkuVault tokens not configured for customer {customerId}");
             }
 
-            // Use Customer.LastSyncedAt for incremental sync
-            var fromDate = customer.LastSyncedAt == default ? DateTime.UtcNow.AddDays(-7) : customer.LastSyncedAt;
+            // Determine if this is an initial sync
+            bool isInitialSync = customer.LastSyncedAt == default;
+            
+            // Determine date range based on initial sync status and customer tier
+            DateTime fromDate;
+            if (isInitialSync)
+            {
+                // Initial sync: use historical data range based on membership tier
+                int historicalDays = GetHistoricalDataRangeDays(customer.MembershipLevel);
+                fromDate = DateTime.UtcNow.AddDays(-historicalDays);
+                _logger.LogInformation("Initial sync for customer {CustomerId}, using {Days} day historical range based on {Tier} tier", 
+                    customerId, historicalDays, customer.MembershipLevel);
+            }
+            else
+            {
+                // Incremental sync: use last sync time
+                fromDate = customer.LastSyncedAt;
+            }
+            
             var toDate = DateTime.UtcNow;
+
+            // Decrypt tokens before sending to API
+            var tenantToken = DecryptToken(customer.Tenant.SkuVaultTenantToken);
+            var userToken = DecryptToken(customer.Tenant.SkuVaultUserToken);
 
             // Fetch transactions in 7-day chunks
             var allApiTransactions = new List<SkuVaultInventoryMovementDto>();
@@ -524,8 +619,8 @@ namespace SkuVaultSaaS.Infrastructure.Services
                 try
                 {
                     var chunkTransactions = await _apiClient.GetInventoryMovementsAsync(
-                        customer.Tenant.SkuVaultTenantToken,
-                        customer.Tenant.SkuVaultUserToken,
+                        tenantToken,
+                        userToken,
                         chunkStart,
                         chunkEnd);
                     allApiTransactions.AddRange(chunkTransactions);
@@ -682,7 +777,11 @@ namespace SkuVaultSaaS.Infrastructure.Services
             var fromDate = customer.LastSyncedAt == default ? DateTime.UtcNow.AddDays(-30) : customer.LastSyncedAt;
             var toDate = DateTime.UtcNow;
 
-            var apiShipments = await _apiClient.GetShipmentsAsync(customer.Tenant.SkuVaultTenantToken, customer.Tenant.SkuVaultUserToken, fromDate, toDate);
+            // Decrypt tokens before sending to API
+            var tenantToken = DecryptToken(customer.Tenant.SkuVaultTenantToken);
+            var userToken = DecryptToken(customer.Tenant.SkuVaultUserToken);
+
+            var apiShipments = await _apiClient.GetShipmentsAsync(tenantToken, userToken, fromDate, toDate);
             _logger.LogInformation("Received {Count} shipments from SkuVault API for customer {CustomerId}", apiShipments.Count, customerId);
 
             int added = 0, updated = 0;

@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using SkuVaultSaaS.Core.Models;
+using SkuVaultSaaS.Core.Services;
 using SkuVaultSaaS.Infrastructure.Data;
 using SkuVaultSaaS.Infrastructure.Services;
 using SkuVaultSaaS.Api.Models;
@@ -23,19 +24,22 @@ namespace SkuVaultSaaS.Api.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly ISkuVaultSyncService _syncService;
         private readonly IEncryptionService _encryptionService;
+        private readonly IServiceProvider _serviceProvider;
 
         public CustomersController(
             ApplicationDbContext context, 
             ILogger<CustomersController> logger, 
             UserManager<ApplicationUser> userManager, 
             ISkuVaultSyncService syncService,
-            IEncryptionService encryptionService)
+            IEncryptionService encryptionService,
+            IServiceProvider serviceProvider)
         {
             _context = context;
             _logger = logger;
             _userManager = userManager;
             _syncService = syncService;
             _encryptionService = encryptionService;
+            _serviceProvider = serviceProvider;
         }
 
         // GET: api/customers
@@ -207,14 +211,19 @@ namespace SkuVaultSaaS.Api.Controllers
                 _context.Customers.Update(customer);
                 await _context.SaveChangesAsync();
 
-                // Initiate a full sync of customer data immediately
+                // Initiate a full sync of customer data immediately using a proper scope
                 _logger.LogInformation("Initiating immediate sync for customer {CustomerId} after SkuVault connection", customer.Id);
                 _ = Task.Run(async () =>
                 {
                     try
                     {
-                        await _syncService.SyncCustomerDataAsync(customer.Id);
-                        _logger.LogInformation("Completed initial sync for customer {CustomerId}", customer.Id);
+                        // Create a new scope for the background task to get a fresh DbContext
+                        using (var scope = _serviceProvider.CreateScope())
+                        {
+                            var syncService = scope.ServiceProvider.GetRequiredService<ISkuVaultSyncService>();
+                            await syncService.SyncCustomerDataAsync(customer.Id);
+                            _logger.LogInformation("Completed initial sync for customer {CustomerId}", customer.Id);
+                        }
                     }
                     catch (Exception syncEx)
                     {

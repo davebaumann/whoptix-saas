@@ -963,5 +963,219 @@ namespace SkuVaultSaaS.Api.Controllers
                 return StatusCode(500, new { message = "Error fetching demo performance metrics" });
             }
         }
+
+        /// <summary>
+        /// Get demo channel performance revenue data for customer 2
+        /// </summary>
+        [HttpGet("customer/2/channel-performance/revenue")]
+        public async Task<IActionResult> GetDemoChannelRevenueByChannel([FromQuery] string? from = null, [FromQuery] string? to = null)
+        {
+            _logger.LogInformation("DemoReportsController.GetDemoChannelRevenueByChannel: Called with from={From}, to={To}", from, to);
+            try
+            {
+                var demoContext = GetDemoContext();
+                var customerId = 2; // Hard-coded demo customer
+
+                // Parse dates from query string
+                DateTime? fromDate = null;
+                DateTime? toDate = null;
+
+                if (!string.IsNullOrEmpty(from))
+                {
+                    if (DateTime.TryParse(from, out var parsedFrom))
+                        fromDate = parsedFrom;
+                }
+
+                if (!string.IsNullOrEmpty(to))
+                {
+                    if (DateTime.TryParse(to, out var parsedTo))
+                        toDate = parsedTo;
+                }
+
+                // Default to last 30 days
+                if (fromDate == null && toDate == null)
+                {
+                    toDate = DateTime.UtcNow;
+                    fromDate = toDate.Value.AddDays(-30);
+                }
+
+                var query = demoContext.Sales.Where(s => s.CustomerId == customerId);
+
+                if (fromDate.HasValue)
+                {
+                    var fromDateUtc = fromDate.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(fromDate.Value, DateTimeKind.Utc) : fromDate.Value;
+                    query = query.Where(s => s.SaleDate >= fromDateUtc);
+                }
+
+                if (toDate.HasValue)
+                {
+                    var toDateUtc = toDate.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(toDate.Value, DateTimeKind.Utc) : toDate.Value;
+                    query = query.Where(s => s.SaleDate <= toDateUtc);
+                }
+
+                var revenueByChannel = await query
+                    .GroupBy(s => s.Channel)
+                    .Select(g => new
+                    {
+                        channel = g.Key ?? "Unknown",
+                        revenue = g.Sum(s => (decimal)s.Price),
+                        quantity = g.Sum(s => s.Quantity),
+                        transactions = g.Count()
+                    })
+                    .OrderByDescending(x => x.revenue)
+                    .ToListAsync();
+
+                return Ok(revenueByChannel);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching demo channel revenue");
+                return StatusCode(500, new { message = "Error fetching demo channel revenue" });
+            }
+        }
+
+        /// <summary>
+        /// Get demo top SKUs by channel for customer 2
+        /// </summary>
+        [HttpGet("customer/2/channel-performance/top-skus")]
+        public async Task<IActionResult> GetDemoTopSkusByChannel([FromQuery] string? from = null, [FromQuery] string? to = null, [FromQuery] int limit = 10)
+        {
+            _logger.LogInformation("DemoReportsController.GetDemoTopSkusByChannel: Called with from={From}, to={To}, limit={Limit}", from, to, limit);
+            try
+            {
+                var demoContext = GetDemoContext();
+                var customerId = 2; // Hard-coded demo customer
+
+                // Parse dates from query string
+                DateTime? fromDate = null;
+                DateTime? toDate = null;
+
+                if (!string.IsNullOrEmpty(from))
+                {
+                    if (DateTime.TryParse(from, out var parsedFrom))
+                        fromDate = parsedFrom;
+                }
+
+                if (!string.IsNullOrEmpty(to))
+                {
+                    if (DateTime.TryParse(to, out var parsedTo))
+                        toDate = parsedTo;
+                }
+
+                // Default to last 30 days
+                if (fromDate == null && toDate == null)
+                {
+                    toDate = DateTime.UtcNow;
+                    fromDate = toDate.Value.AddDays(-30);
+                }
+
+                var query = demoContext.Sales.Where(s => s.CustomerId == customerId);
+
+                if (fromDate.HasValue)
+                {
+                    var fromDateUtc = fromDate.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(fromDate.Value, DateTimeKind.Utc) : fromDate.Value;
+                    query = query.Where(s => s.SaleDate >= fromDateUtc);
+                }
+
+                if (toDate.HasValue)
+                {
+                    var toDateUtc = toDate.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(toDate.Value, DateTimeKind.Utc) : toDate.Value;
+                    query = query.Where(s => s.SaleDate <= toDateUtc);
+                }
+
+                var topSkus = await query
+                    .GroupBy(s => new { s.Sku, s.Channel })
+                    .Select(g => new
+                    {
+                        sku = g.Key.Sku,
+                        channel = g.Key.Channel ?? "Unknown",
+                        revenue = g.Sum(s => (decimal)s.Price),
+                        quantity = g.Sum(s => s.Quantity),
+                        transactions = g.Count()
+                    })
+                    .OrderByDescending(x => x.revenue)
+                    .Take(limit)
+                    .ToListAsync();
+
+                return Ok(topSkus);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching demo top SKUs by channel");
+                return StatusCode(500, new { message = "Error fetching demo top SKUs by channel" });
+            }
+        }
+
+        /// <summary>
+        /// Get demo channel performance trends for customer 2
+        /// </summary>
+        [HttpGet("customer/2/channel-performance/trends")]
+        public async Task<IActionResult> GetDemoChannelTrends([FromQuery] string? from = null, [FromQuery] string? to = null)
+        {
+            _logger.LogInformation("DemoReportsController.GetDemoChannelTrends: Called with from={From}, to={To}", from, to);
+            try
+            {
+                var demoContext = GetDemoContext();
+                var customerId = 2; // Hard-coded demo customer
+
+                // Parse dates from query string
+                DateTime? fromDate = null;
+                DateTime? toDate = null;
+
+                if (!string.IsNullOrEmpty(from))
+                {
+                    if (DateTime.TryParse(from, out var parsedFrom))
+                        fromDate = parsedFrom;
+                }
+
+                if (!string.IsNullOrEmpty(to))
+                {
+                    if (DateTime.TryParse(to, out var parsedTo))
+                        toDate = parsedTo;
+                }
+
+                // Default to last 30 days
+                if (fromDate == null && toDate == null)
+                {
+                    toDate = DateTime.UtcNow;
+                    fromDate = toDate.Value.AddDays(-30);
+                }
+
+                var query = demoContext.Sales.Where(s => s.CustomerId == customerId);
+
+                if (fromDate.HasValue)
+                {
+                    var fromDateUtc = fromDate.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(fromDate.Value, DateTimeKind.Utc) : fromDate.Value;
+                    query = query.Where(s => s.SaleDate >= fromDateUtc);
+                }
+
+                if (toDate.HasValue)
+                {
+                    var toDateUtc = toDate.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(toDate.Value, DateTimeKind.Utc) : toDate.Value;
+                    query = query.Where(s => s.SaleDate <= toDateUtc);
+                }
+
+                var trends = await query
+                    .GroupBy(s => new { Date = s.SaleDate.Date, s.Channel })
+                    .Select(g => new
+                    {
+                        date = g.Key.Date,
+                        channel = g.Key.Channel ?? "Unknown",
+                        revenue = g.Sum(s => (decimal)s.Price),
+                        quantity = g.Sum(s => s.Quantity),
+                        transactions = g.Count()
+                    })
+                    .OrderBy(x => x.date)
+                    .ThenBy(x => x.channel)
+                    .ToListAsync();
+
+                return Ok(trends);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching demo channel trends");
+                return StatusCode(500, new { message = "Error fetching demo channel trends" });
+            }
+        }
     }
 }
