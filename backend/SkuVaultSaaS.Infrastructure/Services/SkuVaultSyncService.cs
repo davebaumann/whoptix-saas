@@ -86,6 +86,10 @@ namespace SkuVaultSaaS.Infrastructure.Services
 
             try
             {
+                // Capture sync start time to use across all sync methods
+                // This ensures we don't miss data that arrives during the sync process
+                var syncStartTime = DateTime.UtcNow;
+
                 // Add delays between API calls to avoid rate limiting
                 const int delayBetweenCallsMs = 2000; // Increased from 1000ms to reduce rate limiting
 
@@ -101,19 +105,11 @@ namespace SkuVaultSaaS.Infrastructure.Services
                 await SyncInventoryMovementsAsync(customerId);
                 await Task.Delay(delayBetweenCallsMs);
 
-                await SyncTransactionsAsync(customerId);
+                await SyncTransactionsAsync(customerId, syncStartTime);
                 await Task.Delay(delayBetweenCallsMs);
 
-                await SyncSalesAsync(customerId);
+                await SyncSalesAsync(customerId, syncStartTime);
                 // await SyncShipmentsAsync(customerId); // Disabled - endpoint returns 404
-
-                // Update customer's last synced timestamp
-                var customer = await _context.Customers.FindAsync(customerId);
-                if (customer != null)
-                {
-                    customer.LastSyncedAt = DateTime.UtcNow;
-                    await _context.SaveChangesAsync();
-                }
 
                 _logger.LogInformation("Completed full sync for customer {CustomerId}", customerId);
             }
@@ -124,7 +120,7 @@ namespace SkuVaultSaaS.Infrastructure.Services
             }
         }
 
-        public async Task SyncSalesAsync(int customerId)
+        public async Task SyncSalesAsync(int customerId, DateTime syncStartTime)
         {
             _logger.LogInformation("Syncing sales for customer {CustomerId}", customerId);
 
@@ -239,13 +235,11 @@ namespace SkuVaultSaaS.Infrastructure.Services
             {
                 await _context.SaveChangesAsync();
             }
-            // Update LastSyncedAt to latest sale date if available
-            if (latestSaleDate.HasValue)
-            {
-                customer.LastSyncedAt = latestSaleDate.Value;
-                await _context.SaveChangesAsync();
-            }
-            _logger.LogInformation("Sales sync complete for customer {CustomerId}: {Added} added, {Updated} updated", customerId, added, updated);
+            // Always update LastSyncedAt to sync start time
+            // This prevents re-syncing the same date range and captures data that arrives during the sync
+            customer.LastSyncedAt = syncStartTime;
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Sales sync complete for customer {CustomerId}: {Added} added, {Updated} updated, LastSyncedAt={LastSyncedAt}", customerId, added, updated, syncStartTime);
         }
 
         public async Task SyncProductsAsync(int customerId)
@@ -614,9 +608,9 @@ namespace SkuVaultSaaS.Infrastructure.Services
             _logger.LogInformation("Completed sync for all customers");
         }
 
-        public async Task SyncTransactionsAsync(int customerId, DateTime? since = null)
+        public async Task SyncTransactionsAsync(int customerId, DateTime syncStartTime)
         {
-            _logger.LogInformation("Syncing transactions for customer {CustomerId} since {Since}", customerId, since);
+            _logger.LogInformation("Syncing transactions for customer {CustomerId}", customerId);
 
             var customer = await _context.Customers
                 .Include(c => c.Tenant)
@@ -783,12 +777,13 @@ namespace SkuVaultSaaS.Infrastructure.Services
             if (syncedCount > 0)
             {
                 await _context.SaveChangesAsync();
-                // Update LastSyncedAt to latest transaction date
-                var latestTransactionDate = apiTransactions.Max(t => t.TransactionDate);
-                customer.LastSyncedAt = latestTransactionDate;
-                await _context.SaveChangesAsync();
             }
-            _logger.LogInformation("Synced {Count} transactions for customer {CustomerId}", syncedCount, customerId);
+            
+            // Always update LastSyncedAt to sync start time
+            // This prevents re-syncing the same date range and captures data that arrives during the sync
+            customer.LastSyncedAt = syncStartTime;
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Synced {Count} transactions for customer {CustomerId}, LastSyncedAt={LastSyncedAt}", syncedCount, customerId, syncStartTime);
         }
 
         private static string ExtractNameFromUser(string? user)

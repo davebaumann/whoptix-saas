@@ -214,9 +214,11 @@ namespace SkuVaultSaaS.Api.Controllers
                 }
 
                 _logger.LogInformation("Manual transaction sync triggered for customer {CustomerId}", customerId);
-                await _syncService.SyncTransactionsAsync(customerId, since);
+                // Use provided 'since' timestamp if provided, otherwise use current time
+                var syncStartTime = since ?? DateTime.UtcNow;
+                await _syncService.SyncTransactionsAsync(customerId, syncStartTime);
 
-                return Ok(new { message = "Transactions synced successfully", customerId, since });
+                return Ok(new { message = "Transactions synced successfully", customerId, syncStartTime });
             }
             catch (HttpRequestException httpEx)
             {

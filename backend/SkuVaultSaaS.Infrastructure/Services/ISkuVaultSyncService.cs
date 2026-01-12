@@ -32,7 +32,7 @@ namespace SkuVaultSaaS.Infrastructure.Services
         /// <summary>
         /// Synchronizes transactions from SkuVault for a specific customer
         /// </summary>
-        Task SyncTransactionsAsync(int customerId, DateTime? since = null);
+        Task SyncTransactionsAsync(int customerId, DateTime syncStartTime);
 
         /// <summary>
         /// Synchronizes all customers for all tenants
@@ -42,7 +42,7 @@ namespace SkuVaultSaaS.Infrastructure.Services
         /// <summary>
         /// Synchronizes sales for a specific customer
         /// </summary>
-        Task SyncSalesAsync(int customerId);
+        Task SyncSalesAsync(int customerId, DateTime syncStartTime);
 
         /// <summary>
         /// Synchronizes shipments for a specific customer
