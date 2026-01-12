@@ -64,6 +64,37 @@ namespace SkuVaultSaaS.Api.Controllers
                 return BadRequest("Customer not found");
             }
 
+            // Check user account limits based on membership tier
+            int maxUserAccounts = customer.MembershipLevel switch
+            {
+                MembershipLevel.Standard => 2,
+                MembershipLevel.Premium => 5,
+                MembershipLevel.Enterprise => 10,
+                _ => 1
+            };
+
+            // Count current active users (ApplicationUsers with this CustomerId)
+            var currentUserCount = await _context.Users
+                .Where(u => u.CustomerId == currentUser.CustomerId)
+                .CountAsync();
+
+            // Count pending invitations (not yet accepted)
+            var pendingInvitationCount = await _context.UserInvitations
+                .Where(ui => ui.CustomerId == currentUser.CustomerId && !ui.IsAccepted && ui.ExpiresAt > DateTime.UtcNow)
+                .CountAsync();
+
+            if (currentUserCount + pendingInvitationCount >= maxUserAccounts)
+            {
+                return BadRequest(new 
+                { 
+                    message = $"User account limit reached for {customer.MembershipLevel} tier",
+                    currentTier = customer.MembershipLevel.ToString(),
+                    maxAccounts = maxUserAccounts,
+                    currentCount = currentUserCount,
+                    pendingInvitations = pendingInvitationCount
+                });
+            }
+
             var invitation = new UserInvitation
             {
                 CustomerId = currentUser.CustomerId.Value,
@@ -108,6 +139,53 @@ namespace SkuVaultSaaS.Api.Controllers
 
             // Redirect to frontend accept invitation page with token
             return Redirect($"/accept-invitation?token={Uri.EscapeDataString(token)}&email={Uri.EscapeDataString(invitation.Email)}&customer={Uri.EscapeDataString(invitation.Customer.Name)}&role={Uri.EscapeDataString(invitation.Role.ToString())}");
+        }
+
+        [HttpGet("account-limits/{customerId}")]
+        public async Task<IActionResult> GetAccountLimits(int customerId)
+        {
+            var currentUserId = _userContext.GetCurrentUserId();
+            if (string.IsNullOrEmpty(currentUserId)) return Unauthorized();
+            var currentUser = await _userManager.FindByIdAsync(currentUserId);
+            
+            if (currentUser?.CustomerId != customerId)
+            {
+                return Forbid();
+            }
+
+            var customer = await _context.Customers.FindAsync(customerId);
+            if (customer == null)
+            {
+                return NotFound();
+            }
+
+            // Get user account limit for this tier
+            int maxUserAccounts = customer.MembershipLevel switch
+            {
+                MembershipLevel.Standard => 2,
+                MembershipLevel.Premium => 5,
+                MembershipLevel.Enterprise => 10,
+                _ => 1
+            };
+
+            // Count current active users
+            var currentUserCount = await _context.Users
+                .Where(u => u.CustomerId == customerId)
+                .CountAsync();
+
+            // Count pending invitations
+            var pendingInvitationCount = await _context.UserInvitations
+                .Where(ui => ui.CustomerId == customerId && !ui.IsAccepted && ui.ExpiresAt > DateTime.UtcNow)
+                .CountAsync();
+
+            return Ok(new
+            {
+                membershipLevel = customer.MembershipLevel.ToString(),
+                maxUserAccounts = maxUserAccounts,
+                currentUserCount = currentUserCount,
+                pendingInvitations = pendingInvitationCount,
+                remainingSlots = maxUserAccounts - currentUserCount - pendingInvitationCount
+            });
         }
 
         [HttpPost("complete")]

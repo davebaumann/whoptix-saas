@@ -86,11 +86,24 @@ namespace SkuVaultSaaS.Infrastructure.Services
 
             try
             {
+                // Add delays between API calls to avoid rate limiting
+                const int delayBetweenCallsMs = 1000; // Increased from 500ms to reduce rate limiting
+
                 await SyncProductsAsync(customerId);
+                await Task.Delay(delayBetweenCallsMs);
+
                 await SyncLocationsAsync(customerId);
+                await Task.Delay(delayBetweenCallsMs);
+
                 await SyncInventoryLevelsAsync(customerId);
+                await Task.Delay(delayBetweenCallsMs);
+
                 await SyncInventoryMovementsAsync(customerId);
+                await Task.Delay(delayBetweenCallsMs);
+
                 await SyncTransactionsAsync(customerId);
+                await Task.Delay(delayBetweenCallsMs);
+
                 await SyncSalesAsync(customerId);
                 // await SyncShipmentsAsync(customerId); // Disabled - endpoint returns 404
 
@@ -137,6 +150,7 @@ namespace SkuVaultSaaS.Infrastructure.Services
             var allSales = new List<SkuVaultSaleDto>();
             var chunkStart = fromDate;
             const int daysPerChunk = 7;
+            const int delayBetweenChunksMs = 800; // Increased from 300ms to reduce rate limiting
 
             while (chunkStart < toDate)
             {
@@ -151,6 +165,12 @@ namespace SkuVaultSaaS.Infrastructure.Services
                 allSales.AddRange(chunkSales);
 
                 chunkStart = chunkEnd;
+                
+                // Add delay between chunks to avoid rate limiting
+                if (chunkStart < toDate)
+                {
+                    await Task.Delay(delayBetweenChunksMs);
+                }
             }
 
             _logger.LogInformation("Received {Count} sales from SkuVault API for customer {CustomerId} (from {FromDate} to {ToDate})", allSales.Count, customerId, fromDate, toDate);

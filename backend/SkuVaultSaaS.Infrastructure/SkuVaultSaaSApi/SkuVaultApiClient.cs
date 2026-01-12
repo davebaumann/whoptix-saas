@@ -268,40 +268,76 @@ namespace SkuVaultSaaS.Infrastructure.SkuVaultSaaSApi
 
         private async Task<List<T>> PostAndParseListWithRetry<T>(string relativePath, Func<string?, object> buildBody, string primaryArrayProperty, string userToken)
         {
-            var attemptBody = buildBody(userToken);
-            var (response, raw) = await SendPostAsync(relativePath, attemptBody);
+            const int maxRetries = 3;
+            int retryCount = 0;
+            int delayMs = 1000; // Start with 1 second
 
-            if (response.IsSuccessStatusCode)
+            while (true)
             {
-                return ParseListFromRaw<T>(raw ?? string.Empty, primaryArrayProperty);
-            }
-
-            var status = (int)response.StatusCode;
-            if (status == 401)
-            {
-                _logger?.LogError("SkuVault 401 Unauthorized - check UserToken and TenantToken configuration");
-                throw CreateHttpException(response, raw ?? string.Empty);
-            }
-            if (status == 404)
-            {
-                foreach (var alt in GetAlternatePaths(relativePath))
+                try
                 {
-                    (response, raw) = await SendPostAsync(alt, buildBody(userToken));
+                    var attemptBody = buildBody(userToken);
+                    var (response, raw) = await SendPostAsync(relativePath, attemptBody);
+
                     if (response.IsSuccessStatusCode)
                     {
                         return ParseListFromRaw<T>(raw ?? string.Empty, primaryArrayProperty);
                     }
-                }
-                foreach (var absoluteUrl in GetAlternateBaseUrls(relativePath))
-                {
-                    (response, raw) = await SendPostAbsoluteAsync(absoluteUrl, buildBody(userToken));
-                    if (response.IsSuccessStatusCode)
+
+                    var status = (int)response.StatusCode;
+                    
+                    // Handle rate limiting (429)
+                    if (status == 429)
                     {
-                        return ParseListFromRaw<T>(raw ?? string.Empty, primaryArrayProperty);
+                        if (retryCount < maxRetries)
+                        {
+                            _logger?.LogWarning("Rate limited (429) on {Path}. Retry {Attempt}/{Max} after {DelayMs}ms", relativePath, retryCount + 1, maxRetries, delayMs);
+                            await Task.Delay(delayMs);
+                            delayMs *= 2; // Exponential backoff
+                            retryCount++;
+                            continue;
+                        }
+                        else
+                        {
+                            _logger?.LogError("Rate limited (429) on {Path}. Max retries exceeded", relativePath);
+                            throw CreateHttpException(response, raw ?? string.Empty);
+                        }
                     }
+
+                    if (status == 401)
+                    {
+                        _logger?.LogError("SkuVault 401 Unauthorized - check UserToken and TenantToken configuration");
+                        throw CreateHttpException(response, raw ?? string.Empty);
+                    }
+                    
+                    if (status == 404)
+                    {
+                        foreach (var alt in GetAlternatePaths(relativePath))
+                        {
+                            (response, raw) = await SendPostAsync(alt, buildBody(userToken));
+                            if (response.IsSuccessStatusCode)
+                            {
+                                return ParseListFromRaw<T>(raw ?? string.Empty, primaryArrayProperty);
+                            }
+                        }
+                        foreach (var absoluteUrl in GetAlternateBaseUrls(relativePath))
+                        {
+                            (response, raw) = await SendPostAbsoluteAsync(absoluteUrl, buildBody(userToken));
+                            if (response.IsSuccessStatusCode)
+                            {
+                                return ParseListFromRaw<T>(raw ?? string.Empty, primaryArrayProperty);
+                            }
+                        }
+                    }
+                    
+                    throw CreateHttpException(response, raw ?? string.Empty);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Error in PostAndParseListWithRetry for {Path}", relativePath);
+                    throw;
                 }
             }
-            throw CreateHttpException(response, raw ?? string.Empty);
         }
 
         private async Task<List<T>> PostAndParseList<T>(string relativePath, object body, string primaryArrayProperty)

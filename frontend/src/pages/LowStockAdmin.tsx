@@ -57,7 +57,9 @@ const LowStockAdmin: React.FC = () => {
   const [notificationPrefs, setNotificationPrefs] = useState({
     lowStockNotificationsEnabled: false,
     lowStockNotificationEmail: '',
-    lowStockCheckIntervalMinutes: 240
+    lowStockCheckIntervalMinutes: 240,
+    canEnableNotifications: false,
+    membershipLevel: 'Basic'
   });
 
   // Get customer ID from user context (assuming it's available)
@@ -247,7 +249,10 @@ const LowStockAdmin: React.FC = () => {
         },
         body: JSON.stringify(data)
       });
-      if (!response.ok) throw new Error('Failed to update notification preferences');
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to update notification preferences');
+      }
       return response.json();
     },
     onSuccess: () => {
@@ -582,6 +587,24 @@ const LowStockAdmin: React.FC = () => {
               Email Notification Settings
             </h2>
             <div className="space-y-4">
+              {!notificationPrefs.canEnableNotifications && (
+                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <h3 className="font-semibold text-yellow-900 mb-2">Premium Feature</h3>
+                  <p className="text-sm text-yellow-800 mb-3">
+                    Email notifications for low stock items require a Premium membership tier.
+                  </p>
+                  <p className="text-xs text-yellow-700">
+                    <strong>Current plan:</strong> {notificationPrefs.membershipLevel}
+                  </p>
+                  <button
+                    onClick={() => window.location.href = 'https://justsku.com/app/membership/upgrade'}
+                    className="mt-3 px-3 py-1 bg-yellow-600 text-white text-sm rounded hover:bg-yellow-700"
+                  >
+                    Upgrade Your Plan
+                  </button>
+                </div>
+              )}
+              
               <div className="flex items-center">
                 <input
                   type="checkbox"
@@ -591,9 +614,10 @@ const LowStockAdmin: React.FC = () => {
                     ...notificationPrefs,
                     lowStockNotificationsEnabled: e.target.checked
                   })}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  disabled={!notificationPrefs.canEnableNotifications}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                 />
-                <label htmlFor="enableNotifications" className="ml-2 block text-sm text-gray-900">
+                <label htmlFor="enableNotifications" className={`ml-2 block text-sm ${notificationPrefs.canEnableNotifications ? 'text-gray-900' : 'text-gray-500'}`}>
                   Enable low stock email notifications
                 </label>
               </div>
@@ -609,8 +633,9 @@ const LowStockAdmin: React.FC = () => {
                     ...notificationPrefs,
                     lowStockNotificationEmail: e.target.value
                   })}
+                  disabled={!notificationPrefs.canEnableNotifications}
                   placeholder="Enter email address"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -624,7 +649,8 @@ const LowStockAdmin: React.FC = () => {
                     ...notificationPrefs,
                     lowStockCheckIntervalMinutes: parseInt(e.target.value)
                   })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  disabled={!notificationPrefs.canEnableNotifications}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <option value={60}>Every hour</option>
                   <option value={120}>Every 2 hours</option>
@@ -645,12 +671,20 @@ const LowStockAdmin: React.FC = () => {
                 </button>
                 <button
                   onClick={() => updateNotificationMutation.mutate(notificationPrefs)}
-                  disabled={updateNotificationMutation.isPending}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                  disabled={updateNotificationMutation.isPending || (!notificationPrefs.canEnableNotifications && notificationPrefs.lowStockNotificationsEnabled)}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {updateNotificationMutation.isPending ? 'Saving...' : 'Save Settings'}
                 </button>
               </div>
+
+              {updateNotificationMutation.isError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-800">
+                    {(updateNotificationMutation.error as Error)?.message}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
