@@ -4,6 +4,10 @@ import { useAuth } from '../contexts/AuthContext'
 
 interface AgingInventoryItem {
   sku: string
+  locationId?: number
+  locationCode: string
+  locationName: string
+  warehouse: string
   currentQuantity: number
   days0_30: number
   days31_60: number
@@ -61,7 +65,12 @@ export default function AgingInventoryReport() {
     )
   }
 
-  const customerId = user.customerId || 1 // Fallback to customer 1 if no association
+  // Check if admin is viewing as another customer
+  const adminViewingData = sessionStorage.getItem('adminViewingAs');
+  const adminViewingCustomerId = adminViewingData ? JSON.parse(adminViewingData).customerId : null;
+  
+  // Use impersonated customer ID if admin is viewing as, otherwise use user's own customer ID
+  const customerId = adminViewingCustomerId || user.customerId || 1 // Fallback to customer 1 if no association
 
   // Debug logging
   console.log('AgingInventoryReport - User:', user)
@@ -93,26 +102,30 @@ export default function AgingInventoryReport() {
     setCurrentPage(1)
   }
 
-  const getSortedData = () => {
-    if (!agingData) return []
-    
+  // Group by SKU for main rows, with subrows for each location
+  const getGroupedData = () => {
+    if (!agingData) return [];
+    // Sort first
     const sorted = [...agingData.details].sort((a, b) => {
-      const aValue = a[sortField]
-      const bValue = b[sortField]
-      
+      const aValue = a[sortField];
+      const bValue = b[sortField];
       if (typeof aValue === 'string' && typeof bValue === 'string') {
-        return sortDirection === 'asc' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue)
+        return sortDirection === 'asc' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue);
       }
-      
-      const numA = Number(aValue)
-      const numB = Number(bValue)
-      return sortDirection === 'asc' ? numA - numB : numB - numA
-    })
-    
-    return sorted
-  }
+      const numA = Number(aValue);
+      const numB = Number(bValue);
+      return sortDirection === 'asc' ? numA - numB : numB - numA;
+    });
+    // Group by SKU
+    const grouped: Record<string, AgingInventoryItem[]> = {};
+    for (const item of sorted) {
+      if (!grouped[item.sku]) grouped[item.sku] = [];
+      grouped[item.sku].push(item);
+    }
+    return Object.entries(grouped);
+  };
 
-  const paginatedData = getSortedData().slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const paginatedGroups = getGroupedData().slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const totalPages = Math.ceil((agingData?.details.length || 0) / pageSize)
 
   const getAgeColor = (days: number): string => {
@@ -294,33 +307,44 @@ export default function AgingInventoryReport() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {paginatedData.map((item, index) => (
-                    <tr key={item.sku} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {item.sku}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {item.currentQuantity}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600">
-                        {item.days0_30}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-yellow-600">
-                        {item.days31_60}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600">
-                        {item.days61_90}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600">
-                        {item.days90Plus}
-                      </td>
-                      <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${getAgeColor(item.averageDaysOld)}`}>
-                        {item.averageDaysOld} days
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {formatDate(item.oldestReceiveDate)}
-                      </td>
-                    </tr>
+                  {paginatedGroups.map(([sku, items]) => (
+                    <>
+                      {/* Main row for SKU */}
+                      <tr key={sku} className="bg-blue-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-blue-900" colSpan={8}>
+                          {sku}
+                        </td>
+                      </tr>
+                      {/* Subrows for each location */}
+                      {items.map((item, idx) => (
+                        <tr key={sku + '-' + item.locationId + '-' + idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 pl-10">
+                            <span className="font-semibold">{item.locationCode}</span> <span className="text-xs text-gray-500">{item.locationName}</span> <span className="text-xs text-gray-400">{item.warehouse}</span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {item.currentQuantity}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600">
+                            {item.days0_30}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-yellow-600">
+                            {item.days31_60}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600">
+                            {item.days61_90}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600">
+                            {item.days90Plus}
+                          </td>
+                          <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${getAgeColor(item.averageDaysOld)}`}> 
+                            {item.averageDaysOld} days
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {formatDate(item.oldestReceiveDate)}
+                          </td>
+                        </tr>
+                      ))}
+                    </>
                   ))}
                 </tbody>
               </table>

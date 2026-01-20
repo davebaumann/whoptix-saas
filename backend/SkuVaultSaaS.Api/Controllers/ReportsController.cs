@@ -13,6 +13,10 @@ namespace SkuVaultSaaS.Api.Controllers
     public class AgingInventoryItem
     {
         public string Sku { get; set; } = string.Empty;
+        public int? LocationId { get; set; }
+        public string LocationCode { get; set; } = string.Empty;
+        public string LocationName { get; set; } = string.Empty;
+        public string Warehouse { get; set; } = string.Empty;
         public int CurrentQuantity { get; set; }
         public int Days0_30 { get; set; }
         public int Days31_60 { get; set; }
@@ -123,6 +127,40 @@ namespace SkuVaultSaaS.Api.Controllers
             return await _userContextService.CanAccessCustomerAsync(customerId);
         }
 
+        /// <summary>
+        /// Gets the customer ID from request context, respecting admin impersonation.
+        /// If admin is impersonating a customer, returns the impersonated customer ID.
+        /// Otherwise returns the user's own customer ID.
+        /// </summary>
+        private int GetEffectiveCustomerId(out bool isAdminImpersonating)
+        {
+            isAdminImpersonating = false;
+
+            // Check if admin is impersonating a customer via X-Impersonate-Customer-Id header
+            if (HttpContext.Request.Headers.TryGetValue("X-Impersonate-Customer-Id", out var impersonateHeader))
+            {
+                if (int.TryParse(impersonateHeader.ToString(), out var impersonatedCustomerId))
+                {
+                    // Verify the user is an admin
+                    if (_userContextService.IsAdmin())
+                    {
+                        isAdminImpersonating = true;
+                        _logger.LogInformation("Admin impersonating customer {CustomerId}", impersonatedCustomerId);
+                        return impersonatedCustomerId;
+                    }
+                }
+            }
+
+            // Fall back to getting the user's own customer ID from claims
+            var customerIdClaim = User.FindFirst("CustomerId")?.Value;
+            if (int.TryParse(customerIdClaim, out var customerId))
+            {
+                return customerId;
+            }
+
+            return 0; // Invalid state
+        }
+
         private async Task<IActionResult> CheckReportAccessAsync(int customerId, string reportName)
         {
             // Check if user is a demo user
@@ -188,21 +226,32 @@ namespace SkuVaultSaaS.Api.Controllers
                 allClaims.Count, 
                 string.Join(", ", allClaims.Select(c => $"{c.Type}={c.Value}")));
 
-            // Get the customer ID from the claims (set by DemoAuthMiddleware or normal auth)
-            var customerIdClaim = User.FindFirst("CustomerId")?.Value;
-            _logger.LogInformation("ReportsController.GetDashboard: CustomerIdClaim={CustomerIdClaim}", customerIdClaim ?? "NULL");
+            // Get the effective customer ID (respecting admin impersonation)
+            var customerId = GetEffectiveCustomerId(out var isAdminImpersonating);
             
-            if (!int.TryParse(customerIdClaim, out var customerId))
+            if (customerId == 0)
             {
-                _logger.LogWarning("ReportsController.GetDashboard: Failed to parse CustomerId claim. Value was: {CustomerIdClaim}", customerIdClaim ?? "NULL");
-                return BadRequest(new { message = "Invalid or missing CustomerId claim" });
+                // Fallback to parsing from claim if GetEffectiveCustomerId failed
+                var customerIdClaim = User.FindFirst("CustomerId")?.Value;
+                _logger.LogInformation("ReportsController.GetDashboard: CustomerIdClaim={CustomerIdClaim}", customerIdClaim ?? "NULL");
+                
+                if (!int.TryParse(customerIdClaim, out customerId))
+                {
+                    _logger.LogWarning("ReportsController.GetDashboard: Failed to parse CustomerId claim. Value was: {CustomerIdClaim}", customerIdClaim ?? "NULL");
+                    return BadRequest(new { message = "Invalid or missing CustomerId claim" });
+                }
             }
 
             // Check if user can access this customer (skip for demo users)
             var isDemoUser = User.FindFirst("IsDemo")?.Value == "true";
-            if (!isDemoUser && !await CanAccessCustomerAsync(customerId))
+            if (!isDemoUser && !isAdminImpersonating && !await CanAccessCustomerAsync(customerId))
             {
                 return Forbid();
+            }
+
+            if (isAdminImpersonating)
+            {
+                _logger.LogInformation("Admin impersonating customer {CustomerId} for dashboard report", customerId);
             }
 
             try
@@ -231,8 +280,8 @@ namespace SkuVaultSaaS.Api.Controllers
                     })
                     .ToListAsync();
 
-                var movements = await _context.InventoryMovements
-                    .Where(im => im.CustomerId == customerId && im.OccurredAtUtc >= last30Days)
+                var movements = await _context.Transactions
+                    .Where(t => t.CustomerId == customerId && t.TransactionDate >= last30Days)
                     .ToListAsync();
 
                 var kpis = new[]
@@ -246,13 +295,13 @@ namespace SkuVaultSaaS.Api.Controllers
                     new
                     {
                         label = "Total Quantity Moved",
-                        value = movements.Sum(m => Math.Abs(m.QuantityChange)),
+                        value = movements.Sum(m => Math.Abs(m.Quantity)),
                         trend = "+3%"
                     },
                     new
                     {
                         label = "Active Users",
-                        value = movements.Select(m => m.PerformedBy).Distinct().Count(),
+                        value = movements.Select(m => m.User).Distinct().Count(),
                         trend = "No change"
                     },
                     new
@@ -266,8 +315,8 @@ namespace SkuVaultSaaS.Api.Controllers
                 var activitySummary = new
                 {
                     totalTransactions = transactions.Count,
-                    uniqueUsers = movements.Select(m => m.PerformedBy).Distinct().Count(),
-                    totalQuantity = movements.Sum(m => Math.Abs(m.QuantityChange)),
+                    uniqueUsers = movements.Select(m => m.User).Distinct().Count(),
+                    totalQuantity = movements.Sum(m => Math.Abs(m.Quantity)),
                     byType = movements
                         .GroupBy(m => m.TransactionType)
                         .Select(g => new { type = g.Key, count = g.Count() })
@@ -396,8 +445,14 @@ namespace SkuVaultSaaS.Api.Controllers
                     .OrderBy(t => t.TransactionDate)
                     .ToListAsync();
 
+                // Get all locations for the customer (for lookup)
+                var locations = await _context.Locations
+                    .AsNoTracking()
+                    .Where(l => l.CustomerId == customerId)
+                    .ToDictionaryAsync(l => l.Id);
+
                 var agingResults = new List<AgingInventoryItem>();
-                
+
                 // If no transactions exist, return empty result
                 if (!allTransactions.Any())
                 {
@@ -419,65 +474,139 @@ namespace SkuVaultSaaS.Api.Controllers
                     });
                 }
 
-                // Calculate current inventory levels per SKU
-                var currentInventory = allTransactions
-                    .GroupBy(t => t.Sku)
-                    .Select(g => new
-                    {
-                        Sku = g.Key,
-                        CurrentQuantity = g.Sum(t => t.Quantity),
-                        Transactions = g.ToList()
-                    })
-                    .Where(x => x.CurrentQuantity > 0) // Only include SKUs with positive inventory
+                // Group by SKU and LocationId, include all pairs
+                var grouped = allTransactions
+                    .GroupBy(t => new { t.Sku, t.LocationId })
                     .ToList();
 
                 var cutoffDate = DateTime.UtcNow.Date;
 
-                foreach (var item in currentInventory)
+                foreach (var g in grouped)
                 {
+                    var sku = g.Key.Sku;
+                    var locationId = g.Key.LocationId;
+                    var transactions = g.OrderBy(t => t.TransactionDate).ToList();
+
                     try
                     {
-                        // Get the oldest "Add" or "Return" transaction date for aging calculation
-                        var firstAddTransaction = item.Transactions
+                        // Find the most recent transaction for this (SKU, Location)
+                        var mostRecent = transactions.LastOrDefault();
+                        int? mostRecentQtyAfter = mostRecent?.QuantityAfter;
+
+                        // FIFO batch logic (as before)
+                        var receivedBatches = transactions
                             .Where(t => (t.TransactionType == "Add" || t.TransactionType == "Return") && t.Quantity > 0)
                             .OrderBy(t => t.TransactionDate)
-                            .FirstOrDefault();
+                            .Select(t => new { t.TransactionDate, t.Quantity })
+                            .ToList();
 
-                        DateTime oldestDate = firstAddTransaction?.TransactionDate ?? 
-                                           item.Transactions.OrderBy(t => t.TransactionDate).First().TransactionDate;
-                        var daysOld = (cutoffDate - oldestDate.Date).Days;
+                        var picks = transactions
+                            .Where(t => (t.TransactionType == "Pick" || t.TransactionType == "Remove") && t.Quantity > 0)
+                            .OrderBy(t => t.TransactionDate)
+                            .ToList();
 
-                        // Ensure daysOld is not negative
-                        daysOld = Math.Max(0, daysOld);
-
-                        // Simple aging buckets based on oldest Add transaction
-                        var days0_30 = daysOld <= 30 ? item.CurrentQuantity : 0;
-                        var days31_60 = daysOld > 30 && daysOld <= 60 ? item.CurrentQuantity : 0;
-                        var days61_90 = daysOld > 60 && daysOld <= 90 ? item.CurrentQuantity : 0;
-                        var days90Plus = daysOld > 90 ? item.CurrentQuantity : 0;
-
-                        agingResults.Add(new AgingInventoryItem
+                        var remainingBatches = new List<(DateTime Date, int Quantity)>();
+                        foreach (var batch in receivedBatches)
                         {
-                            Sku = item.Sku,
-                            CurrentQuantity = item.CurrentQuantity,
-                            Days0_30 = days0_30,
-                            Days31_60 = days31_60,
-                            Days61_90 = days61_90,
-                            Days90Plus = days90Plus,
-                            OldestReceiveDate = oldestDate,
-                            AverageDaysOld = daysOld
-                        });
+                            remainingBatches.Add((batch.TransactionDate, batch.Quantity));
+                        }
+
+                        foreach (var pick in picks)
+                        {
+                            int qtyToRemove = pick.Quantity;
+                            for (int i = 0; i < remainingBatches.Count && qtyToRemove > 0; i++)
+                            {
+                                if (remainingBatches[i].Quantity >= qtyToRemove)
+                                {
+                                    remainingBatches[i] = (remainingBatches[i].Date, remainingBatches[i].Quantity - qtyToRemove);
+                                    qtyToRemove = 0;
+                                }
+                                else
+                                {
+                                    qtyToRemove -= remainingBatches[i].Quantity;
+                                    remainingBatches[i] = (remainingBatches[i].Date, 0);
+                                }
+                            }
+                        }
+
+                        int days0_30 = 0, days31_60 = 0, days61_90 = 0, days90Plus = 0;
+                        DateTime oldestDate = DateTime.UtcNow;
+                        int totalRemainingQty = 0;
+
+                        foreach (var batch in remainingBatches.Where(b => b.Quantity > 0))
+                        {
+                            var daysForThisBatch = (cutoffDate - batch.Date.Date).Days;
+                            daysForThisBatch = Math.Max(0, daysForThisBatch);
+                            totalRemainingQty += batch.Quantity;
+
+                            if (batch.Date < oldestDate)
+                                oldestDate = batch.Date;
+
+                            if (daysForThisBatch <= 30)
+                                days0_30 += batch.Quantity;
+                            else if (daysForThisBatch <= 60)
+                                days31_60 += batch.Quantity;
+                            else if (daysForThisBatch <= 90)
+                                days61_90 += batch.Quantity;
+                            else
+                                days90Plus += batch.Quantity;
+                        }
+
+                        // Lookup location details
+                        string locationCode = string.Empty, locationName = string.Empty, warehouse = string.Empty;
+                        if (locationId.HasValue && locations.TryGetValue(locationId.Value, out var loc))
+                        {
+                            locationCode = loc.Code;
+                            locationName = loc.Name ?? loc.Code;
+                            warehouse = loc.Warehouse ?? string.Empty;
+                        }
+
+                        // If the most recent transaction's QuantityAfter > 0, always include this location
+                        if (mostRecentQtyAfter.HasValue && mostRecentQtyAfter.Value > 0)
+                        {
+                            // If batch math matches, use batch math for aging buckets; otherwise, put all in 0-30
+                            int useQty = mostRecentQtyAfter.Value;
+                            if (totalRemainingQty == useQty)
+                            {
+                                // Use batch math as before
+                            }
+                            else
+                            {
+                                // If batch math doesn't match, assign all to 0-30 bucket and set oldestDate to most recent
+                                days0_30 = useQty;
+                                days31_60 = 0;
+                                days61_90 = 0;
+                                days90Plus = 0;
+                                oldestDate = mostRecent?.TransactionDate ?? DateTime.UtcNow;
+                            }
+
+                            agingResults.Add(new AgingInventoryItem
+                            {
+                                Sku = sku,
+                                LocationId = locationId,
+                                LocationCode = locationCode,
+                                LocationName = locationName,
+                                Warehouse = warehouse,
+                                CurrentQuantity = useQty,
+                                Days0_30 = days0_30,
+                                Days31_60 = days31_60,
+                                Days61_90 = days61_90,
+                                Days90Plus = days90Plus,
+                                OldestReceiveDate = oldestDate,
+                                AverageDaysOld = 0 // Not meaningful if batch math doesn't match
+                            });
+                        }
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogWarning(ex, "Error calculating aging for SKU {Sku}", item.Sku);
+                        _logger.LogWarning(ex, "Error calculating aging for SKU {Sku} LocationId {LocationId}", sku, locationId);
                         // Continue processing other items
                     }
                 }
 
                 var summary = new AgingInventorySummary
                 {
-                    TotalSkus = agingResults.Count,
+                    TotalSkus = agingResults.Select(x => x.Sku).Distinct().Count(),
                     TotalQuantity = agingResults.Sum(x => x.CurrentQuantity),
                     Days0_30_Total = agingResults.Sum(x => x.Days0_30),
                     Days31_60_Total = agingResults.Sum(x => x.Days31_60),
@@ -489,7 +618,7 @@ namespace SkuVaultSaaS.Api.Controllers
                 {
                     reportDate = DateTime.UtcNow,
                     summary,
-                    details = agingResults.OrderBy(x => x.Sku).ToList()
+                    details = agingResults.OrderBy(x => x.Sku).ThenBy(x => x.LocationCode).ToList()
                 });
             }
             catch (Exception ex)
@@ -843,19 +972,17 @@ namespace SkuVaultSaaS.Api.Controllers
                 var previousPeriodStart = startDate.AddDays(-daysBack);
 
                 // Get inventory movements for current and previous periods
-                var currentPeriodMovements = await _context.InventoryMovements
-                    .Where(im => im.CustomerId == customerId && 
-                               im.OccurredAtUtc >= startDate && 
-                               im.OccurredAtUtc <= endDate)
-                    .Include(im => im.Product)
+                var currentPeriodMovements = await _context.Transactions
+                    .Where(t => t.CustomerId == customerId && 
+                               t.TransactionDate >= startDate && 
+                               t.TransactionDate <= endDate)
                     .AsNoTracking()
                     .ToListAsync();
 
-                var previousPeriodMovements = await _context.InventoryMovements
-                    .Where(im => im.CustomerId == customerId && 
-                               im.OccurredAtUtc >= previousPeriodStart && 
-                               im.OccurredAtUtc < startDate)
-                    .Include(im => im.Product)
+                var previousPeriodMovements = await _context.Transactions
+                    .Where(t => t.CustomerId == customerId && 
+                               t.TransactionDate >= previousPeriodStart && 
+                               t.TransactionDate < startDate)
                     .AsNoTracking()
                     .ToListAsync();
 
@@ -881,8 +1008,8 @@ namespace SkuVaultSaaS.Api.Controllers
                 // Get underperformers
                 var underPerformers = GetUnderPerformers(inventoryLevels, currentPeriodMovements);
 
-                var totalUnitsSold = currentPeriodMovements.Where(m => m.TransactionType == "Pick" || m.TransactionType == "Sale").Sum(m => Math.Abs(m.QuantityChange));
-                var previousUnitsSold = previousPeriodMovements.Where(m => m.TransactionType == "Pick" || m.TransactionType == "Sale").Sum(m => Math.Abs(m.QuantityChange));
+                var totalUnitsSold = currentPeriodMovements.Where(m => m.TransactionType == "Pick" || m.TransactionType == "Sale").Sum(m => Math.Abs(m.Quantity));
+                var previousUnitsSold = previousPeriodMovements.Where(m => m.TransactionType == "Pick" || m.TransactionType == "Sale").Sum(m => Math.Abs(m.Quantity));
                 var unitsSoldGrowth = previousUnitsSold > 0 ? ((totalUnitsSold - previousUnitsSold) / (decimal)previousUnitsSold) * 100 : 0;
 
                 var performanceSummary = new PerformanceReportSummary
@@ -932,14 +1059,14 @@ namespace SkuVaultSaaS.Api.Controllers
                         customerId = customerId,
                         movementDateRange = currentPeriodMovements.Any() ? 
                             new { 
-                                earliest = currentPeriodMovements.Min(m => m.OccurredAtUtc),
-                                latest = currentPeriodMovements.Max(m => m.OccurredAtUtc)
+                                earliest = currentPeriodMovements.Min(m => m.TransactionDate),
+                                latest = currentPeriodMovements.Max(m => m.TransactionDate)
                             } : null,
                         sampleMovements = currentPeriodMovements.Take(3).Select(m => new {
                             m.TransactionType,
-                            m.QuantityChange,
-                            m.OccurredAtUtc,
-                            ProductSku = m.Product.Sku
+                            m.Quantity,
+                            m.TransactionDate,
+                            Sku = m.Sku
                         }).ToList()
                     }
                 });
@@ -1321,7 +1448,7 @@ namespace SkuVaultSaaS.Api.Controllers
             return diversityScore + quantityScore + valueScore;
         }
 
-        private List<VelocityMetric> CalculateVelocityMetrics(List<InventoryMovement> movements, List<InventoryLevel> inventory, int daysInPeriod = 30)
+        private List<VelocityMetric> CalculateVelocityMetrics(List<Transaction> movements, List<InventoryLevel> inventory, int daysInPeriod = 30)
         {
             var velocityMetrics = new List<VelocityMetric>();
             
@@ -1330,8 +1457,8 @@ namespace SkuVaultSaaS.Api.Controllers
                 var productMovements = movements.Where(m => m.ProductId == product.Key.Id).ToList();
                 var outboundQuantity = productMovements
                     .Where(m => m.TransactionType == "Pick" || m.TransactionType == "Sale" || 
-                               (m.TransactionType == "Adjust" && m.QuantityChange < 0))
-                    .Sum(m => Math.Abs(m.QuantityChange));
+                               (m.TransactionType == "Adjust" && m.Quantity < 0))
+                    .Sum(m => Math.Abs(m.Quantity));
                 
                 var averageStock = product.Sum(p => p.QuantityAvailable);
                 var velocity = outboundQuantity / (double)daysInPeriod; // Daily velocity over the selected period
@@ -1350,7 +1477,7 @@ namespace SkuVaultSaaS.Api.Controllers
             return velocityMetrics;
         }
 
-        private List<TurnoverMetric> CalculateTurnoverMetrics(List<InventoryMovement> movements, List<InventoryLevel> inventory, int daysInPeriod = 30)
+        private List<TurnoverMetric> CalculateTurnoverMetrics(List<Transaction> movements, List<InventoryLevel> inventory, int daysInPeriod = 30)
         {
             var turnoverMetrics = new List<TurnoverMetric>();
             
@@ -1359,7 +1486,7 @@ namespace SkuVaultSaaS.Api.Controllers
                 var productMovements = movements.Where(m => m.ProductId == product.Key.Id).ToList();
                 var soldQuantity = productMovements
                     .Where(m => m.TransactionType == "Pick" || m.TransactionType == "Sale")
-                    .Sum(m => Math.Abs(m.QuantityChange));
+                    .Sum(m => Math.Abs(m.Quantity));
                 
                 var averageStock = product.Sum(p => p.QuantityAvailable);
                 var turnoverRate = averageStock > 0 ? (decimal)soldQuantity / averageStock : 0;
@@ -1382,19 +1509,19 @@ namespace SkuVaultSaaS.Api.Controllers
             return turnoverMetrics;
         }
 
-        private PerformanceTrend CalculatePerformanceTrends(List<InventoryMovement> current, List<InventoryMovement> previous)
+        private PerformanceTrend CalculatePerformanceTrends(List<Transaction> current, List<Transaction> previous)
         {
-            var currentSales = current.Where(m => m.TransactionType == "Pick" || m.TransactionType == "Sale").Sum(m => Math.Abs(m.QuantityChange));
-            var previousSales = previous.Where(m => m.TransactionType == "Pick" || m.TransactionType == "Sale").Sum(m => Math.Abs(m.QuantityChange));
+            var currentSales = current.Where(m => m.TransactionType == "Pick" || m.TransactionType == "Sale").Sum(m => Math.Abs(m.Quantity));
+            var previousSales = previous.Where(m => m.TransactionType == "Pick" || m.TransactionType == "Sale").Sum(m => Math.Abs(m.Quantity));
             var salesGrowth = previousSales > 0 ? ((decimal)(currentSales - previousSales) / previousSales) * 100 : 0;
             
-            // Calculate revenue using product cost since movements don't have unit cost
+            // NOTE: Transactions table does not have cost information; revenue calculation removed
             var currentRevenue = current
                 .Where(m => m.TransactionType == "Pick" || m.TransactionType == "Sale")
-                .Sum(m => Math.Abs(m.QuantityChange) * (m.Product.Cost ?? 0));
+                .Sum(m => Math.Abs(m.Quantity) * 0); // Placeholder: no cost data in Transactions
             var previousRevenue = previous
                 .Where(m => m.TransactionType == "Pick" || m.TransactionType == "Sale")
-                .Sum(m => Math.Abs(m.QuantityChange) * (m.Product.Cost ?? 0));
+                .Sum(m => Math.Abs(m.Quantity) * 0); // Placeholder: no cost data in Transactions
             var revenueGrowth = previousRevenue > 0 ? ((currentRevenue - previousRevenue) / previousRevenue) * 100 : 0;
             
             return new PerformanceTrend
@@ -1406,33 +1533,33 @@ namespace SkuVaultSaaS.Api.Controllers
             };
         }
 
-        private List<TopPerformer> GetTopPerformers(List<InventoryMovement> movements, List<InventoryLevel> inventory)
+        private List<TopPerformer> GetTopPerformers(List<Transaction> movements, List<InventoryLevel> inventory)
         {
             return movements
                 .Where(m => m.TransactionType == "Pick" || m.TransactionType == "Sale")
-                .GroupBy(m => new { m.ProductId, m.Product.Sku, m.Product.Name })
+                .GroupBy(m => new { m.ProductId, m.Sku })
                 .Select(g => {
-                    var unitsSold = g.Sum(m => Math.Abs(m.QuantityChange));
+                    var unitsSold = g.Sum(m => Math.Abs(m.Quantity));
                     var days = 30; // Assuming 30-day period
                     var velocity = days > 0 ? (decimal)unitsSold / days : 0;
                     return new TopPerformer
                     {
                         ProductSku = g.Key.Sku,
-                        ProductName = g.Key.Name,
-                        Sku = g.Key.Sku, // For frontend compatibility
-                        Revenue = g.Sum(m => Math.Abs(m.QuantityChange) * (m.Product.Cost ?? 0)),
+                        ProductName = g.FirstOrDefault()?.Title ?? g.Key.Sku, // Use Title from Transactions
+                        Sku = g.Key.Sku,
+                        Revenue = 0, // Transactions table has no cost data
                         UnitsSold = unitsSold,
                         Transactions = g.Count(),
                         CurrentStock = inventory.Where(il => il.ProductId == g.Key.ProductId).Sum(il => il.QuantityOnHand),
                         Velocity = velocity
                     };
                 })
-                .OrderByDescending(p => p.Revenue)
+                .OrderByDescending(p => p.UnitsSold)
                 .Take(10)
                 .ToList();
         }
 
-        private List<UnderPerformer> GetUnderPerformers(List<InventoryLevel> inventory, List<InventoryMovement> movements)
+        private List<UnderPerformer> GetUnderPerformers(List<InventoryLevel> inventory, List<Transaction> movements)
         {
             var productsWithSales = movements.Where(m => m.TransactionType == "Pick" || m.TransactionType == "Sale").Select(m => m.ProductId).Distinct().ToHashSet();
             
@@ -1460,14 +1587,15 @@ namespace SkuVaultSaaS.Api.Controllers
                 .ToList();
         }
 
-        private decimal CalculateRevenueGrowth(List<InventoryMovement> current, List<InventoryMovement> previous)
+        private decimal CalculateRevenueGrowth(List<Transaction> current, List<Transaction> previous)
         {
+            // NOTE: Transactions table does not have cost information; revenue calculation disabled
             var currentRevenue = current
                 .Where(m => m.TransactionType == "Pick" || m.TransactionType == "Sale")
-                .Sum(m => Math.Abs(m.QuantityChange) * (m.Product.Cost ?? 0));
+                .Sum(m => Math.Abs(m.Quantity) * 0); // No cost data available
             var previousRevenue = previous
                 .Where(m => m.TransactionType == "Pick" || m.TransactionType == "Sale")
-                .Sum(m => Math.Abs(m.QuantityChange) * (m.Product.Cost ?? 0));
+                .Sum(m => Math.Abs(m.Quantity) * 0); // No cost data available
             
             return previousRevenue > 0 ? ((currentRevenue - previousRevenue) / previousRevenue) * 100 : 0;
         }
