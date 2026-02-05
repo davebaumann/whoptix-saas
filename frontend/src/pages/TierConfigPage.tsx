@@ -35,7 +35,8 @@ const TierConfigPage: React.FC = () => {
     'demand-forecast': { tier: 3, name: 'Demand Forecast', description: 'Predict future inventory needs based on historical patterns' },
     'financial-warehouse': { tier: 3, name: 'Financial Warehouse Report', description: 'Financial analytics and warehouse value tracking' },
     'locations': { tier: 3, name: 'Locations Report', description: 'Location utilization and optimization insights' },
-    'performance': { tier: 4, name: 'Performance Analytics', description: 'Advanced metrics including velocity, turnover, and trends' }
+    'performance': { tier: 4, name: 'Performance Analytics', description: 'Advanced metrics including velocity, turnover, and trends' },
+    'picker-analytics': { tier: 3, name: 'Picker Analytics', description: 'Individual picker performance metrics, accuracy tracking, and productivity rankings' }
   };
 
   // Initialize edited state with current values from backend
@@ -287,15 +288,17 @@ const TierConfigPage: React.FC = () => {
                               <option value={2}>Standard</option>
                               <option value={3}>Premium</option>
                               <option value={4}>Enterprise</option>
+                              <option value={5}>Development (Admin Only)</option>
                             </select>
                           ) : (
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                               currentTier === 1 ? 'bg-gray-100 text-gray-800' :
                               currentTier === 2 ? 'bg-blue-100 text-blue-800' :
                               currentTier === 3 ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-purple-100 text-purple-800'
+                              currentTier === 4 ? 'bg-purple-100 text-purple-800' :
+                              'bg-red-100 text-red-800'
                             }`}>
-                              {currentTier === 1 ? 'Basic' : currentTier === 2 ? 'Standard' : currentTier === 3 ? 'Premium' : 'Enterprise'}
+                              {currentTier === 1 ? 'Basic' : currentTier === 2 ? 'Standard' : currentTier === 3 ? 'Premium' : currentTier === 4 ? 'Enterprise' : 'Development'}
                             </span>
                           )}
                         </td>
