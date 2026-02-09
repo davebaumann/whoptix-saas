@@ -452,14 +452,18 @@ namespace SkuVaultSaaS.Api.Controllers
             // Check tenant access and membership level
             var accessCheck = await CheckReportAccessAsync(customerId, "aging-inventory");
             if (accessCheck != null) return accessCheck;
-
             try
             {
-                // Get ONLY current inventory state using database-level grouping to minimize memory
-                // Use window functions in database to get most recent transaction per (SKU, LocationId)
+                // Get ONLY current inventory state using database-level filtering to minimize memory
+                // Limit to most recent 50k transactions to prevent massive result set grouping
+                var cutoffDate = DateTime.UtcNow.Date;
+                var transactionHistoryCutoff = cutoffDate.AddYears(-3);
+                
                 var currentInventoryState = await _context.Transactions
                     .AsNoTracking()
-                    .Where(t => t.CustomerId == customerId && t.QuantityAfter > 0)
+                    .Where(t => t.CustomerId == customerId && t.QuantityAfter > 0 && t.TransactionDate >= transactionHistoryCutoff)
+                    .OrderByDescending(t => t.TransactionDate)
+                    .Take(50000)  // Hard limit on transactions to group - prevents huge GroupBy result sets
                     .GroupBy(t => new { t.Sku, t.LocationId })
                     .Select(g => new
                     {
@@ -491,16 +495,10 @@ namespace SkuVaultSaaS.Api.Controllers
                 }
 
                 // Get ALL transactions ONLY for SKU+Location combinations that have current inventory
-                // This early filtering significantly reduces memory usage
+                // Process each SKU+Location separately to avoid loading massive result sets into memory
+                // This prevents timeout and memory exhaustion on large datasets
                 var skuLocationPairs = currentInventoryState.Select(x => new { x.Sku, x.LocationId }).Distinct().ToList();
                 
-                var allTransactions = await _context.Transactions
-                    .AsNoTracking()
-                    .Where(t => t.CustomerId == customerId && 
-                                skuLocationPairs.Any(p => p.Sku == t.Sku && p.LocationId == t.LocationId))
-                    .OrderBy(t => t.TransactionDate)
-                    .ToListAsync();
-
                 // Get only locations for SKUs that have current inventory (memory optimization)
                 var locationIds = currentInventoryState.Where(x => x.LocationId.HasValue).Select(x => x.LocationId.Value).Distinct().ToList();
                 var locations = await _context.Locations
@@ -510,23 +508,31 @@ namespace SkuVaultSaaS.Api.Controllers
 
                 var agingResults = new List<AgingInventoryItem>();
 
-                // Group only the filtered transactions by SKU and LocationId
-                var grouped = allTransactions
-                    .GroupBy(t => new { t.Sku, t.LocationId })
-                    .ToList();
-
-                var cutoffDate = DateTime.UtcNow.Date;
-
-                foreach (var g in grouped)
+                // Process each SKU+LocationId pair individually to avoid loading massive datasets into memory
+                foreach (var pair in skuLocationPairs)
                 {
-                    var sku = g.Key.Sku;
-                    var locationId = g.Key.LocationId;
-                    var transactions = g.OrderBy(t => t.TransactionDate).ToList();
+                    var sku = pair.Sku;
+                    var locationId = pair.LocationId;
+                    
+                    // Fetch ONLY transactions for THIS SKU+Location AFTER the history cutoff
+                    // Add hard limit to prevent loading massive result sets for high-volume SKUs
+                    var transactions = await _context.Transactions
+                        .AsNoTracking()
+                        .Where(t => t.CustomerId == customerId && 
+                                    t.Sku == sku &&
+                                    (!locationId.HasValue || t.LocationId == locationId) &&
+                                    t.TransactionDate >= transactionHistoryCutoff)  // CRITICAL: Only recent history
+                        .OrderByDescending(t => t.TransactionDate)
+                        .Take(10000)  // Hard limit: most recent 10k transactions is enough for FIFO aging calc
+                        .OrderBy(t => t.TransactionDate)
+                        .ToListAsync();
 
                     try
                     {
                         // Find the most recent transaction for this (SKU, Location)
-                        var mostRecent = transactions.LastOrDefault();
+                        // If no recent transactions but we have current inventory, assume it arrived >3 years ago
+                        var mostRecent = transactions.LastOrDefault() ?? 
+                            (transactions.Count == 0 ? new Transaction { TransactionDate = transactionHistoryCutoff.AddDays(-1) } : null);
                         int? mostRecentQtyAfter = mostRecent?.QuantityAfter;
 
                         // FIFO batch logic (as before)
@@ -658,9 +664,6 @@ namespace SkuVaultSaaS.Api.Controllers
                 });
 
                 // Clear collections to allow garbage collection
-                agingResults.Clear();
-                grouped.Clear();
-                allTransactions.Clear();
                 currentInventoryState.Clear();
                 GC.Collect(generation: 1, mode: GCCollectionMode.Optimized);
 

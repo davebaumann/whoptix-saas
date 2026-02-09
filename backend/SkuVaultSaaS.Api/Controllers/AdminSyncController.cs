@@ -75,6 +75,9 @@ namespace SkuVaultSaaS.Api.Controllers
                         case "pos-completed":
                             await syncService.SyncPurchaseOrdersCompletedAsync(request.CustomerId, syncFromDate);
                             break;
+                        case "receives":
+                            await syncService.SyncReceivesHistoryAsync(request.CustomerId, syncFromDate);
+                            break;
                         case "all":
                             await syncService.SyncCustomerDataAsync(request.CustomerId);
                             break;

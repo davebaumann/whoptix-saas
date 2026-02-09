@@ -147,6 +147,9 @@ namespace SkuVaultSaaS.Infrastructure.Services
                 customer.LastSyncedAt = syncStartTime;
                 await _context.SaveChangesAsync();
                 
+                // CRITICAL: Clear EF Core change tracker after all syncs to release memory
+                _context.ChangeTracker.Clear();
+                
                 _logger.LogInformation("Completed full sync for customer {CustomerId}. LastSyncedAt={LastSyncedAt}", customerId, syncStartTime);
             }
             catch (Exception ex)
@@ -349,6 +352,17 @@ namespace SkuVaultSaaS.Infrastructure.Services
                 await _context.SaveChangesAsync();
             }
 
+            // Clear collections to free memory immediately after processing
+            allSales?.Clear();
+            allSales = null;
+            saleItemsToAdd?.Clear();
+            saleItemsToAdd = null;
+            existingSaleIds?.Clear();
+            existingSaleIds = null;
+
+            // CRITICAL: Clear EF Core change tracker to release all tracked entities from memory
+            _context.ChangeTracker.Clear();
+
             // LastSyncedAt will be updated once after all syncs complete (in SyncCustomerDataAsync)
             _logger.LogInformation("Sales sync complete for customer {CustomerId}: {Added} sales added, {Updated} updated, {SaleItems} items added", customerId, added, updated, saleItemsAdded);
         }
@@ -428,7 +442,19 @@ namespace SkuVaultSaaS.Infrastructure.Services
             }
 
             var saved = await _context.SaveChangesAsync();
-            _logger.LogInformation("Saved {SavedCount} changes. Synced {Count} products for customer {CustomerId}", saved, apiProducts.Count, customerId);
+            
+            // Clear collections to free memory
+            localProducts?.Clear();
+            localProducts = null;
+            localSkuSet?.Clear();
+            localSkuSet = null;
+            apiProducts?.Clear();
+            apiProducts = null;
+            
+            // CRITICAL: Clear EF Core change tracker to release all tracked entities from memory
+            _context.ChangeTracker.Clear();
+            
+            _logger.LogInformation("Saved {SavedCount} changes. Synced {Count} products for customer {CustomerId}", saved, apiProducts?.Count ?? 0, customerId);
         }
 
         public async Task SyncLocationsAsync(int customerId)
@@ -682,7 +708,6 @@ namespace SkuVaultSaaS.Infrastructure.Services
 
             const int batchSize = 500;
             int totalSyncedCount = 0;
-            var allApiTransactions = new List<SkuVaultInventoryMovementDto>();
             DateTime chunkStart = fromDate;
             while (chunkStart < toDate)
             {
@@ -696,7 +721,6 @@ namespace SkuVaultSaaS.Infrastructure.Services
                         userToken!,
                         chunkStart,
                         chunkEnd);
-                    allApiTransactions.AddRange(chunkTransactions);
                     
                     // Process this chunk immediately during the delay
                     _logger.LogInformation("Processing {Count} transactions from chunk {ChunkStart} to {ChunkEnd} during delay period", 
@@ -705,6 +729,10 @@ namespace SkuVaultSaaS.Infrastructure.Services
                     int chunkSyncedCount = await ProcessTransactionChunkAsync(chunkTransactions, customerId, products, locations, 
                         existingSkuVaultIds, batchSize);
                     totalSyncedCount += chunkSyncedCount;
+                    
+                    // Explicitly dispose/clear chunk to free memory immediately after processing
+                    chunkTransactions?.Clear();
+                    chunkTransactions = null;
                 }
                 catch (HttpRequestException ex) when (ex.Message.Contains("429"))
                 {
@@ -725,6 +753,19 @@ namespace SkuVaultSaaS.Infrastructure.Services
 
             _logger.LogInformation("Transaction sync complete for customer {CustomerId}: {SyncedCount} transactions synced", 
                 customerId, totalSyncedCount);
+
+            // Clear large collections to free memory immediately after processing
+            products?.Clear();
+            products = null;
+            locations?.Clear();
+            locations = null;
+            locationList?.Clear();
+            locationList = null;
+            existingSkuVaultIds?.Clear();
+            existingSkuVaultIds = null;
+            
+            // CRITICAL: Clear EF Core change tracker to release all tracked entities from memory
+            _context.ChangeTracker.Clear();
         }
 
         /// <summary>
@@ -961,6 +1002,16 @@ namespace SkuVaultSaaS.Infrastructure.Services
             {
                 await _context.SaveChangesAsync();
             }
+            
+            // Clear large collections to free memory
+            saleIds?.Clear();
+            saleIds = null;
+            apiShipments?.Clear();
+            apiShipments = null;
+            
+            // CRITICAL: Clear EF Core change tracker to release all tracked entities from memory
+            _context.ChangeTracker.Clear();
+            
             _logger.LogInformation("Shipments sync complete for customer {CustomerId}: {Added} added, {Updated} updated", customerId, added, updated);
         }
 

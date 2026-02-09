@@ -20,6 +20,7 @@ export default function AdminSyncPage() {
     { value: 'shipments', label: 'Shipments' },
     { value: 'pos', label: 'Purchase Orders - Active (with date range)' },
     { value: 'pos-completed', label: 'Purchase Orders - Completed (with date range)' },
+    { value: 'receives', label: 'Receives (with date range)' },
     { value: 'all', label: 'Full Customer Sync (All Data)' }
   ];
 
@@ -39,7 +40,7 @@ export default function AdminSyncPage() {
         syncType: syncType
       };
 
-      if ((syncType === 'sales' || syncType === 'transactions' || syncType === 'pos' || syncType === 'pos-completed') && fromDate) {
+      if ((syncType === 'sales' || syncType === 'transactions' || syncType === 'pos' || syncType === 'pos-completed' || syncType === 'receives') && fromDate) {
         body.fromDate = new Date(fromDate).toISOString();
       }
 
@@ -133,8 +134,8 @@ export default function AdminSyncPage() {
             </select>
           </div>
 
-          {/* From Date (only for sales, transactions, and purchase orders) */}
-          {(syncType === 'sales' || syncType === 'transactions' || syncType === 'pos' || syncType === 'pos-completed') && (
+          {/* From Date (only for sales, transactions, purchase orders, and receives) */}
+          {(syncType === 'sales' || syncType === 'transactions' || syncType === 'pos' || syncType === 'pos-completed' || syncType === 'receives') && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 From Date (optional - defaults to 30/365 days ago)

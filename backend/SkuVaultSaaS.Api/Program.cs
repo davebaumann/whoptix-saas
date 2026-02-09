@@ -341,6 +341,9 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
             maxRetryCount: 3,
             maxRetryDelay: TimeSpan.FromSeconds(5),
             errorNumbersToAdd: null);
+        
+        // Increase command timeout for complex reports (default is 30 seconds)
+        mySqlOptions.CommandTimeout(300); // 5 minutes for aging inventory and other complex queries
     }), ServiceLifetime.Scoped); // Explicit scoped lifetime
 
 // Add memory caching for frequent queries
