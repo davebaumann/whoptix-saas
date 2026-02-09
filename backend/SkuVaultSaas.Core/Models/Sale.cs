@@ -10,6 +10,7 @@ namespace SkuVaultSaaS.Core.Models
         public int Quantity { get; set; }
         public DateTime SaleDate { get; set; }
         public string Channel { get; set; } = string.Empty;
+        public string ChannelId { get; set; } = string.Empty;
         public string OrderNumber { get; set; } = string.Empty;
         public decimal Price { get; set; }
         public string CustomerName { get; set; } = string.Empty;

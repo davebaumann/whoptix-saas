@@ -3,6 +3,7 @@
 export interface CreatePaymentIntentRequest {
   priceId: string;
   email: string;
+  discountCode?: string;
 }
 
 export interface CreatePaymentIntentResponse {

@@ -23,16 +23,16 @@ namespace SkuVaultSaaS.Api.Controllers
             var fromDate = from ?? DateTime.UtcNow.AddDays(-7);
             var toDate = to ?? DateTime.UtcNow;
 
-            // Single optimized query for dashboard KPIs
-            var summary = await _context.InventoryMovements
+            // Single optimized query for dashboard KPIs using Transactions table
+            var summary = await _context.Transactions
                 .Where(t => t.CustomerId == customerId && 
-                           t.OccurredAtUtc >= fromDate && 
-                           t.OccurredAtUtc <= toDate)
+                           t.TransactionDate >= fromDate && 
+                           t.TransactionDate <= toDate)
                 .GroupBy(t => 1)
                 .Select(g => new
                 {
                     totalTransactions = g.Count(),
-                    totalQuantity = g.Sum(t => Math.Abs(t.QuantityChange)),
+                    totalQuantity = g.Sum(t => Math.Abs(t.Quantity)),
                     pickCount = g.Count(t => t.TransactionType == "Pick"),
                     packCount = g.Count(t => t.TransactionType == "Pack"),
                     receiveCount = g.Count(t => t.TransactionType == "Receive"),
@@ -50,22 +50,22 @@ namespace SkuVaultSaaS.Api.Controllers
             var fromDate = from ?? DateTime.UtcNow.AddDays(-7);
             var toDate = to ?? DateTime.UtcNow;
 
-            // Optimized query for top packers with aggregation in database
-            var topPackers = await _context.InventoryMovements
+            // Optimized query for top packers with aggregation in database using Transactions table
+            var topPackers = await _context.Transactions
                 .Where(t => t.CustomerId == customerId && 
-                           t.OccurredAtUtc >= fromDate && 
-                           t.OccurredAtUtc <= toDate &&
+                           t.TransactionDate >= fromDate && 
+                           t.TransactionDate <= toDate &&
                            !string.IsNullOrEmpty(t.PerformedBy))
                 .GroupBy(t => t.PerformedBy)
                 .Select(g => new
                 {
                     user = g.Key,
-                    totalQuantity = g.Sum(t => Math.Abs(t.QuantityChange)),
+                    totalQuantity = g.Sum(t => Math.Abs(t.Quantity)),
                     pickCount = g.Count(t => t.TransactionType == "Pick"),
                     packCount = g.Count(t => t.TransactionType == "Pack"),
                     totalTransactions = g.Count(),
-                    firstActivity = g.Min(t => t.OccurredAtUtc),
-                    lastActivity = g.Max(t => t.OccurredAtUtc)
+                    firstActivity = g.Min(t => t.TransactionDate),
+                    lastActivity = g.Max(t => t.TransactionDate)
                 })
                 .OrderByDescending(p => p.totalQuantity)
                 .Take(limit)
@@ -102,15 +102,15 @@ namespace SkuVaultSaaS.Api.Controllers
         {
             var fromDate = DateTime.UtcNow.AddDays(-days).Date;
 
-            // Optimized daily aggregation query
-            var dailyActivity = await _context.InventoryMovements
-                .Where(t => t.CustomerId == customerId && t.OccurredAtUtc >= fromDate)
-                .GroupBy(t => t.OccurredAtUtc.Date)
+            // Optimized daily aggregation query using Transactions table
+            var dailyActivity = await _context.Transactions
+                .Where(t => t.CustomerId == customerId && t.TransactionDate >= fromDate)
+                .GroupBy(t => t.TransactionDate.Date)
                 .Select(g => new
                 {
                     date = g.Key,
                     totalTransactions = g.Count(),
-                    totalQuantity = g.Sum(t => Math.Abs(t.QuantityChange)),
+                    totalQuantity = g.Sum(t => Math.Abs(t.Quantity)),
                     pickTransactions = g.Count(t => t.TransactionType == "Pick"),
                     packTransactions = g.Count(t => t.TransactionType == "Pack"),
                     receiveTransactions = g.Count(t => t.TransactionType == "Receive"),

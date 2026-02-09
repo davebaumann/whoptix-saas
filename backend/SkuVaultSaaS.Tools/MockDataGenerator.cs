@@ -86,9 +86,6 @@ namespace SkuVaultSaaS.Tools
                 var txnCount = await _context.Transactions.Where(t => t.CustomerId == customerId).ExecuteDeleteAsync();
                 _logger.LogInformation("Deleted {Count} transactions", txnCount);
                 
-                var movCount = await _context.InventoryMovements.Where(im => im.CustomerId == customerId).ExecuteDeleteAsync();
-                _logger.LogInformation("Deleted {Count} inventory movements", movCount);
-                
                 var saleCount = await _context.Sales.Where(s => s.CustomerId == customerId).ExecuteDeleteAsync();
                 _logger.LogInformation("Deleted {Count} sales", saleCount);
                 
@@ -359,7 +356,7 @@ namespace SkuVaultSaaS.Tools
             }
             
             _context.Transactions.AddRange(transactions);
-            _context.InventoryMovements.AddRange(movements);
+            // DECOMMISSIONED: InventoryMovements no longer used
         }
         
         private string EscapeSql(string? value)

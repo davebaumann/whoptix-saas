@@ -3,21 +3,18 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5239
 export interface Transaction {
   id: number;
   sku: string;
-  quantityChange: number;
-  reason: string | null;
-  reference: string | null;
-  performedBy: string | null;
+  code: string | null;
+  scannedCode: string | null;
+  title: string | null;
+  quantity: number;
+  quantityBefore: number;
+  quantityAfter: number;
+  transactionReason: string | null;
+  transactionNote: string | null;
+  user: string | null;
   transactionType: string | null;
-  context: string | null;
-  occurredAtUtc: string;
-  product?: {
-    sku: string;
-    description: string;
-  };
-  location?: {
-    code: string;
-    name: string;
-  };
+  contextId: string | null;
+  transactionDate: string;
 }
 
 export interface TransactionSummaryItem {
@@ -151,7 +148,7 @@ export interface RecentTransaction {
   transactionType: string
   quantity: number
   transactionDate: string
-  performedBy: string
+  user: string
   locationId?: number
 }
 
@@ -312,13 +309,35 @@ class ApiClient {
     // Ensure endpoint starts with a single slash
     const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
     const url = `${this.baseUrl}${normalizedEndpoint}`;
+    
+    // Check if admin is impersonating a customer
+    const adminViewingAs = sessionStorage.getItem('adminViewingAs');
+    const headersObj: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    
+    // Add existing headers from options
+    if (options?.headers) {
+      const existingHeaders = options.headers as Record<string, string>;
+      Object.assign(headersObj, existingHeaders);
+    }
+    
+    // Add impersonation header if admin is viewing as customer
+    if (adminViewingAs) {
+      try {
+        const impersonationData = JSON.parse(adminViewingAs);
+        if (impersonationData.customerId) {
+          headersObj['X-Impersonate-Customer-Id'] = impersonationData.customerId.toString();
+        }
+      } catch (e) {
+        // Invalid impersonation data, ignore
+      }
+    }
+
     const response = await fetch(url, {
       ...options,
       credentials: 'include', // Include cookies in all requests
-      headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers,
-      },
+      headers: headersObj,
     });
 
     if (!response.ok) {
@@ -398,6 +417,24 @@ class ApiClient {
     const queryString = params.toString();
     return this.fetch<PickerPerformanceResponse>(
       `/api/transactions/customer/${customerId}/picker-performance${queryString ? `?${queryString}` : ''}`
+    );
+  }
+
+  async getPickerDetail(
+    customerId: number,
+    pickerName: string,
+    period?: string,
+    from?: string,
+    to?: string
+  ): Promise<any> {
+    const params = new URLSearchParams();
+    if (period) params.append('period', period);
+    if (from) params.append('from', from);
+    if (to) params.append('to', to);
+
+    const queryString = params.toString();
+    return this.fetch<any>(
+      `/api/Picker/customer/${customerId}/picker/${encodeURIComponent(pickerName)}${queryString ? `?${queryString}` : ''}`
     );
   }
 
@@ -519,6 +556,16 @@ class ApiClient {
   async getInventorySummary(customerId: number): Promise<InventorySummaryResponse> {
     return this.fetch<InventorySummaryResponse>(
       `/api/inventory/customer/${customerId}/summary`
+    );
+  }
+
+  // Reports API methods
+  async getDemandForecast(customerId: number, forecastDays: number = 30): Promise<any> {
+    const params = new URLSearchParams();
+    params.append('forecastDays', forecastDays.toString());
+
+    return this.fetch<any>(
+      `/api/reports/customer/${customerId}/demand-forecast?${params.toString()}`
     );
   }
 

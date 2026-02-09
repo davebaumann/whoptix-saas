@@ -388,65 +388,71 @@ namespace SkuVaultSaaS.Api.Controllers
                 var connectionString = _context.Database.GetConnectionString();
                 var databaseName = ExtractDatabaseName(connectionString);
                 
-                // Get database size using ExecuteSqlRaw for MySQL
-                var dbSizeQuery = $@"
-                    SELECT 
-                        ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS DatabaseSizeMB,
-                        SUM(data_length + index_length) AS DatabaseSizeBytes
-                    FROM information_schema.tables 
-                    WHERE table_schema = '{databaseName}'";
-                
-                var dbSizeCommand = _context.Database.GetDbConnection().CreateCommand();
-                dbSizeCommand.CommandText = dbSizeQuery;
-                await _context.Database.OpenConnectionAsync();
-                
                 DatabaseSizeResult? dbSizeResult = null;
-                using (var reader = await dbSizeCommand.ExecuteReaderAsync())
-                {
-                    if (await reader.ReadAsync())
-                    {
-                        dbSizeResult = new DatabaseSizeResult
-                        {
-                            DatabaseSizeMB = reader.IsDBNull(0) ? 0 : reader.GetDecimal(0),
-                            DatabaseSizeBytes = reader.IsDBNull(1) ? 0 : reader.GetInt64(1)
-                        };
-                    }
-                }
-                
-                // Get table information
-                var tableInfoQuery = $@"
-                    SELECT 
-                        table_name as TableName,
-                        COALESCE(table_rows, 0) as RowCount,
-                        ROUND(COALESCE(data_length, 0) / 1024 / 1024, 2) AS DataSizeMB,
-                        COALESCE(data_length, 0) as DataSizeBytes,
-                        ROUND(COALESCE(index_length, 0) / 1024 / 1024, 2) AS IndexSizeMB,
-                        COALESCE(index_length, 0) as IndexSizeBytes
-                    FROM information_schema.tables 
-                    WHERE table_schema = '{databaseName}'
-                    ORDER BY (COALESCE(data_length, 0) + COALESCE(index_length, 0)) DESC";
-                
-                var tableCommand = _context.Database.GetDbConnection().CreateCommand();
-                tableCommand.CommandText = tableInfoQuery;
-                
                 var tableResults = new List<TableSizeResult>();
-                using (var reader = await tableCommand.ExecuteReaderAsync())
+
+                // Use using statement to ensure connection is properly closed and disposed
+                using (var connection = _context.Database.GetDbConnection())
                 {
-                    while (await reader.ReadAsync())
+                    await connection.OpenAsync();
+                    
+                    // Get database size
+                    var dbSizeQuery = $@"
+                        SELECT 
+                            ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS DatabaseSizeMB,
+                            SUM(data_length + index_length) AS DatabaseSizeBytes
+                        FROM information_schema.tables 
+                        WHERE table_schema = '{databaseName}'";
+                    
+                    using (var dbSizeCommand = connection.CreateCommand())
                     {
-                        tableResults.Add(new TableSizeResult
+                        dbSizeCommand.CommandText = dbSizeQuery;
+                        using (var reader = await dbSizeCommand.ExecuteReaderAsync())
                         {
-                            TableName = reader.GetString(0),
-                            RowCount = reader.IsDBNull(1) ? 0 : reader.GetInt64(1),
-                            DataSizeMB = reader.IsDBNull(2) ? 0 : reader.GetDecimal(2),
-                            DataSizeBytes = reader.IsDBNull(3) ? 0 : reader.GetInt64(3),
-                            IndexSizeMB = reader.IsDBNull(4) ? 0 : reader.GetDecimal(4),
-                            IndexSizeBytes = reader.IsDBNull(5) ? 0 : reader.GetInt64(5)
-                        });
+                            if (await reader.ReadAsync())
+                            {
+                                dbSizeResult = new DatabaseSizeResult
+                                {
+                                    DatabaseSizeMB = reader.IsDBNull(0) ? 0 : reader.GetDecimal(0),
+                                    DatabaseSizeBytes = reader.IsDBNull(1) ? 0 : reader.GetInt64(1)
+                                };
+                            }
+                        }
                     }
-                }
-                
-                await _context.Database.CloseConnectionAsync();
+                    
+                    // Get table information
+                    var tableInfoQuery = $@"
+                        SELECT 
+                            table_name as TableName,
+                            COALESCE(table_rows, 0) as RowCount,
+                            ROUND(COALESCE(data_length, 0) / 1024 / 1024, 2) AS DataSizeMB,
+                            COALESCE(data_length, 0) as DataSizeBytes,
+                            ROUND(COALESCE(index_length, 0) / 1024 / 1024, 2) AS IndexSizeMB,
+                            COALESCE(index_length, 0) as IndexSizeBytes
+                        FROM information_schema.tables 
+                        WHERE table_schema = '{databaseName}'
+                        ORDER BY (COALESCE(data_length, 0) + COALESCE(index_length, 0)) DESC";
+                    
+                    using (var tableCommand = connection.CreateCommand())
+                    {
+                        tableCommand.CommandText = tableInfoQuery;
+                        using (var reader = await tableCommand.ExecuteReaderAsync())
+                        {
+                            while (await reader.ReadAsync())
+                            {
+                                tableResults.Add(new TableSizeResult
+                                {
+                                    TableName = reader.GetString(0),
+                                    RowCount = reader.IsDBNull(1) ? 0 : reader.GetInt64(1),
+                                    DataSizeMB = reader.IsDBNull(2) ? 0 : reader.GetDecimal(2),
+                                    DataSizeBytes = reader.IsDBNull(3) ? 0 : reader.GetInt64(3),
+                                    IndexSizeMB = reader.IsDBNull(4) ? 0 : reader.GetDecimal(4),
+                                    IndexSizeBytes = reader.IsDBNull(5) ? 0 : reader.GetInt64(5)
+                                });
+                            }
+                        }
+                    }
+                }  // Connection properly closed and disposed
                 
                 var response = new DatabaseSpecsResponse
                 {
@@ -469,13 +475,32 @@ namespace SkuVaultSaaS.Api.Controllers
                     )
                 };
                 
-                return Ok(response);
+                var result = Ok(response);
+                
+                // Clear temp collections and run GC after heavy database query
+                tableResults.Clear();
+                GC.Collect(generation: 1, mode: GCCollectionMode.Optimized);
+                
+                return result;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to retrieve database specs");
-                await _context.Database.CloseConnectionAsync();
+                try
+                {
+                    await _context.Database.CloseConnectionAsync();
+                }
+                catch { /* Ignore if already closed */ }
                 return StatusCode(500, "Failed to retrieve database specifications.");
+            }
+            finally
+            {
+                // Ensure connection is closed
+                try
+                {
+                    await _context.Database.CloseConnectionAsync();
+                }
+                catch { /* Ignore */ }
             }
         }
         

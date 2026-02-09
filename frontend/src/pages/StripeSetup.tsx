@@ -7,11 +7,12 @@ import { stripeService } from '../api/stripeService';
 import { useAuth } from '../contexts/AuthContext';
 import { getTierInfo } from '../config/membershipTiers.tsx';
 
-function PaymentForm({ tierInfo, clientSecret }: { tierInfo: { name: string; price: string }; clientSecret: string }) {
+function PaymentForm({ tierInfo, clientSecret, onCouponChange }: { tierInfo: { name: string; price: string }; clientSecret: string; onCouponChange: (code: string) => void }) {
   const stripe = useStripe();
   const elements = useElements();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [couponCode, setCouponCode] = useState('');
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -58,8 +59,27 @@ function PaymentForm({ tierInfo, clientSecret }: { tierInfo: { name: string; pri
     }
   };
 
+  const handleCouponChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const code = e.target.value.toUpperCase();
+    setCouponCode(code);
+    onCouponChange(code);
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Coupon Code (Optional)
+        </label>
+        <input
+          type="text"
+          value={couponCode}
+          onChange={handleCouponChange}
+          placeholder="Enter coupon code"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+        />
+      </div>
+
       <PaymentElement />
       
       {error && (
@@ -96,6 +116,7 @@ export default function StripeSetup() {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [couponCode, setCouponCode] = useState<string | undefined>();
   
   const tier = searchParams.get('tier') || '2';
   const tierInfo = getTierInfo(tier);
@@ -114,7 +135,8 @@ export default function StripeSetup() {
         const priceId = await stripeService.getPriceIdFromTier(tier);
         const { clientSecret: secret } = await stripeService.createPaymentIntent({
           priceId,
-          email: user.email
+          email: user.email,
+          discountCode: couponCode
         });
         
         setClientSecret(secret);
@@ -191,7 +213,7 @@ export default function StripeSetup() {
           </div>
 
           <Elements stripe={stripePromise} options={{ clientSecret }}>
-            <PaymentForm tierInfo={tierInfo} clientSecret={clientSecret} />
+            <PaymentForm tierInfo={tierInfo} clientSecret={clientSecret} onCouponChange={setCouponCode} />
           </Elements>
           
           <div className="mt-4">

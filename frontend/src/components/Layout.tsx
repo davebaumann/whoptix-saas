@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useMembership } from '../contexts/MembershipContext'
 import Footer from './Footer'
+import AdminViewingBanner from './AdminViewingBanner'
 
 interface LayoutProps {
   children: ReactNode
@@ -18,6 +19,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/app/admin', label: 'Admin Dashboard', icon: '⚙️' },
     { path: '/app/admin/customers', label: 'Customers', icon: '🏢' },
     { path: '/app/admin/tiers', label: 'Tier Configuration', icon: '👑' },
+    { path: '/app/admin/sync', label: 'Manual Sync', icon: '🔄' },
   ]
 
   const allNavItems = [
@@ -51,6 +53,7 @@ export default function Layout({ children }: LayoutProps) {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
+      <AdminViewingBanner />
       <nav className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-2" style={{ minHeight: '56px' }}>

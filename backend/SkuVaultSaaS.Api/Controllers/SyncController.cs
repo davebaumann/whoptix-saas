@@ -184,8 +184,9 @@ namespace SkuVaultSaaS.Api.Controllers
                     return NotFound(new { message = "Customer not found" });
                 }
 
-                await _syncService.SyncInventoryMovementsAsync(customerId, since);
-                return Ok(new { message = "Inventory movements synced successfully", customerId });
+                // DEPRECATED: SyncInventoryMovementsAsync has been replaced by SyncTransactionsAsync
+                // All transaction data is now stored in the Transactions table only
+                return Ok(new { message = "Inventory movements sync is deprecated. Use transactions endpoint instead.", customerId });
             }
             catch (HttpRequestException httpEx)
             {
@@ -213,22 +214,52 @@ namespace SkuVaultSaaS.Api.Controllers
                     return NotFound(new { message = "Customer not found" });
                 }
 
-                _logger.LogInformation("Manual transaction sync triggered for customer {CustomerId}", customerId);
-                // Use provided 'since' timestamp if provided, otherwise use current time
-                var syncStartTime = since ?? DateTime.UtcNow;
-                await _syncService.SyncTransactionsAsync(customerId, syncStartTime);
+                _logger.LogInformation("Manual sync triggered for customer {CustomerId}", customerId);
+                // Call full sync (which includes transactions, sales, etc.)
+                await _syncService.SyncCustomerDataAsync(customerId);
 
-                return Ok(new { message = "Transactions synced successfully", customerId, syncStartTime });
+                return Ok(new { message = "Sync completed successfully", customerId });
             }
             catch (HttpRequestException httpEx)
             {
-                _logger.LogError(httpEx, "Upstream SkuVault error syncing transactions for customer {CustomerId}", customerId);
+                _logger.LogError(httpEx, "Upstream SkuVault error during sync for customer {CustomerId}", customerId);
                 return BadRequest(new { message = "SkuVault API error", details = httpEx.Message });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error syncing transactions for customer {CustomerId}", customerId);
                 return StatusCode(500, new { message = "Internal server error", details = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Sync receives history (item-level PO receipts and corrections) for a customer
+        /// </summary>
+        [HttpPost("customer/{customerId}/receives")]
+        public async Task<IActionResult> SyncReceivesHistory(int customerId, [FromQuery] DateTime? since = null)
+        {
+            try
+            {
+                var customer = await _context.Customers.FindAsync(customerId);
+                if (customer == null)
+                {
+                    return NotFound(new { message = "Customer not found" });
+                }
+
+                _logger.LogInformation("Manual sync triggered for receives history, customer {CustomerId}", customerId);
+                await _syncService.SyncReceivesHistoryAsync(customerId, since);
+
+                return Ok(new { message = "Receives history synced successfully", customerId });
+            }
+            catch (HttpRequestException httpEx)
+            {
+                _logger.LogError(httpEx, "Upstream SkuVault error syncing receives history for customer {CustomerId}", customerId);
+                return StatusCode(502, new { message = "SkuVault API error", error = httpEx.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error syncing receives history for customer {CustomerId}", customerId);
+                return StatusCode(500, new { message = "Error during sync", error = ex.Message });
             }
         }
 
@@ -250,7 +281,6 @@ namespace SkuVaultSaaS.Api.Controllers
             var productCount = await _context.Products.CountAsync(p => p.CustomerId == customerId);
             var locationCount = await _context.Locations.CountAsync(l => l.CustomerId == customerId);
             var inventoryCount = await _context.InventoryLevels.CountAsync(i => i.CustomerId == customerId);
-            var movementCount = await _context.InventoryMovements.CountAsync(m => m.CustomerId == customerId);
             var transactionCount = await _context.Transactions.CountAsync(t => t.CustomerId == customerId);
 
             return Ok(new
@@ -264,9 +294,25 @@ namespace SkuVaultSaaS.Api.Controllers
                 ProductCount = productCount,
                 LocationCount = locationCount,
                 InventoryCount = inventoryCount,
-                MovementCount = movementCount,
                 TransactionCount = transactionCount
             });
+        }
+
+        [HttpPost("integrations/{customerId}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> SyncIntegrations(int customerId)
+        {
+            try
+            {
+                _logger.LogInformation("Manual sync requested for integrations, customer {CustomerId}", customerId);
+                await _syncService.SyncIntegrationsAsync(customerId);
+                return Ok(new { message = "Integrations sync completed successfully", customerId });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error syncing integrations for customer {CustomerId}", customerId);
+                return StatusCode(500, new { error = "Failed to sync integrations", details = ex.Message });
+            }
         }
     }
 }

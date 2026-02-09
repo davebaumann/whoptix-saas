@@ -8,7 +8,12 @@ import { useAuth } from '../contexts/AuthContext';
 const PerformanceContent: React.FC = () => {
   const { user } = useAuth()
   const [selectedTimeframe, setSelectedTimeframe] = useState('30days');
-  const customerId = user?.customerId || 1
+  // Check if admin is viewing as another customer
+  const adminViewingData = sessionStorage.getItem('adminViewingAs');
+  const adminViewingCustomerId = adminViewingData ? JSON.parse(adminViewingData).customerId : null;
+  
+  // Use impersonated customer ID if admin is viewing as, otherwise use user's own customer ID
+  const customerId = adminViewingCustomerId || user?.customerId || 1
   const [pickerModal, setPickerModal] = useState<{ pickerName: string | null }>({ pickerName: null });
 
   const { data: performanceData, isLoading, error } = useQuery({
@@ -123,7 +128,7 @@ const PerformanceContent: React.FC = () => {
       <div className="md:flex md:items-center md:justify-between">
         <div className="min-w-0 flex-1">
           <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
-            Performance Dashboard
+            Inventory Performance Dashboard
           </h2>
           <p className="mt-1 text-sm text-gray-500">
             Track inventory velocity, turnover rates, and product performance metrics
@@ -266,13 +271,10 @@ const PerformanceContent: React.FC = () => {
                   
                   return (
                     <>
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm text-gray-600">Fast Moving (≥10/day)</span>
-                        <div className="flex items-center flex-shrink-0">
-                          <span className="text-sm font-semibold text-green-600 mr-2 min-w-fit">
-                            {fast}
-                          </span>
-                          <div className="w-16 bg-gray-200 rounded-full h-2 flex-shrink-0">
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm text-gray-600 min-w-fit">Fast Moving (≥10/day)</span>
+                        <div className="flex-1 min-w-0 flex items-center gap-2">
+                          <div className="flex-1 min-w-0 bg-gray-200 rounded-full h-2">
                             <div 
                               className="bg-green-500 h-2 rounded-full" 
                               style={{ 
@@ -280,15 +282,15 @@ const PerformanceContent: React.FC = () => {
                               }}
                             ></div>
                           </div>
+                          <span className="text-sm font-semibold text-green-600 min-w-fit">
+                            {fast}
+                          </span>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm text-gray-600">Medium Moving (5-10/day)</span>
-                        <div className="flex items-center flex-shrink-0">
-                          <span className="text-sm font-semibold text-blue-600 mr-2 min-w-fit">
-                            {medium}
-                          </span>
-                          <div className="w-16 bg-gray-200 rounded-full h-2 flex-shrink-0">
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm text-gray-600 min-w-fit">Medium Moving (5-10/day)</span>
+                        <div className="flex-1 min-w-0 flex items-center gap-2">
+                          <div className="flex-1 min-w-0 bg-gray-200 rounded-full h-2">
                             <div 
                               className="bg-blue-500 h-2 rounded-full" 
                               style={{ 
@@ -296,15 +298,15 @@ const PerformanceContent: React.FC = () => {
                               }}
                             ></div>
                           </div>
+                          <span className="text-sm font-semibold text-blue-600 min-w-fit">
+                            {medium}
+                          </span>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm text-gray-600">Slow Moving (1-5/day)</span>
-                        <div className="flex items-center flex-shrink-0">
-                          <span className="text-sm font-semibold text-yellow-600 mr-2 min-w-fit">
-                            {slow}
-                          </span>
-                          <div className="w-16 bg-gray-200 rounded-full h-2 flex-shrink-0">
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm text-gray-600 min-w-fit">Slow Moving (1-5/day)</span>
+                        <div className="flex-1 min-w-0 flex items-center gap-2">
+                          <div className="flex-1 min-w-0 bg-gray-200 rounded-full h-2">
                             <div 
                               className="bg-yellow-500 h-2 rounded-full" 
                               style={{ 
@@ -312,15 +314,15 @@ const PerformanceContent: React.FC = () => {
                               }}
                             ></div>
                           </div>
+                          <span className="text-sm font-semibold text-yellow-600 min-w-fit">
+                            {slow}
+                          </span>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm text-gray-600">Dead Stock (&lt;1/day)</span>
-                        <div className="flex items-center flex-shrink-0">
-                          <span className="text-sm font-semibold text-red-600 mr-2 min-w-fit">
-                            {velocityMetrics?.deadStockCount || 0}
-                          </span>
-                          <div className="w-16 bg-gray-200 rounded-full h-2 flex-shrink-0">
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm text-gray-600 min-w-fit">Dead Stock (&lt;1/day)</span>
+                        <div className="flex-1 min-w-0 flex items-center gap-2">
+                          <div className="flex-1 min-w-0 bg-gray-200 rounded-full h-2">
                             <div 
                               className="bg-red-500 h-2 rounded-full" 
                               style={{ 
@@ -328,6 +330,9 @@ const PerformanceContent: React.FC = () => {
                               }}
                             ></div>
                           </div>
+                          <span className="text-sm font-semibold text-red-600 min-w-fit">
+                            {velocityMetrics?.deadStockCount || 0}
+                          </span>
                         </div>
                       </div>
                     </>

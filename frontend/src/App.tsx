@@ -47,6 +47,7 @@ import PickerAnalytics from './pages/PickerAnalytics'
 import EmailVerified from './pages/EmailVerified'
 import PaymentSuccess from './pages/PaymentSuccess'
 import SkuVaultConnection from './pages/SkuVaultConnection'
+import AdminSync from './pages/AdminSync'
 import NotFound from './pages/NotFound'
 
 function App() {
@@ -107,6 +108,7 @@ function App() {
                           <Route path="/admin/customers" element={<CustomerManagement />} />
                           <Route path="/admin/tiers" element={<TierConfigPage />} />
                           <Route path="/admin/users" element={<UserManagement />} />
+                          <Route path="/admin/sync" element={<AdminSync />} />
                           <Route path="/membership/upgrade" element={<MembershipUpgrade />} />
                           <Route path="/account-settings" element={<AccountSettings />} />
                           <Route path="/user-management" element={<UserManagement />} />

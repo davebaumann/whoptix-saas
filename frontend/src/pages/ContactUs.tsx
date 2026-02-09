@@ -7,7 +7,7 @@ export default function ContactUs() {
     name: '',
     email: '',
     company: '',
-    subject: '',
+    subject: 'Inquiry',
     message: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);

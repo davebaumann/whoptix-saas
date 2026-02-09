@@ -45,9 +45,29 @@ export const MEMBERSHIP_LEVELS = {
 export const membershipService = {
   async getMembershipInfo(customerId: number): Promise<MembershipInfo> {
     const url = `${API_BASE_URL}/api/membership/customer/${customerId}`;
-    console.log('membershipService: Fetching from', url);
+    console.log('membershipService: Fetching from', url, 'for customerId:', customerId);
+    
+    // Check if admin is impersonating a customer
+    const adminViewingAs = sessionStorage.getItem('adminViewingAs');
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (adminViewingAs) {
+      try {
+        const impersonationData = JSON.parse(adminViewingAs);
+        if (impersonationData.customerId) {
+          headers['X-Impersonate-Customer-Id'] = impersonationData.customerId.toString();
+          console.log('membershipService: Adding impersonation header for customer:', impersonationData.customerId);
+        }
+      } catch (e) {
+        console.error('Failed to parse admin viewing context:', e);
+      }
+    }
+    
     const response = await fetch(url, {
-      credentials: 'include'
+      credentials: 'include',
+      headers
     });
     
     if (!response.ok) {

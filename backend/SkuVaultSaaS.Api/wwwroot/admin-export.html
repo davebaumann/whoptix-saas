@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Export Transactions</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 500px;
+            width: 100%;
+            padding: 40px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        input[type="number"],
+        input[type="datetime-local"],
+        input[type="date"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        input[type="number"]:focus,
+        input[type="datetime-local"]:focus,
+        input[type="date"]:focus {
+            outline: none;
+            border-color: #667eea;
+            background-color: #f8f9ff;
+        }
+        
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 30px;
+        }
+        
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-export {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            grid-column: 1 / -1;
+        }
+        
+        .btn-export:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-export:active {
+            transform: translateY(0);
+        }
+        
+        .btn-reset {
+            background: #f0f0f0;
+            color: #333;
+        }
+        
+        .btn-reset:hover {
+            background: #e0e0e0;
+        }
+        
+        .info-box {
+            background: #f0f7ff;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #333;
+            line-height: 1.5;
+        }
+        
+        .info-box strong {
+            color: #667eea;
+        }
+        
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            display: none;
+            font-size: 14px;
+        }
+        
+        .status.loading {
+            background: #fff3cd;
+            color: #856404;
+            display: block;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            display: block;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            display: block;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid #ccc;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: -2px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .quick-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .quick-btn {
+            padding: 8px 12px;
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .quick-btn:hover {
+            background: #e8e8e8;
+            border-color: #bbb;
+        }
+        
+        .note {
+            color: #999;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Export Transactions</h1>
+        <p class="subtitle">Admin Tool - Download transaction data as CSV</p>
+        
+        <div class="info-box">
+            <strong>💡 Tip:</strong> Use this to verify sync data integrity. Export a date range and check that quantities chain correctly (QtyAfter of one row = QtyBefore of next).
+        </div>
+        
+        <form id="exportForm" onsubmit="handleExport(event)">
+            <div class="form-group">
+                <label for="customerId">Customer ID *</label>
+                <input type="number" id="customerId" name="customerId" placeholder="e.g., 2" required min="1">
+            </div>
+            
+            <div class="form-group">
+                <label>Date Range *</label>
+                <div class="quick-buttons">
+                    <button type="button" class="quick-btn" onclick="setDateRange('7days')">Last 7 Days</button>
+                    <button type="button" class="quick-btn" onclick="setDateRange('30days')">Last 30 Days</button>
+                    <button type="button" class="quick-btn" onclick="setDateRange('90days')">Last 90 Days</button>
+                    <button type="button" class="quick-btn" onclick="setDateRange('custom')">Custom</button>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="transactionFrom">From Date *</label>
+                <input type="date" id="transactionFrom" name="transactionFrom" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="transactionTo">To Date *</label>
+                <input type="date" id="transactionTo" name="transactionTo" required>
+                <p class="note">Dates are inclusive</p>
+            </div>
+            
+            <div class="button-group">
+                <button type="reset" class="btn-reset" onclick="resetForm()">Clear</button>
+                <button type="submit" class="btn-export">📥 Export to CSV</button>
+            </div>
+        </form>
+        
+        <div id="status" class="status"></div>
+    </div>
+    
+    <script>
+        // Set default dates on page load
+        function initializeDateDefaults() {
+            const today = new Date();
+            const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+            
+            document.getElementById('transactionFrom').valueAsDate = thirtyDaysAgo;
+            document.getElementById('transactionTo').valueAsDate = today;
+        }
+        
+        function setDateRange(range) {
+            const today = new Date();
+            let from;
+            
+            switch(range) {
+                case '7days':
+                    from = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+                    break;
+                case '30days':
+                    from = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+                    break;
+                case '90days':
+                    from = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000);
+                    break;
+                case 'custom':
+                    return;
+                default:
+                    return;
+            }
+            
+            document.getElementById('transactionFrom').valueAsDate = from;
+            document.getElementById('transactionTo').valueAsDate = today;
+        }
+        
+        function resetForm() {
+            document.getElementById('exportForm').reset();
+            document.getElementById('status').className = 'status';
+            initializeDateDefaults();
+        }
+        
+        async function handleExport(event) {
+            event.preventDefault();
+            
+            const customerId = document.getElementById('customerId').value;
+            const transactionFrom = document.getElementById('transactionFrom').value;
+            const transactionTo = document.getElementById('transactionTo').value;
+            
+            if (!customerId || !transactionFrom || !transactionTo) {
+                showStatus('Please fill in all required fields', 'error');
+                return;
+            }
+            
+            // Validate dates
+            const from = new Date(transactionFrom);
+            const to = new Date(transactionTo);
+            
+            if (from >= to) {
+                showStatus('Start date must be before end date', 'error');
+                return;
+            }
+            
+            showStatus('<span class="spinner"></span>Exporting transactions...', 'loading');
+            
+            try {
+                // Add UTC timezone info
+                const fromISO = new Date(from.getTime() - from.getTimezoneOffset() * 60000).toISOString();
+                const toISO = new Date(to.getTime() - to.getTimezoneOffset() * 60000).toISOString();
+                
+                const url = `/api/admin/export-transactions-csv?customerId=${customerId}&transactionFrom=${encodeURIComponent(fromISO)}&transactionTo=${encodeURIComponent(toISO)}`;
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('jwtToken') || ''}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                // Get filename from content-disposition header
+                const contentDisposition = response.headers.get('content-disposition');
+                let filename = 'transactions.csv';
+                if (contentDisposition) {
+                    const matches = contentDisposition.match(/filename="([^"]+)"/);
+                    if (matches) filename = matches[1];
+                }
+                
+                // Download the file
+                const blob = await response.blob();
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = downloadUrl;
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(downloadUrl);
+                
+                showStatus(`✅ Successfully downloaded ${filename}`, 'success');
+            } catch (error) {
+                showStatus(`❌ Error: ${error.message}`, 'error');
+                console.error('Export error:', error);
+            }
+        }
+        
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = message;
+            statusDiv.className = `status ${type}`;
+        }
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', initializeDateDefaults);
+    </script>
+</body>

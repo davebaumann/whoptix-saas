@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { AlertCircle, TrendingUp, Package, Calendar, Shield, Info, Download } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { apiClient } from '../api/client'
 import WithMembershipCheck from '../components/WithMembershipCheck'
 
 // InfoTooltip component
@@ -79,7 +80,12 @@ interface DemandForecastSummary {
 
 export default function DemandForecast() {
   const { user } = useAuth()
-  const customerId = user?.customerId || 1
+  // Check if admin is viewing as another customer
+  const adminViewingData = sessionStorage.getItem('adminViewingAs');
+  const adminViewingCustomerId = adminViewingData ? JSON.parse(adminViewingData).customerId : null;
+  
+  // Use impersonated customer ID if admin is viewing as, otherwise use user's own customer ID
+  const customerId = adminViewingCustomerId || user?.customerId || 1
   const [summary, setSummary] = useState<DemandForecastSummary | null>(null)
   const [forecasts, setForecasts] = useState<DemandForecastItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -97,22 +103,7 @@ export default function DemandForecast() {
       try {
         setLoading(true)
         setError('')
-        const response = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}/api/reports/customer/${customerId}/demand-forecast?forecastDays=${forecastDays}`,
-          { 
-            credentials: 'include',
-            // Prevent caching to ensure fresh data when forecast period changes
-            headers: {
-              'Cache-Control': 'no-cache, no-store, must-revalidate',
-              'Pragma': 'no-cache',
-              'Expires': '0'
-            }
-          }
-        )
-
-        if (!response.ok) throw new Error(`Error: ${response.statusText}`)
-
-        const data = await response.json()
+        const data = await apiClient.getDemandForecast(customerId, forecastDays)
         setSummary(data.summary)
         setForecasts(data.allForecasts || data.forecasts || [])
       } catch (err) {

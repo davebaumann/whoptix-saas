@@ -136,7 +136,21 @@ namespace SkuVaultSaaS.Api.Controllers
         {
             try
             {
-                _logger.LogInformation("ConnectSkuVault called for email: {Email}", request.Email);
+                // Support both credential-based and token-based authentication
+                bool useTokens = !string.IsNullOrEmpty(request.TenantToken) && !string.IsNullOrEmpty(request.UserToken);
+                bool useCredentials = !string.IsNullOrEmpty(request.Email) && !string.IsNullOrEmpty(request.Password);
+
+                if (!useTokens && !useCredentials)
+                {
+                    return BadRequest(new { message = "Please provide either credentials (email/password) or tokens (tenantToken/userToken)" });
+                }
+
+                if (useTokens && useCredentials)
+                {
+                    return BadRequest(new { message = "Please provide either credentials or tokens, not both" });
+                }
+
+                _logger.LogInformation("ConnectSkuVault called with {AuthMethod}", useTokens ? "tokens" : "credentials");
 
                 // Get the current authenticated user
                 var userId = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value ??
@@ -175,28 +189,58 @@ namespace SkuVaultSaaS.Api.Controllers
                     return NotFound(new { message = "Tenant not found" });
                 }
 
-                // Validate SkuVault credentials
-                if (!ValidateSkuVaultCredentials(request.Email, request.Password))
+                SkuVaultTokensResponse? tokens;
+
+                if (useTokens)
                 {
-                    _logger.LogWarning("Invalid SkuVault credentials for customer {CustomerId}", customer.Id);
-                    return BadRequest(new { message = "Invalid SkuVault credentials. Please check your email and password." });
+                    // Token-based authentication
+                    _logger.LogInformation("Using token-based authentication for customer {CustomerId}", customer.Id);
+                    
+                    // Validate that tokens are non-empty
+                    if (string.IsNullOrWhiteSpace(request.TenantToken) || string.IsNullOrWhiteSpace(request.UserToken))
+                    {
+                        _logger.LogWarning("Invalid SkuVault tokens provided for customer {CustomerId}", customer.Id);
+                        return BadRequest(new { message = "Invalid SkuVault tokens. Please check your tokens and try again." });
+                    }
+
+                    tokens = new SkuVaultTokensResponse
+                    {
+                        TenantToken = request.TenantToken,
+                        UserToken = request.UserToken,
+                        AccountId = ""
+                    };
+                }
+                else
+                {
+                    // Credential-based authentication
+                    _logger.LogInformation("Using credential-based authentication for email: {Email}", request.Email);
+
+                    // Validate SkuVault credentials
+                    if (!ValidateSkuVaultCredentials(request.Email, request.Password))
+                    {
+                        _logger.LogWarning("Invalid SkuVault credentials for customer {CustomerId}", customer.Id);
+                        return BadRequest(new { message = "Invalid SkuVault credentials. Please check your email and password." });
+                    }
+
+                    // Get SkuVault tokens using the credentials
+                    _logger.LogInformation("Fetching SkuVault tokens for email: {Email}", request.Email);
+                    tokens = await GetSkuVaultTokens(request.Email, request.Password);
+                    
+                    if (tokens == null)
+                    {
+                        _logger.LogError("Failed to retrieve SkuVault tokens for email: {Email}", request.Email);
+                        return BadRequest(new { message = "Failed to authenticate with SkuVault. Please verify your credentials." });
+                    }
+
+                    _logger.LogInformation("Successfully retrieved SkuVault tokens. AccountId: {AccountId}", tokens.AccountId);
+
+                    // Update tenant with encrypted credentials
+                    tenant.SkuVaultEmail = request.Email;
+                    tenant.SkuVaultPassword = _encryptionService.Encrypt(request.Password);
+                    tenant.SkuVaultAccountId = tokens.AccountId;
                 }
 
-                // Get SkuVault tokens using the credentials
-                _logger.LogInformation("Fetching SkuVault tokens for email: {Email}", request.Email);
-                var tokens = await GetSkuVaultTokens(request.Email, request.Password);
-                
-                if (tokens == null)
-                {
-                    _logger.LogError("Failed to retrieve SkuVault tokens for email: {Email}", request.Email);
-                    return BadRequest(new { message = "Failed to authenticate with SkuVault. Please verify your credentials." });
-                }
-
-                _logger.LogInformation("Successfully retrieved SkuVault tokens. AccountId: {AccountId}", tokens.AccountId);
-
-                // Update tenant with encrypted credentials and tokens
-                tenant.SkuVaultEmail = request.Email;
-                tenant.SkuVaultPassword = _encryptionService.Encrypt(request.Password);
+                // Update tenant with encrypted tokens (for both credential and token-based methods)
                 tenant.SkuVaultAccountId = tokens.AccountId;
                 tenant.SkuVaultTenantToken = _encryptionService.Encrypt(tokens.TenantToken);
                 tenant.SkuVaultUserToken = _encryptionService.Encrypt(tokens.UserToken);
@@ -251,6 +295,51 @@ namespace SkuVaultSaaS.Api.Controllers
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Failed to validate SkuVault credentials");
+                return false;
+            }
+        }
+
+        private async Task<bool> ValidateSkuVaultTokens(string tenantToken, string userToken)
+        {
+            try
+            {
+                _logger.LogInformation("Validating SkuVault tokens");
+                using (var client = new HttpClient())
+                {
+                    client.Timeout = TimeSpan.FromSeconds(10);
+                    
+                    // Make a simple API call to SkuVault to validate the tokens
+                    // Using the /getproducts endpoint as a lightweight validation call
+                    var requestBody = new
+                    {
+                        TenantToken = tenantToken,
+                        UserToken = userToken,
+                        PageSize = 1 // Only get 1 product to minimize data transfer
+                    };
+
+                    var json = System.Text.Json.JsonSerializer.Serialize(requestBody);
+                    var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+                    _logger.LogInformation("Calling SkuVault /getproducts endpoint to validate tokens");
+                    
+                    var response = await client.PostAsync("https://app.skuvault.com/api/getproducts?format=json", content);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        _logger.LogInformation("SkuVault tokens validated successfully");
+                        return true;
+                    }
+                    else
+                    {
+                        var errorContent = await response.Content.ReadAsStringAsync();
+                        _logger.LogWarning("SkuVault token validation failed with status {StatusCode}: {Error}", response.StatusCode, errorContent);
+                        return false;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error validating SkuVault tokens");
                 return false;
             }
         }
@@ -321,23 +410,51 @@ namespace SkuVaultSaaS.Api.Controllers
 
         // POST: api/customers/test-skuvault
         [HttpPost("test-skuvault")]
-        public IActionResult TestSkuVault([FromBody] TestSkuVaultRequest request)
+        public async Task<IActionResult> TestSkuVault([FromBody] TestSkuVaultRequest request)
         {
             try
             {
                 _logger.LogInformation("TestSkuVault called");
 
-                if (!ValidateSkuVaultCredentials(request.Email, request.Password))
+                // Determine if testing with tokens or credentials
+                bool useTokens = !string.IsNullOrWhiteSpace(request.TenantToken) && !string.IsNullOrWhiteSpace(request.UserToken);
+                bool useCredentials = !string.IsNullOrWhiteSpace(request.Email) && !string.IsNullOrWhiteSpace(request.Password);
+
+                if (!useTokens && !useCredentials)
                 {
-                    return BadRequest(new { message = "Invalid SkuVault email or password" });
+                    return BadRequest(new { message = "Please provide either credentials (email and password) or tokens (tenantToken and userToken)" });
                 }
 
-                return Ok(new { message = "Credentials verified successfully" });
+                if (useCredentials)
+                {
+                    // Test credentials
+                    _logger.LogInformation("Testing SkuVault credentials for email: {Email}", request.Email);
+                    if (!ValidateSkuVaultCredentials(request.Email, request.Password))
+                    {
+                        return BadRequest(new { message = "Invalid SkuVault email or password" });
+                    }
+                    return Ok(new { message = "Credentials verified successfully" });
+                }
+                else
+                {
+                    // Test tokens by making a real SkuVault API call
+                    _logger.LogInformation("Testing SkuVault tokens");
+                    
+                    // Try to make a simple API call to validate tokens (e.g., get products list)
+                    bool tokensValid = await ValidateSkuVaultTokens(request.TenantToken, request.UserToken);
+                    
+                    if (!tokensValid)
+                    {
+                        return BadRequest(new { message = "Invalid SkuVault tokens. Please verify your Tenant Token and User Token." });
+                    }
+
+                    return Ok(new { message = "Tokens verified successfully" });
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error testing SkuVault credentials");
-                return StatusCode(500, new { message = "An error occurred while testing credentials" });
+                _logger.LogError(ex, "Error testing SkuVault connection");
+                return StatusCode(500, new { message = "An error occurred while testing your SkuVault connection" });
             }
         }
 
@@ -391,27 +508,41 @@ namespace SkuVaultSaaS.Api.Controllers
 
         // POST: api/customers/refresh-skuvault-tokens
         [HttpPost("refresh-skuvault-tokens")]
-        public async Task<IActionResult> RefreshSkuVaultTokens()
+        public async Task<IActionResult> RefreshSkuVaultTokens([FromBody] RefreshTokensRequest? request = null)
         {
             try
             {
-                _logger.LogInformation("RefreshSkuVaultTokens called");
+                _logger.LogInformation("RefreshSkuVaultTokens called with request: {Request}", request != null ? $"customerId={request.CustomerId}" : "null");
 
-                var userEmail = User.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress")?.Value 
-                    ?? User.FindFirst(JwtRegisteredClaimNames.Email)?.Value
-                    ?? User.FindFirst("email")?.Value;
-                    
-                if (string.IsNullOrEmpty(userEmail))
+                Customer? customer = null;
+
+                // If customerId is provided (admin use), look up that customer
+                if (request != null && request.CustomerId.HasValue && request.CustomerId.Value > 0)
                 {
-                    _logger.LogWarning("User email not found in claims");
-                    return Unauthorized(new { message = "User not authenticated" });
+                    _logger.LogInformation("Admin refresh for customerId: {CustomerId}", request.CustomerId);
+                    customer = await _context.Customers
+                        .Include(c => c.Tenant)
+                        .FirstOrDefaultAsync(c => c.Id == request.CustomerId);
                 }
+                else
+                {
+                    // Otherwise, use current user's email
+                    var userEmail = User.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress")?.Value 
+                        ?? User.FindFirst(JwtRegisteredClaimNames.Email)?.Value
+                        ?? User.FindFirst("email")?.Value;
+                        
+                    if (string.IsNullOrEmpty(userEmail))
+                    {
+                        _logger.LogWarning("User email not found in claims");
+                        return Unauthorized(new { message = "User not authenticated" });
+                    }
 
-                _logger.LogInformation("RefreshSkuVaultTokens for user: {Email}", userEmail);
+                    _logger.LogInformation("RefreshSkuVaultTokens for user: {Email}", userEmail);
 
-                var customer = await _context.Customers
-                    .Include(c => c.Tenant)
-                    .FirstOrDefaultAsync(c => c.Email.ToLower() == userEmail.ToLower());
+                    customer = await _context.Customers
+                        .Include(c => c.Tenant)
+                        .FirstOrDefaultAsync(c => c.Email.ToLower() == userEmail.ToLower());
+                }
 
                 if (customer == null)
                 {
@@ -457,10 +588,22 @@ namespace SkuVaultSaaS.Api.Controllers
     public class TestSkuVaultRequest
     {
         [JsonPropertyName("email")]
-        public string Email { get; set; } = string.Empty;
+        public string? Email { get; set; }
 
         [JsonPropertyName("password")]
-        public string Password { get; set; } = string.Empty;
+        public string? Password { get; set; }
+
+        [JsonPropertyName("tenantToken")]
+        public string? TenantToken { get; set; }
+
+        [JsonPropertyName("userToken")]
+        public string? UserToken { get; set; }
+    }
+
+    public class RefreshTokensRequest
+    {
+        [JsonPropertyName("customerId")]
+        public int? CustomerId { get; set; }
     }
 
     public class UpdateSkuVaultRequest
@@ -497,9 +640,15 @@ namespace SkuVaultSaaS.Api.Controllers
     public class ConnectSkuVaultRequest
     {
         [JsonPropertyName("email")]
-        public string Email { get; set; } = string.Empty;
+        public string? Email { get; set; }
 
         [JsonPropertyName("password")]
-        public string Password { get; set; } = string.Empty;
+        public string? Password { get; set; }
+
+        [JsonPropertyName("tenantToken")]
+        public string? TenantToken { get; set; }
+
+        [JsonPropertyName("userToken")]
+        public string? UserToken { get; set; }
     }
 }

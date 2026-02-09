@@ -14,13 +14,18 @@ namespace SkuVaultSaaS.Infrastructure.Data
         public DbSet<Product> Products => Set<Product>();
         public DbSet<Location> Locations => Set<Location>();
         public DbSet<InventoryLevel> InventoryLevels => Set<InventoryLevel>();
-        public DbSet<InventoryMovement> InventoryMovements => Set<InventoryMovement>();
+        // DECOMMISSIONED: InventoryMovements table
         public DbSet<Transaction> Transactions => Set<Transaction>();
         public DbSet<LowStockThreshold> LowStockThresholds => Set<LowStockThreshold>();
         public DbSet<Sale> Sales => Set<Sale>();
+        public DbSet<SaleItem> SaleItems => Set<SaleItem>();
         public DbSet<Shipment> Shipments => Set<Shipment>();
+        public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
+        public DbSet<PurchaseOrderReceive> PurchaseOrderReceives => Set<PurchaseOrderReceive>();
+        public DbSet<PurchaseOrderReceiveCorrection> PurchaseOrderReceiveCorrections => Set<PurchaseOrderReceiveCorrection>();
         public DbSet<UserInvitation> UserInvitations => Set<UserInvitation>();
         public DbSet<Suggestion> Suggestions => Set<Suggestion>();
+        public DbSet<Integration> Integrations => Set<Integration>();
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -149,6 +154,20 @@ namespace SkuVaultSaaS.Infrastructure.Data
                 .HasForeignKey(s => s.CustomerId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            // SaleItem configuration
+            builder.Entity<SaleItem>()
+                .HasIndex(si => new { si.SaleId, si.CustomerId });
+            builder.Entity<SaleItem>()
+                .HasIndex(si => si.Sku);
+            builder.Entity<SaleItem>()
+                .Property(si => si.UnitPrice)
+                .HasColumnType("decimal(18,2)");
+            builder.Entity<SaleItem>()
+                .HasOne(si => si.Customer)
+                .WithMany()
+                .HasForeignKey(si => si.CustomerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
             // ApplicationUser-Customer relationship
             builder.Entity<ApplicationUser>()
                 .HasOne(u => u.Customer)
@@ -175,6 +194,43 @@ namespace SkuVaultSaaS.Infrastructure.Data
                 .WithMany()
                 .HasForeignKey(ui => ui.AcceptedByUserId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // Integration configuration
+            builder.Entity<Integration>()
+                .HasIndex(i => new { i.TenantId, i.SkuVaultId })
+                .IsUnique();
+            builder.Entity<Integration>()
+                .HasOne(i => i.Tenant)
+                .WithMany()
+                .HasForeignKey(i => i.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // PurchaseOrderReceive configuration
+            builder.Entity<PurchaseOrderReceive>()
+                .HasIndex(p => new { p.CustomerId, p.PONumber })
+                .IsUnique();
+            builder.Entity<PurchaseOrderReceive>()
+                .HasIndex(p => p.SKU);
+            builder.Entity<PurchaseOrderReceive>()
+                .HasIndex(p => p.ReceiptDate);
+            builder.Entity<PurchaseOrderReceive>()
+                .HasOne(p => p.Customer)
+                .WithMany()
+                .HasForeignKey(p => p.CustomerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // PurchaseOrderReceiveCorrection configuration
+            builder.Entity<PurchaseOrderReceiveCorrection>()
+                .HasIndex(p => new { p.CustomerId, p.PONumber });
+            builder.Entity<PurchaseOrderReceiveCorrection>()
+                .HasIndex(p => p.SKU);
+            builder.Entity<PurchaseOrderReceiveCorrection>()
+                .HasIndex(p => p.CorrectedDate);
+            builder.Entity<PurchaseOrderReceiveCorrection>()
+                .HasOne(p => p.Customer)
+                .WithMany()
+                .HasForeignKey(p => p.CustomerId)
+                .OnDelete(DeleteBehavior.Cascade);
         }
     }
 }

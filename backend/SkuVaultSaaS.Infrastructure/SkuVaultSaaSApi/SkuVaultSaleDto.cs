@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace SkuVaultSaaS.Infrastructure.SkuVaultSaaSApi
 {
@@ -14,6 +15,7 @@ namespace SkuVaultSaaS.Infrastructure.SkuVaultSaaSApi
         public string Marketplace { get; set; } = string.Empty;
         public List<SkuVaultSaleItemDto> SaleItems { get; set; } = new();
         public List<SkuVaultSaleItemDto> FulfilledItems { get; set; } = new();
+        public List<SkuVaultSaleItemDto> MerchantItems { get; set; } = new();
         public List<object> SaleKits { get; set; } = new();
         public List<object> FulfilledKits { get; set; } = new();
         public SkuVaultMoneyDto ShippingCost { get; set; } = new();

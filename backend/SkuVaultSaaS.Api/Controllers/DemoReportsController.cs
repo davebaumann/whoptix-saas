@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using SkuVaultSaaS.Infrastructure.Data;
 using SkuVaultSaaS.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace SkuVaultSaaS.Api.Controllers
 {
@@ -69,11 +70,9 @@ namespace SkuVaultSaaS.Api.Controllers
 
                 var transactions = await demoContext.Transactions
                     .Where(t => t.CustomerId == customerId && t.TransactionDate >= startDate && t.TransactionDate <= endDate)
-                    .Select(t => new { t.Id, t.Quantity })
                     .ToListAsync();
 
-                var recentTransactions = await demoContext.Transactions
-                    .Where(t => t.CustomerId == customerId && t.TransactionDate >= startDate && t.TransactionDate <= endDate)
+                var recentTransactions = transactions
                     .OrderByDescending(t => t.TransactionDate)
                     .Take(10)
                     .Select(t => new
@@ -85,37 +84,32 @@ namespace SkuVaultSaaS.Api.Controllers
                         t.TransactionDate,
                         t.PerformedBy
                     })
-                    .ToListAsync();
-
-                var movements = await demoContext.InventoryMovements
-                    .Where(im => im.CustomerId == customerId && im.OccurredAtUtc >= startDate && im.OccurredAtUtc <= endDate)
-                    .Select(im => new { im.QuantityChange, im.TransactionType, im.PerformedBy })
-                    .ToListAsync();
+                    .ToList();
 
                 var kpis = new[]
                 {
                     new
                     {
                         label = "Total Transactions",
-                        value = transactions.Count > 0 ? transactions.Count : 127,
+                        value = transactions.Count,
                         trend = "+5%"
                     },
                     new
                     {
                         label = "Total Quantity Moved",
-                        value = movements.Count > 0 ? movements.Sum(m => Math.Abs(m.QuantityChange)) : 342,
+                        value = transactions.Sum(t => t.Quantity),
                         trend = "+3%"
                     },
                     new
                     {
                         label = "Active Users",
-                        value = movements.Count > 0 ? movements.Select(m => m.PerformedBy).Distinct().Count() : 8,
+                        value = transactions.Select(t => t.PerformedBy).Distinct().Count(),
                         trend = "No change"
                     },
                     new
                     {
                         label = "Picks",
-                        value = movements.Count > 0 ? movements.Count(m => m.TransactionType == "Pick") : 89,
+                        value = transactions.Count(t => t.TransactionType == "Pick"),
                         trend = "+2%"
                     }
                 };
@@ -126,14 +120,14 @@ namespace SkuVaultSaaS.Api.Controllers
                     activitySummary = new
                     {
                         totalTransactions = transactions.Count,
-                        totalQuantity = movements.Sum(m => Math.Abs(m.QuantityChange)),
-                        byUser = movements
-                            .GroupBy(m => m.PerformedBy)
+                        totalQuantity = transactions.Sum(t => t.Quantity),
+                        byUser = transactions
+                            .GroupBy(t => t.PerformedBy)
                             .Select(userGroup => new
                             {
                                 user = userGroup.Key,
                                 transactionTypes = userGroup
-                                    .GroupBy(m => m.TransactionType)
+                                    .GroupBy(t => t.TransactionType)
                                     .Select(typeGroup => new
                                     {
                                         type = typeGroup.Key,
@@ -386,7 +380,7 @@ namespace SkuVaultSaaS.Api.Controllers
         /// Get profitability report for demo customer 2
         /// </summary>
         [HttpGet("customer/2/profitability")]
-        public async Task<IActionResult> GetDemoProfitability([FromQuery] string dateRange = "today")
+        public async Task<IActionResult> GetDemoProfitability([FromQuery] string dateRange = "last90days")
         {
             try
             {
@@ -394,12 +388,16 @@ namespace SkuVaultSaaS.Api.Controllers
                 var customerId = 2;
                 var now = DateTime.UtcNow;
                 
-                // Calculate date filter based on dateRange parameter
-                DateTime startDate = now.Date;
+                // Calculate date filter based on dateRange parameter - default to last 90 days to match historical sales data
+                DateTime startDate = now.AddDays(-90).Date;
                 DateTime endDate = now.Date.AddDays(1);
                 
                 switch (dateRange)
                 {
+                    case "today":
+                        startDate = now.Date;
+                        endDate = now.Date.AddDays(1);
+                        break;
                     case "yesterday":
                         startDate = now.AddDays(-1).Date;
                         endDate = now.Date;
@@ -408,48 +406,36 @@ namespace SkuVaultSaaS.Api.Controllers
                         startDate = now.AddDays(-7).Date;
                         endDate = now.Date.AddDays(1);
                         break;
-                    case "today":
+                    case "last90days":
                     default:
-                        startDate = now.Date;
+                        startDate = now.AddDays(-90).Date;
                         endDate = now.Date.AddDays(1);
                         break;
                 }
 
                 _logger.LogInformation($"DemoProfitability: fetching for range {dateRange}, startDate={startDate}, endDate={endDate}");
 
-                // First, let's see what transaction types exist for customer 2
-                var allTransactions = await demoContext.Transactions
-                    .Where(t => t.CustomerId == customerId && t.TransactionDate >= startDate && t.TransactionDate < endDate)
-                    .ToListAsync();
-                
-                _logger.LogInformation($"DemoProfitability: found {allTransactions.Count} total transactions");
-                var types = allTransactions.Select(t => t.TransactionType).Distinct().ToList();
-                foreach (var type in types)
-                {
-                    _logger.LogInformation($"  - TransactionType: {type}");
-                }
-
-                // Get sales data with products
-                var transactions = await demoContext.Transactions
-                    .Where(t => t.CustomerId == customerId && t.TransactionType == "Sale" && t.TransactionDate >= startDate && t.TransactionDate < endDate)
+                // Get sales data from Sales table and join with products to get cost data
+                var sales = await demoContext.Sales
+                    .Where(s => s.CustomerId == customerId && s.SaleDate >= startDate && s.SaleDate < endDate)
                     .Join(demoContext.Products,
-                        t => t.ProductId,
-                        p => p.Id,
-                        (t, p) => new { Transaction = t, Product = p })
+                        s => s.Sku,
+                        p => p.Sku,
+                        (s, p) => new { Sale = s, Product = p })
                     .ToListAsync();
 
-                _logger.LogInformation($"DemoProfitability: found {transactions.Count} sales transactions");
+                _logger.LogInformation($"DemoProfitability: found {sales.Count} sales transactions");
 
-                var items = transactions
-                    .GroupBy(t => t.Product)
+                var items = sales
+                    .GroupBy(x => x.Product)
                     .Select(g =>
                     {
                         var cost = g.Key.Cost ?? 0;
                         var price = g.Key.Price ?? 0;
-                        var unitsSold = g.Count();
-                        var revenue = price * unitsSold;
-                        var grossProfit = (price - cost) * unitsSold;
-                        var marginPercent = price > 0 ? ((price - cost) / price) * 100 : 0;
+                        var unitsSold = g.Sum(x => x.Sale.Quantity);
+                        var revenue = (decimal)price * unitsSold;
+                        var grossProfit = ((decimal)price - cost) * unitsSold;
+                        var marginPercent = price > 0 ? (((decimal)price - cost) / (decimal)price) * 100 : 0;
 
                         return new
                         {
@@ -464,50 +450,18 @@ namespace SkuVaultSaaS.Api.Controllers
                     .OrderByDescending(i => i.grossProfit)
                     .ToList();
 
-                // If no real sales data, return demo data
-                if (items.Count == 0)
-                {
-                    _logger.LogInformation("DemoProfitability: no real data found, returning demo data");
-                    var demoItems = new[]
-                    {
-                        new { sku = "SKU-001", productName = "Widget A", unitsSold = 150, revenue = 7500m, grossProfit = 3000m, marginPercent = 40.0 },
-                        new { sku = "SKU-002", productName = "Widget B", unitsSold = 120, revenue = 6000m, grossProfit = 2400m, marginPercent = 40.0 },
-                        new { sku = "SKU-003", productName = "Gadget X", unitsSold = 85, revenue = 8500m, grossProfit = 2125m, marginPercent = 25.0 },
-                        new { sku = "SKU-004", productName = "Tool Pro", unitsSold = 45, revenue = 4500m, grossProfit = 1350m, marginPercent = 30.0 },
-                        new { sku = "SKU-005", productName = "Basic Item", unitsSold = 200, revenue = 2000m, grossProfit = 200m, marginPercent = 10.0 }
-                    };
-
-                    var totalRevenue = demoItems.Sum(i => (decimal)i.revenue);
-                    var totalGrossProfit = demoItems.Sum(i => (decimal)i.grossProfit);
-                    var avgMargin = demoItems.Average(i => i.marginPercent);
-
-                    return Ok(new
-                    {
-                        totalRevenue,
-                        totalCost = totalGrossProfit,
-                        totalGrossProfit,
-                        totalUnitsSold = demoItems.Sum(i => i.unitsSold),
-                        avgMarginPercent = avgMargin,
-                        highMarginCount = demoItems.Count(i => i.marginPercent > 30),
-                        mediumMarginCount = demoItems.Count(i => i.marginPercent >= 10 && i.marginPercent <= 30),
-                        lowMarginCount = demoItems.Count(i => i.marginPercent >= 0 && i.marginPercent < 10),
-                        unprofitableCount = demoItems.Count(i => i.marginPercent < 0),
-                        items = demoItems
-                    });
-                }
-
-                var totalRevenue2 = items.Sum(i => (decimal)i.revenue);
-                var totalCost = items.Sum(i => (decimal)i.grossProfit);
-                var totalGrossProfit2 = items.Sum(i => (decimal)i.grossProfit);
-                var avgMargin2 = items.Count() > 0 ? items.Average(i => (double)i.marginPercent) : 0;
+                var totalRevenue = items.Sum(i => (decimal)i.revenue);
+                var totalCostOfGoodsSold = sales.Sum(x => (decimal)(x.Product.Cost ?? 0) * x.Sale.Quantity);
+                var totalGrossProfit = totalRevenue - totalCostOfGoodsSold;
+                var avgMargin = items.Count() > 0 ? items.Average(i => (double)i.marginPercent) : 0;
 
                 return Ok(new
                 {
-                    totalRevenue = totalRevenue2,
-                    totalCost,
-                    totalGrossProfit = totalGrossProfit2,
+                    totalRevenue,
+                    totalCost = totalCostOfGoodsSold,
+                    totalGrossProfit,
                     totalUnitsSold = items.Sum(i => (int)i.unitsSold),
-                    avgMarginPercent = avgMargin2,
+                    avgMarginPercent = avgMargin,
                     highMarginCount = items.Count(i => (double)i.marginPercent > 30),
                     mediumMarginCount = items.Count(i => (double)i.marginPercent >= 10 && (double)i.marginPercent <= 30),
                     lowMarginCount = items.Count(i => (double)i.marginPercent >= 0 && (double)i.marginPercent < 10),
@@ -545,20 +499,20 @@ namespace SkuVaultSaaS.Api.Controllers
                     ? now.AddDays(-1).Date.AddDays(1).AddTicks(-1) 
                     : now;
 
-                // Filter in database query, not in memory
-                var movements = await demoContext.InventoryMovements
-                    .Where(im => im.CustomerId == customerId && im.OccurredAtUtc >= startDate && im.OccurredAtUtc <= endDate)
-                    .Select(m => new { m.PerformedBy, m.TransactionType, m.OccurredAtUtc })
+                // Filter transactions by date range
+                var transactions = await demoContext.Transactions
+                    .Where(t => t.CustomerId == customerId && t.TransactionDate >= startDate && t.TransactionDate <= endDate)
+                    .Select(t => new { t.PerformedBy, t.TransactionType, t.TransactionDate })
                     .ToListAsync();
 
-                var topPerformers = movements
-                    .GroupBy(m => m.PerformedBy)
+                var topPerformers = transactions
+                    .GroupBy(t => t.PerformedBy)
                     .Select((g, idx) => new
                     {
                         rank = idx + 1,
                         name = g.Key,
-                        picks = g.Count(m => m.TransactionType == "Pick"),
-                        picksPerHour = g.Count(m => m.TransactionType == "Pick") / Math.Max(1, (now - g.Min(m => m.OccurredAtUtc)).TotalHours),
+                        picks = g.Count(t => t.TransactionType == "Pick"),
+                        picksPerHour = g.Count(t => t.TransactionType == "Pick") / Math.Max(1, (now - g.Min(t => t.TransactionDate)).TotalHours),
                         accuracy = 98 + (idx % 3), // Demo data
                         status = idx < 3 ? "On Track" : "Active"
                     })
@@ -579,53 +533,49 @@ namespace SkuVaultSaaS.Api.Controllers
         /// Get picker performance chart data for demo customer 2
         /// </summary>
         [HttpGet("customer/2/picker-performance")]
-        public IActionResult GetDemoPickerPerformance()
+        public async Task<IActionResult> GetDemoPickerPerformance([FromQuery] string dateRange = "today")
         {
-            _logger.LogInformation("DemoReportsController.GetDemoPickerPerformance: Called");
+            _logger.LogInformation("DemoReportsController.GetDemoPickerPerformance: Called with dateRange={DateRange}", dateRange);
             try
             {
+                var demoContext = GetDemoContext();
+                var customerId = 2;
+                var now = DateTime.UtcNow;
 
-                // Generate demo picker performance data
-                var pickerPerformance = new[]
+                var startDate = dateRange switch
                 {
-                    new { id = 1, name = "Sarah Johnson", shift = "Morning", unitsPicked = 1247, accuracy = 99, avgTimePerUnit = 12, status = "Active" },
-                    new { id = 2, name = "Marcus Chen", shift = "Morning", unitsPicked = 1156, accuracy = 98, avgTimePerUnit = 13, status = "Active" },
-                    new { id = 3, name = "Jessica Martinez", shift = "Afternoon", unitsPicked = 1089, accuracy = 97, avgTimePerUnit = 14, status = "Break" },
-                    new { id = 4, name = "David Kim", shift = "Afternoon", unitsPicked = 1342, accuracy = 99, avgTimePerUnit = 11, status = "Active" },
-                    new { id = 5, name = "Emma Wilson", shift = "Night", unitsPicked = 987, accuracy = 96, avgTimePerUnit = 15, status = "Active" }
+                    "yesterday" => now.AddDays(-1).Date,
+                    "last7days" => now.AddDays(-7).Date,
+                    _ => now.Date // "today"
                 };
+                var endDate = dateRange == "yesterday"
+                    ? now.AddDays(-1).Date.AddDays(1).AddTicks(-1)
+                    : now;
 
-                var trends = new[]
-                {
-                    new { date = "Mon", accuracy = 97 },
-                    new { date = "Tue", accuracy = 98 },
-                    new { date = "Wed", accuracy = 97 },
-                    new { date = "Thu", accuracy = 99 },
-                    new { date = "Fri", accuracy = 98 },
-                    new { date = "Sat", accuracy = 96 },
-                    new { date = "Sun", accuracy = 97 }
-                };
+                var transactions = await demoContext.Transactions
+                    .Where(t => t.CustomerId == customerId && t.TransactionDate >= startDate && t.TransactionDate <= endDate)
+                    .ToListAsync();
 
-                var shiftPerformance = new[]
-                {
-                    new { name = "Morning (6am-2pm)", pickers = 12, avgAccuracy = 98.5, unitsProcessed = 2403 },
-                    new { name = "Afternoon (2pm-10pm)", pickers = 10, avgAccuracy = 98.0, unitsProcessed = 2431 },
-                    new { name = "Night (10pm-6am)", pickers = 5, avgAccuracy = 96.5, unitsProcessed = 987 }
-                };
-
-                var exceptions = new[]
-                {
-                    new { type = "Mispicks", count = 8 },
-                    new { type = "Missing Items", count = 5 },
-                    new { type = "Damaged Units", count = 3 },
-                    new { type = "QC Rejects", count = 2 }
-                };
+                var pickerPerformance = transactions
+                    .GroupBy(t => t.PerformedBy)
+                    .Select((g, idx) => new
+                    {
+                        id = idx + 1,
+                        name = g.Key,
+                        shift = idx % 3 == 0 ? "Morning" : idx % 3 == 1 ? "Afternoon" : "Night",
+                        unitsPicked = g.Count(),
+                        accuracy = 96 + (idx % 4),
+                        avgTimePerUnit = 12 + (idx % 4),
+                        status = "Active"
+                    })
+                    .Take(5)
+                    .ToList();
 
                 var kpis = new
                 {
-                    pickAccuracy = 97.8,
+                    pickAccuracy = transactions.Count > 0 ? 97.8 : 0,
                     avgProcessingTime = 4.2,
-                    pickRate = "156 units/hr",
+                    pickRate = $"{(transactions.Count > 0 ? transactions.Count / Math.Max(1, (endDate - startDate).TotalHours) : 0):F0} units/hr",
                     onTimeShipRate = 94.5
                 };
 
@@ -633,9 +583,9 @@ namespace SkuVaultSaaS.Api.Controllers
                 {
                     kpis,
                     pickerPerformance,
-                    trends,
-                    shiftPerformance,
-                    exceptions
+                    trends = new object[0],
+                    shiftPerformance = new object[0],
+                    exceptions = new object[0]
                 });
             }
             catch (Exception ex)
@@ -649,63 +599,105 @@ namespace SkuVaultSaaS.Api.Controllers
         /// Get demand forecast for demo customer 2
         /// </summary>
         [HttpGet("customer/2/demand-forecast")]
-        public IActionResult GetDemoDemandForecast([FromQuery] string forecastPeriod = "30days")
+        public async Task<IActionResult> GetDemoDemandForecast([FromQuery] int forecastDays = 30)
         {
-            _logger.LogInformation($"DemoReportsController.GetDemoDemandForecast: Called with forecastPeriod={forecastPeriod}");
+            _logger.LogInformation($"DemoReportsController.GetDemoDemandForecast: Called with forecastDays={forecastDays}");
             try
             {
+                var demoContext = GetDemoContext();
+                var customerId = 2;
 
-                // Generate demo forecast data
-                var forecastItems = new[]
-                {
-                    new { sku = "KITT-GENE-3386", productName = "Generic Product - Green One Size", category = "Kitchen & Dining", avgDaily = 15.0, forecast = 450, trend = 0.0, currentStock = 104, daysLeft = 6.9, confidence = 95, risk = "Critical" },
-                    new { sku = "SPO-BICY-8687", productName = "Bicycle Helmet - Standard", category = "Sports & Outdoors", avgDaily = 12.0, forecast = 360, trend = 0.0, currentStock = 7, daysLeft = 0.6, confidence = 95, risk = "Critical" },
-                    new { sku = "HOM-PICT-4364", productName = "Picture Frame - Gray", category = "Home & Garden", avgDaily = 7.7, forecast = 345, trend = 50.0, currentStock = 45, daysLeft = 5.9, confidence = 93, risk = "Critical" },
-                    new { sku = "AUT-FLOO-7837", productName = "Floor Mats - Standard", category = "Automotive", avgDaily = 9.0, forecast = 270, trend = 0.0, currentStock = 35, daysLeft = 3.9, confidence = 95, risk = "Critical" },
-                    new { sku = "AUT-WIND-7622", productName = "Windshield Wipers - Red", category = "Automotive", avgDaily = 9.0, forecast = 270, trend = 0.0, currentStock = 50, daysLeft = 5.6, confidence = 95, risk = "Critical" },
-                    new { sku = "AUT-WIND-2453", productName = "Windshield Wipers - White Large", category = "Automotive", avgDaily = 5.5, forecast = 247, trend = 50.0, currentStock = 21, daysLeft = 3.8, confidence = 95, risk = "Critical" },
-                    new { sku = "ELE-BATT-5523", productName = "AA Battery Pack", category = "Electronics", avgDaily = 8.3, forecast = 223, trend = -10.0, currentStock = 156, daysLeft = 18.8, confidence = 92, risk = "Low" },
-                    new { sku = "HOB-KNOB-3344", productName = "Door Knob Chrome", category = "Home Hardware", avgDaily = 4.2, forecast = 189, trend = 25.0, currentStock = 72, daysLeft = 17.1, confidence = 90, risk = "Low" }
-                };
+                // Get sales data for the last 90 days (production uses 90 days lookback)
+                var cutoffDate = DateTime.UtcNow.AddDays(-90);
+                var sales = await demoContext.Sales
+                    .Where(s => s.CustomerId == customerId && s.SaleDate >= cutoffDate)
+                    .ToListAsync();
 
-                var riskCounts = new
-                {
-                    critical = forecastItems.Count(i => i.risk == "Critical"),
-                    high = forecastItems.Count(i => i.risk == "High"),
-                    medium = forecastItems.Count(i => i.risk == "Medium"),
-                    low = forecastItems.Count(i => i.risk == "Low")
-                };
+                // Get all products
+                var products = await demoContext.Products
+                    .Where(p => p.CustomerId == customerId)
+                    .ToListAsync();
 
-                // Calculate forecast metrics based on period
-                var (periodDays, periodLabel, totalDemand) = forecastPeriod switch
-                {
-                    "7days" => (7, "7 days", 29400),
-                    "14days" => (14, "14 days", 52000),
-                    "60days" => (60, "60 days", 150000),
-                    "90days" => (90, "90 days", 210000),
-                    _ => (30, "30 days", 74448) // default 30days
-                };
+                var productMap = products.ToDictionary(p => p.Sku, p => p);
 
-                var kpis = new
+                // Group sales by SKU and date
+                var salesBySkuAndDate = sales
+                    .GroupBy(s => new { s.Sku, Date = s.SaleDate.Date })
+                    .Select(g => new
+                    {
+                        g.Key.Sku,
+                        g.Key.Date,
+                        Quantity = g.Sum(s => s.Quantity)
+                    })
+                    .OrderBy(x => x.Sku)
+                    .ThenBy(x => x.Date)
+                    .ToList();
+
+                var forecasts = new List<DemoDemandForecastItem>();
+
+                foreach (var skuGroup in salesBySkuAndDate.GroupBy(x => x.Sku))
                 {
-                    skusAnalyzed = 601,
-                    totalForecastedDemand = totalDemand,
-                    forecastPeriod = periodLabel,
-                    avgDailyDemand = (decimal)totalDemand / periodDays,
-                    atRiskSkus = riskCounts.critical + riskCounts.high
+                    var sku = skuGroup.Key;
+                    if (!productMap.TryGetValue(sku, out var product)) continue;
+
+                    var dailySales = skuGroup.Select(g => (double)g.Quantity).ToList();
+                    
+                    // Calculate historical average daily demand
+                    var avgDailyDemand = dailySales.Any() ? dailySales.Average() : 0;
+
+                    // Calculate demand trend using recent data
+                    var trendLookbackDays = Math.Min(60, Math.Max(forecastDays * 2, 14));
+                    var recentSales = dailySales.TakeLast(trendLookbackDays).ToList();
+                    var trend = CalculateSalesTrend(recentSales);
+
+                    // Calculate forecasted demand
+                    var forecastedDemand = avgDailyDemand * forecastDays * (1 + (trend / 100));
+
+                    // Calculate variance and confidence
+                    var variance = CalculateSalesVariance(dailySales);
+                    var confidenceScore = Math.Max(0, Math.Min(100, 100 - (variance * 10)));
+
+                    // Determine risk level based on variance
+                    var riskLevel = variance > 0.5 ? "Critical" : variance > 0.3 ? "High" : variance > 0.15 ? "Medium" : "Low";
+
+                    forecasts.Add(new DemoDemandForecastItem
+                    {
+                        Sku = sku,
+                        ProductName = product.Name,
+                        Category = product.Category ?? "Uncategorized",
+                        HistoricalAvgDailyDemand = Math.Round(avgDailyDemand, 2),
+                        ForecastedDemand = (int)forecastedDemand,
+                        DemandTrend = Math.Round(trend, 2),
+                        ConfidenceScore = (int)confidenceScore,
+                        RiskLevel = riskLevel
+                    });
+                }
+
+                // Sort by risk level and forecasted demand
+                var riskOrder = new Dictionary<string, int> { { "Critical", 0 }, { "High", 1 }, { "Medium", 2 }, { "Low", 3 } };
+                forecasts = forecasts
+                    .OrderBy(f => riskOrder.TryGetValue(f.RiskLevel, out var order) ? order : 4)
+                    .ThenByDescending(f => f.ForecastedDemand)
+                    .ToList();
+
+                // Calculate summary
+                var summary = new
+                {
+                    totalSkusAnalyzed = forecasts.Count,
+                    totalForecastedDemand = forecasts.Cast<dynamic>().Sum(f => (int)f.forecastedDemand),
+                    avgDailyDemand = forecasts.Count > 0 ? Math.Round(forecasts.Cast<dynamic>().Average(f => (double)f.historicalAvgDailyDemand), 2) : 0,
+                    criticalRiskCount = forecasts.Cast<dynamic>().Count(f => (string)f.riskLevel == "Critical"),
+                    highRiskCount = forecasts.Cast<dynamic>().Count(f => (string)f.riskLevel == "High"),
+                    mediumRiskCount = forecasts.Cast<dynamic>().Count(f => (string)f.riskLevel == "Medium"),
+                    lowRiskCount = forecasts.Cast<dynamic>().Count(f => (string)f.riskLevel == "Low"),
+                    forecastPeriodDays = forecastDays
                 };
 
                 return Ok(new
                 {
-                    kpis,
-                    riskDistribution = new
-                    {
-                        critical = riskCounts.critical,
-                        high = riskCounts.high,
-                        medium = riskCounts.medium,
-                        low = riskCounts.low
-                    },
-                    forecastItems
+                    summary,
+                    topForecasts = forecasts.Take(10),
+                    allForecasts = forecasts
                 });
             }
             catch (Exception ex)
@@ -715,72 +707,108 @@ namespace SkuVaultSaaS.Api.Controllers
             }
         }
 
+        private double CalculateSalesTrend(List<double> dailySales)
+        {
+            if (dailySales.Count < 2) return 0;
+
+            var n = dailySales.Count;
+            var xValues = Enumerable.Range(0, n).Select(i => (double)i).ToList();
+            var xMean = xValues.Average();
+            var yMean = dailySales.Average();
+
+            var numerator = xValues.Zip(dailySales, (x, y) => (x - xMean) * (y - yMean)).Sum();
+            var denominator = xValues.Sum(x => Math.Pow(x - xMean, 2));
+
+            if (denominator == 0) return 0;
+
+            var slope = numerator / denominator;
+            var trendPercent = (slope / yMean) * 100;
+            return Math.Min(50, Math.Max(-50, trendPercent));
+        }
+
+        private double CalculateSalesVariance(List<double> dailySales)
+        {
+            if (dailySales.Count < 2) return 0.5;
+
+            var mean = dailySales.Average();
+            var variance = dailySales.Sum(x => Math.Pow(x - mean, 2)) / dailySales.Count;
+            var stdDev = Math.Sqrt(variance);
+            var coeffVar = mean > 0 ? (stdDev / mean) : 0.5;
+            return Math.Min(1.0, coeffVar);
+        }
+
         /// <summary>
         /// Get financial report for demo customer 2
         /// </summary>
         [HttpGet("customer/2/financial")]
-        public IActionResult GetDemoFinancial([FromQuery] string dateRange = "today")
+        public async Task<IActionResult> GetDemoFinancial([FromQuery] string dateRange = "today")
         {
             _logger.LogInformation($"DemoReportsController.GetDemoFinancial: Called with dateRange={dateRange}");
             try
             {
+                var demoContext = GetDemoContext();
+                var customerId = 2;
+                var now = DateTime.UtcNow;
 
-                // Generate demo financial data with values varying by date range
-                var (multiplier, period) = dateRange switch
+                var startDate = dateRange switch
                 {
-                    "yesterday" => (0.8, "Yesterday"),
-                    "last7days" => (5.5, "Last 7 Days"),
-                    _ => (1.0, "Today") // default "today"
+                    "yesterday" => now.AddDays(-1).Date,
+                    "last7days" => now.AddDays(-7).Date,
+                    _ => now.Date // "today"
                 };
+                var endDate = dateRange == "yesterday"
+                    ? now.AddDays(-1).Date.AddDays(1).AddTicks(-1)
+                    : now;
 
-                var topProducts = new[]
-                {
-                    new { sku = "KITT-GENE-3386", productName = "Generic Product - Green One Size", unitsSold = (int)(145 * multiplier), revenue = 2175.00 * multiplier, cogs = 1305.00 * multiplier, profit = 870.00 * multiplier, marginPercent = 40.0 },
-                    new { sku = "SPO-BICY-8687", productName = "Bicycle Helmet - Standard", unitsSold = (int)(98 * multiplier), revenue = 1960.00 * multiplier, cogs = 1078.00 * multiplier, profit = 882.00 * multiplier, marginPercent = 45.0 },
-                    new { sku = "HOM-PICT-4364", productName = "Picture Frame - Gray", unitsSold = (int)(156 * multiplier), revenue = 1404.00 * multiplier, cogs = 701.00 * multiplier, profit = 703.00 * multiplier, marginPercent = 50.0 },
-                    new { sku = "AUT-FLOO-7837", productName = "Floor Mats - Standard", unitsSold = (int)(234 * multiplier), revenue = 2106.00 * multiplier, cogs = 1263.00 * multiplier, profit = 843.00 * multiplier, marginPercent = 40.0 },
-                    new { sku = "AUT-WIND-7622", productName = "Windshield Wipers - Red", unitsSold = (int)(178 * multiplier), revenue = 1960.00 * multiplier, cogs = 941.00 * multiplier, profit = 1019.00 * multiplier, marginPercent = 52.0 },
-                    new { sku = "ELE-BATT-5523", productName = "AA Battery Pack", unitsSold = (int)(412 * multiplier), revenue = 1648.00 * multiplier, cogs = 742.00 * multiplier, profit = 906.00 * multiplier, marginPercent = 55.0 },
-                    new { sku = "HOB-KNOB-3344", productName = "Door Knob Chrome", unitsSold = (int)(89 * multiplier), revenue = 1602.00 * multiplier, cogs = 480.00 * multiplier, profit = 1122.00 * multiplier, marginPercent = 70.0 },
-                    new { sku = "AUT-WIND-2453", productName = "Windshield Wipers - White Large", unitsSold = (int)(67 * multiplier), revenue = 1340.00 * multiplier, cogs = 536.00 * multiplier, profit = 804.00 * multiplier, marginPercent = 60.0 }
-                };
+                var sales = await demoContext.Sales
+                    .Where(s => s.CustomerId == customerId && s.SaleDate >= startDate && s.SaleDate <= endDate)
+                    .ToListAsync();
 
-                var totalRevenue = topProducts.Sum(p => p.revenue);
-                var totalCogs = topProducts.Sum(p => p.cogs);
-                var grossProfit = totalRevenue - totalCogs;
-                var totalUnits = topProducts.Sum(p => p.unitsSold);
-                var totalOrders = (int)(127 * multiplier);
-
-                var categoryPerformance = new[]
-                {
-                    new { category = "Kitchen & Dining", revenue = 2175.00 * multiplier },
-                    new { category = "Sports & Outdoors", revenue = 1960.00 * multiplier },
-                    new { category = "Home & Garden", revenue = 3245.00 * multiplier },
-                    new { category = "Automotive", revenue = 5406.00 * multiplier },
-                    new { category = "Electronics", revenue = 1648.00 * multiplier },
-                    new { category = "Home Hardware", revenue = 1602.00 * multiplier }
-                };
+                var totalRevenue = sales.Sum(s => s.Price * s.Quantity);
+                var totalUnits = sales.Sum(s => s.Quantity);
+                var totalOrders = sales.GroupBy(s => s.OrderNumber).Count();
 
                 var kpis = new
                 {
                     totalRevenue = (int)totalRevenue,
-                    grossProfit = (int)grossProfit,
+                    grossProfit = (int)(totalRevenue * 0.4m),
                     totalOrders,
-                    cogs = (int)totalCogs,
-                    avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0,
+                    cogs = (int)(totalRevenue * 0.6m),
+                    avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0m,
                     totalUnits,
-                    grossMarginPercent = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0,
-                    cogsPercent = totalRevenue > 0 ? (totalCogs / totalRevenue) * 100 : 0
+                    grossMarginPercent = totalRevenue > 0 ? 40.0 : 0,
+                    cogsPercent = totalRevenue > 0 ? 60.0 : 0
                 };
+
+                var categoryPerformance = sales
+                    .GroupBy(s => s.Channel)
+                    .Select(g => new { category = g.Key, revenue = g.Sum(s => s.Price * s.Quantity) })
+                    .ToList();
 
                 var metrics = new
                 {
                     returnRate = 2.5,
-                    customerLTV = 485.25 * multiplier,
+                    customerLTV = 485.25,
                     inventoryTurnover = 3.4,
                     daysInventoryOutstanding = 107,
                     profitMargin = 22.5
                 };
+
+                var topProducts = sales
+                    .GroupBy(s => s.Sku)
+                    .Select((g, idx) => new
+                    {
+                        sku = g.Key,
+                        productName = $"Product {g.Key}",
+                        unitsSold = g.Sum(s => s.Quantity),
+                        revenue = g.Sum(s => s.Price * s.Quantity),
+                        cogs = g.Sum(s => s.Price * s.Quantity) * 0.6m,
+                        profit = g.Sum(s => s.Price * s.Quantity) * 0.4m,
+                        marginPercent = 40.0
+                    })
+                    .OrderByDescending(p => p.revenue)
+                    .Take(8)
+                    .ToList();
 
                 return Ok(new
                 {
@@ -804,157 +832,154 @@ namespace SkuVaultSaaS.Api.Controllers
         public IActionResult GetDemoLocations()
         {
             _logger.LogInformation("DemoReportsController.GetDemoLocations: Called");
-            try
+            return Ok(new
             {
-
-                // Generate demo location data
-                var locations = new[]
-                {
-                    new { id = 1, name = "Main Warehouse - CA", skuCount = 1234, inventoryValue = 145000.00, totalUnits = 5420, utilization = 72, lowStockItems = 8, health = "Good" },
-                    new { id = 2, name = "Regional Hub - TX", skuCount = 892, inventoryValue = 98500.00, totalUnits = 3847, utilization = 65, lowStockItems = 5, health = "Good" },
-                    new { id = 3, name = "Distribution Center - NY", skuCount = 1067, inventoryValue = 112300.00, totalUnits = 4512, utilization = 81, lowStockItems = 14, health = "Warning" },
-                    new { id = 4, name = "Fulfillment Center - IL", skuCount = 756, inventoryValue = 67200.00, totalUnits = 2834, utilization = 58, lowStockItems = 3, health = "Good" }
-                };
-
-                var topSkus = new[]
-                {
-                    new { 
-                        sku = "KITT-GENE-3386", 
-                        productName = "Generic Product - Green One Size", 
-                        totalUnits = 1245,
-                        distribution = new[] {
-                            new { location = "Main Warehouse - CA", percentage = 35 },
-                            new { location = "Regional Hub - TX", percentage = 28 },
-                            new { location = "Distribution Center - NY", percentage = 22 },
-                            new { location = "Fulfillment Center - IL", percentage = 15 }
-                        }
-                    },
-                    new { 
-                        sku = "SPO-BICY-8687", 
-                        productName = "Bicycle Helmet - Standard", 
-                        totalUnits = 956,
-                        distribution = new[] {
-                            new { location = "Main Warehouse - CA", percentage = 40 },
-                            new { location = "Regional Hub - TX", percentage = 32 },
-                            new { location = "Distribution Center - NY", percentage = 18 },
-                            new { location = "Fulfillment Center - IL", percentage = 10 }
-                        }
-                    },
-                    new { 
-                        sku = "AUT-FLOO-7837", 
-                        productName = "Floor Mats - Standard", 
-                        totalUnits = 1872,
-                        distribution = new[] {
-                            new { location = "Main Warehouse - CA", percentage = 28 },
-                            new { location = "Regional Hub - TX", percentage = 24 },
-                            new { location = "Distribution Center - NY", percentage = 32 },
-                            new { location = "Fulfillment Center - IL", percentage = 16 }
-                        }
-                    },
-                    new { 
-                        sku = "HOB-KNOB-3344", 
-                        productName = "Door Knob Chrome", 
-                        totalUnits = 734,
-                        distribution = new[] {
-                            new { location = "Main Warehouse - CA", percentage = 38 },
-                            new { location = "Regional Hub - TX", percentage = 26 },
-                            new { location = "Distribution Center - NY", percentage = 20 },
-                            new { location = "Fulfillment Center - IL", percentage = 16 }
-                        }
-                    }
-                };
-
-                var kpis = new
-                {
-                    totalLocations = locations.Length,
-                    totalInventoryValue = locations.Sum(l => l.inventoryValue),
-                    avgUtilization = locations.Average(l => l.utilization),
-                    totalSkus = locations.Sum(l => l.skuCount)
-                };
-
-                return Ok(new
-                {
-                    kpis,
-                    locations,
-                    topSkus
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error fetching demo location data");
-                return StatusCode(500, new { message = "Error fetching demo location data" });
-            }
+                kpis = new { totalLocations = 0, totalInventoryValue = 0m, avgUtilization = 0, totalSkus = 0 },
+                locations = new object[0],
+                topSkus = new object[0]
+            });
         }
 
         /// <summary>
         /// Get performance metrics for demo customer 2
         /// </summary>
         [HttpGet("customer/2/performance-metrics")]
-        public IActionResult GetDemoPerformanceMetrics()
+        public async Task<IActionResult> GetDemoPerformanceMetrics([FromQuery] string timeframe = "90days")
         {
             _logger.LogInformation("DemoReportsController.GetDemoPerformanceMetrics: Called");
             try
             {
-
-                // Top performing SKUs
-                var topPerformers = new[]
+                var demoContext = GetDemoContext();
+                var customerId = 2;
+                var endDate = DateTime.UtcNow;
+                
+                int daysBack = timeframe switch
                 {
-                    new { sku = "SPO-BICY-8687", productName = "Bicycle Helmet - Standard", velocity = 45.5, turnoverRate = 12.3, currentStock = 234, category = "Sports & Outdoors" },
-                    new { sku = "AUT-WIND-7622", productName = "Windshield Wipers - Red", velocity = 38.2, turnoverRate = 10.8, currentStock = 456, category = "Automotive" },
-                    new { sku = "ELE-BATT-5523", productName = "AA Battery Pack", velocity = 67.3, turnoverRate = 15.2, currentStock = 789, category = "Electronics" },
-                    new { sku = "KITT-GENE-3386", productName = "Generic Product - Green One Size", velocity = 52.1, turnoverRate = 11.5, currentStock = 123, category = "Kitchen & Dining" },
-                    new { sku = "HOB-KNOB-3344", productName = "Door Knob Chrome", velocity = 31.8, turnoverRate = 8.9, currentStock = 567, category = "Home Hardware" }
+                    "7days" => 7,
+                    "30days" => 30,
+                    "90days" => 90,
+                    _ => 90 // Default 90 days to match historical sales
                 };
 
-                // Under performing SKUs
-                var underPerformers = new[]
-                {
-                    new { sku = "HOM-DECOR-2891", productName = "Decorative Mirror - Gold", velocity = 0.3, daysOfStock = 267, currentStock = 89, category = "Home & Garden" },
-                    new { sku = "ART-PAINT-1234", productName = "Professional Paint Set", velocity = 0.8, daysOfStock = 145, currentStock = 34, category = "Art Supplies" },
-                    new { sku = "TOOL-WRENCH-5678", productName = "Adjustable Wrench Set", velocity = 1.2, daysOfStock = 98, currentStock = 56, category = "Tools" },
-                    new { sku = "LIGHT-LED-9999", productName = "LED Strip Lights", velocity = 0.5, daysOfStock = 203, currentStock = 42, category = "Electronics" }
-                };
+                var startDate = endDate.AddDays(-daysBack);
+                var previousPeriodStart = startDate.AddDays(-daysBack);
 
-                // Trends
-                var trends = new[]
+                // Get sales for current and previous periods
+                var currentSales = await demoContext.Sales
+                    .Where(s => s.CustomerId == customerId && s.SaleDate >= startDate && s.SaleDate <= endDate)
+                    .ToListAsync();
+
+                var previousSales = await demoContext.Sales
+                    .Where(s => s.CustomerId == customerId && s.SaleDate >= previousPeriodStart && s.SaleDate < startDate)
+                    .ToListAsync();
+
+                // Get products for calculations
+                var products = await demoContext.Products
+                    .Where(p => p.CustomerId == customerId)
+                    .ToListAsync();
+
+                var productMap = products.ToDictionary(p => p.Id, p => p);
+
+                // Calculate velocity metrics based on sales
+                var velocityByProduct = currentSales
+                    .GroupBy(s => s.Sku)
+                    .Select(g =>
+                    {
+                        var unitsSold = g.Sum(s => s.Quantity);
+                        var avgDailyVelocity = daysBack > 0 ? (decimal)unitsSold / daysBack : 0;
+                        return new
+                        {
+                            sku = g.Key,
+                            velocity = avgDailyVelocity,
+                            unitsSold = unitsSold
+                        };
+                    })
+                    .ToList();
+
+                var avgVelocity = velocityByProduct.Any() ? velocityByProduct.Average(v => (double)v.velocity) : 0;
+                var fastMovers = velocityByProduct.Count(v => v.velocity >= 10);
+                var slowMovers = velocityByProduct.Count(v => v.velocity < 1);
+                var totalProducts = products.Count;
+                var activeSKUs = velocityByProduct.Count;
+                var zeroStockSKUs = totalProducts - activeSKUs;
+
+                // Calculate totals
+                var totalUnitsSold = currentSales.Sum(s => s.Quantity);
+                var previousUnitsSold = previousSales.Sum(s => s.Quantity);
+                var unitsSoldGrowth = previousUnitsSold > 0 ? ((totalUnitsSold - previousUnitsSold) / (decimal)previousUnitsSold) * 100 : 0;
+
+                var summary = new
                 {
-                    new { metric = "Sales Growth", change = 12.5, direction = "up" },
-                    new { metric = "Units Sold", change = 8.3, direction = "up" },
-                    new { metric = "Movement Growth", change = 5.7, direction = "up" },
-                    new { metric = "Active Products", change = 2.1, direction = "stable" }
+                    totalProducts = totalProducts,
+                    totalMovements = currentSales.Count,
+                    averageVelocity = Math.Round(avgVelocity, 2),
+                    averageTurnover = Math.Round(totalProducts > 0 ? (double)totalUnitsSold / totalProducts : 0, 2),
+                    fastMovers = fastMovers,
+                    slowMovers = slowMovers,
+                    unitsSold = totalUnitsSold,
+                    unitsSoldGrowth = Math.Round((double)unitsSoldGrowth, 2),
+                    averageStockCoverage = daysBack, // Days in the period
+                    activeSKUs = activeSKUs,
+                    zeroStockSKUs = zeroStockSKUs,
+                    totalTransactions = currentSales.Count
                 };
 
                 var velocityMetrics = new
                 {
-                    fastMovingCount = 68,
-                    mediumMovingCount = 145,
-                    slowMovingCount = 234,
-                    deadStockCount = 54
+                    averageVelocity = Math.Round(avgVelocity, 2),
+                    fastMovingCount = velocityByProduct.Count(v => v.velocity >= 10),
+                    mediumMovingCount = velocityByProduct.Count(v => v.velocity >= 5 && v.velocity < 10),
+                    slowMovingCount = velocityByProduct.Count(v => v.velocity >= 1 && v.velocity < 5),
+                    deadStockCount = velocityByProduct.Count(v => v.velocity < 1),
+                    timeframeDays = daysBack
                 };
 
-                var summary = new
+                // Calculate trends
+                var currentRevenue = currentSales.Sum(s => (decimal)s.Price * s.Quantity);
+                var previousRevenue = previousSales.Sum(s => (decimal)s.Price * s.Quantity);
+                var salesGrowth = previousUnitsSold > 0 ? ((totalUnitsSold - previousUnitsSold) / (decimal)previousUnitsSold) * 100 : 0;
+                var revenueGrowth = previousRevenue > 0 ? ((currentRevenue - previousRevenue) / previousRevenue) * 100 : 0;
+
+                var trends = new[]
                 {
-                    totalProducts = 501,
-                    totalMovements = 3847,
-                    averageVelocity = 8.5,
-                    averageTurnover = 4.2,
-                    fastMovers = velocityMetrics.fastMovingCount,
-                    slowMovers = velocityMetrics.slowMovingCount,
-                    unitsSold = 18234,
-                    unitsSoldGrowth = 8.3,
-                    averageStockCoverage = 45.2,
-                    activeSKUs = 447,
-                    zeroStockSKUs = 12,
-                    totalTransactions = 3847
+                    new { metric = "Sales Growth", change = Math.Round((double)salesGrowth, 2), direction = salesGrowth >= 0 ? "up" : "down" },
+                    new { metric = "Revenue Growth", change = Math.Round((double)revenueGrowth, 2), direction = revenueGrowth >= 0 ? "up" : "down" },
+                    new { metric = "Active Products", change = 0.0, direction = "stable" }
                 };
+
+                // Get top performers
+                var topPerformers = velocityByProduct
+                    .OrderByDescending(v => v.unitsSold)
+                    .Take(5)
+                    .Select(v => new
+                    {
+                        sku = v.sku,
+                        unitsSold = v.unitsSold,
+                        dailyVelocity = Math.Round(v.velocity, 2),
+                        performance = "Fast Moving"
+                    })
+                    .ToList();
+
+                // Get underperformers
+                var underPerformers = velocityByProduct
+                    .OrderBy(v => v.unitsSold)
+                    .Take(5)
+                    .Select(v => new
+                    {
+                        sku = v.sku,
+                        unitsSold = v.unitsSold,
+                        dailyVelocity = Math.Round(v.velocity, 2),
+                        performance = v.unitsSold == 0 ? "Dead Stock" : "Slow Moving"
+                    })
+                    .ToList();
 
                 return Ok(new
                 {
-                    summary,
-                    velocityMetrics,
-                    trends,
-                    topPerformers,
-                    underPerformers
+                    summary = summary,
+                    velocityMetrics = velocityMetrics,
+                    trends = trends,
+                    topPerformers = topPerformers,
+                    underPerformers = underPerformers
                 });
             }
             catch (Exception ex)
@@ -1176,6 +1201,98 @@ namespace SkuVaultSaaS.Api.Controllers
                 _logger.LogError(ex, "Error fetching demo channel trends");
                 return StatusCode(500, new { message = "Error fetching demo channel trends" });
             }
+        }
+
+        /// <summary>
+        /// Get demo picker analytics for customer 2
+        /// </summary>
+        [HttpGet("customer/2/picker-analytics")]
+        public async Task<ActionResult> GetPickerAnalytics([FromQuery] string dateRange = "today")
+        {
+            try
+            {
+                _logger.LogInformation($"GetPickerAnalytics: Called with dateRange={dateRange}");
+                
+                // Get the demo database context
+                var demoContext = GetDemoContext();
+
+                // Determine date filter based on dateRange parameter
+                var now = DateTime.UtcNow;
+                var startDate = dateRange switch
+                {
+                    "yesterday" => now.AddDays(-1).Date,
+                    "last7days" => now.AddDays(-7).Date,
+                    "last30days" => now.AddDays(-30).Date,
+                    _ => now.Date // "today"
+                };
+
+                _logger.LogInformation($"Querying transactions from {startDate} to {now}");
+
+                // Get picker transactions from demo database
+                var pickTransactions = await demoContext.Transactions
+                    .Where(t => t.CustomerId == 2 && 
+                                t.TransactionType == "Pick" && 
+                                t.TransactionDate >= startDate)
+                    .ToListAsync();
+
+                _logger.LogInformation($"Found {pickTransactions.Count} pick transactions");
+
+                if (!pickTransactions.Any())
+                {
+                    return Ok(new
+                    {
+                        totalPickers = 0,
+                        avgPicksPerHour = 0.0,
+                        avgAccuracy = 0.0,
+                        totalPicks = 0,
+                        pickers = Array.Empty<object>()
+                    });
+                }
+
+                // Group by picker and calculate statistics
+                var pickerStats = pickTransactions
+                    .GroupBy(t => t.PerformedBy ?? t.User ?? "Unknown")
+                    .Select(g => new
+                    {
+                        name = g.Key,
+                        picks = g.Sum(t => Math.Abs(t.Quantity)),
+                        pickCount = g.Count(),
+                        picksPerHour = Math.Round((double)g.Sum(t => Math.Abs(t.Quantity)) / 8.0, 1), // Standard 8-hour shift
+                        accuracy = 95.5, // Standard accuracy for demo
+                        trend = (g.Count() % 2 == 0) ? 1.5 : -0.8
+                    })
+                    .OrderByDescending(p => p.picks)
+                    .ToList();
+
+                var summary = new
+                {
+                    totalPickers = pickerStats.Count,
+                    avgPicksPerHour = pickerStats.Any() ? Math.Round(pickerStats.Average(p => p.picksPerHour), 1) : 0.0,
+                    avgAccuracy = pickerStats.Any() ? Math.Round(pickerStats.Average(p => p.accuracy), 1) : 0.0,
+                    totalPicks = pickerStats.Sum(p => p.picks),
+                    pickers = pickerStats
+                };
+
+                _logger.LogInformation($"Returning picker stats: {pickerStats.Count} pickers, {summary.totalPicks} total picks");
+                return Ok(summary);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching demo picker analytics");
+                return StatusCode(500, new { message = "Error fetching demo picker analytics" });
+            }
+        }
+
+        private class DemoDemandForecastItem
+        {
+            public string Sku { get; set; } = string.Empty;
+            public string ProductName { get; set; } = string.Empty;
+            public string Category { get; set; } = string.Empty;
+            public double HistoricalAvgDailyDemand { get; set; }
+            public int ForecastedDemand { get; set; }
+            public double DemandTrend { get; set; }
+            public int ConfidenceScore { get; set; }
+            public string RiskLevel { get; set; } = string.Empty;
         }
     }
 }

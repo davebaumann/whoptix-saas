@@ -75,51 +75,56 @@ namespace SkuVaultSaaS.Api.Controllers
 
             _logger.LogInformation("GetTransactions parsed: customerId={CustomerId}, from={From}, to={To}", customerId, fromDate, toDate);
 
-            var query = _context.InventoryMovements.AsNoTracking().Where(t => t.CustomerId == customerId);
+            var query = _context.Transactions.AsNoTracking().Where(t => t.CustomerId == customerId);
             
             // Check all data first
-            var allData = await _context.InventoryMovements.AsNoTracking()
+            var allData = await _context.Transactions.AsNoTracking()
                 .Where(t => t.CustomerId == customerId)
-                .Select(t => new { t.OccurredAtUtc, Kind = t.OccurredAtUtc.Kind })
+                .Select(t => new { t.TransactionDate, Kind = t.TransactionDate.Kind })
                 .ToListAsync();
             
             _logger.LogInformation("All data for customer {CustomerId}: {Count} total records", customerId, allData.Count);
             if (allData.Any())
             {
-                var distinctDates = allData.Select(x => x.OccurredAtUtc.Date).Distinct().OrderBy(d => d).ToList();
+                var distinctDates = allData.Select(x => x.TransactionDate.Date).Distinct().OrderBy(d => d).ToList();
                 _logger.LogInformation("Dates in database: {Dates}", string.Join(", ", distinctDates.Select(d => d.ToString("yyyy-MM-dd"))));
-                _logger.LogInformation("Min date: {Min}, Max date: {Max}", allData.Min(x => x.OccurredAtUtc), allData.Max(x => x.OccurredAtUtc));
+                _logger.LogInformation("Min date: {Min}, Max date: {Max}", allData.Min(x => x.TransactionDate), allData.Max(x => x.TransactionDate));
             }
             
             if (fromDate != null) 
             {
-                _logger.LogInformation("Applying filter: OccurredAtUtc >= {FromDate}", fromDate);
-                query = query.Where(t => t.OccurredAtUtc >= fromDate);
+                _logger.LogInformation("Applying filter: TransactionDate >= {FromDate}", fromDate);
+                query = query.Where(t => t.TransactionDate >= fromDate);
             }
             if (toDate != null)
             {
-                _logger.LogInformation("Applying filter: OccurredAtUtc <= {ToDate}", toDate);
-                query = query.Where(t => t.OccurredAtUtc <= toDate);
+                _logger.LogInformation("Applying filter: TransactionDate <= {ToDate}", toDate);
+                query = query.Where(t => t.TransactionDate <= toDate);
             }
 
             var total = await query.CountAsync();
             _logger.LogInformation("GetTransactions: Found {Count} total transactions in date range", total);
 
             var items = await query
-                .OrderByDescending(t => t.OccurredAtUtc)
+                .OrderByDescending(t => t.TransactionDate)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .Select(t => new
                 {
                     t.Id,
-                    Sku = t.Product.Sku,
-                    t.QuantityChange,
+                    t.Sku,
+                    t.Code,
+                    t.ScannedCode,
+                    t.Title,
+                    t.Quantity,
+                    t.QuantityBefore,
+                    t.QuantityAfter,
                     t.TransactionType,
-                    t.Reason,
-                    t.PerformedBy,
-                    t.Reference,
-                    t.Context,
-                    t.OccurredAtUtc
+                    t.TransactionReason,
+                    t.TransactionNote,
+                    t.TransactionDate,
+                    t.ContextId,
+                    t.User
                 })
                 .ToListAsync();
 
@@ -188,27 +193,27 @@ namespace SkuVaultSaaS.Api.Controllers
 
             _logger.LogInformation("GetSummary parsed: customerId={CustomerId}, from={From}, to={To}", customerId, fromDate, toDate);
 
-            var query = _context.InventoryMovements.AsNoTracking().Where(t => t.CustomerId == customerId);
+            var query = _context.Transactions.AsNoTracking().Where(t => t.CustomerId == customerId);
             if (fromDate != null)
             {
                 var fromDateUtc = fromDate.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(fromDate.Value, DateTimeKind.Utc) : fromDate.Value;
-                query = query.Where(t => t.OccurredAtUtc >= fromDateUtc);
+                query = query.Where(t => t.TransactionDate >= fromDateUtc);
             }
             if (toDate != null)
             {
                 var toDateUtc = toDate.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(toDate.Value, DateTimeKind.Utc) : toDate.Value;
-                query = query.Where(t => t.OccurredAtUtc <= toDateUtc);
+                query = query.Where(t => t.TransactionDate <= toDateUtc);
             }
 
             // Create a flat summary combining user and transaction type data
             var summary = await query
-                .GroupBy(t => new { t.PerformedBy, t.TransactionType })
+                .GroupBy(t => new { t.User, t.TransactionType })
                 .Select(g => new
                 {
-                    User = g.Key.PerformedBy ?? "Unknown",
+                    User = g.Key.User ?? "Unknown",
                     TransactionType = g.Key.TransactionType ?? "Unknown",
                     Count = g.Count(),
-                    TotalQuantity = Math.Abs(g.Sum(x => x.QuantityChange))
+                    TotalQuantity = Math.Abs(g.Sum(x => x.Quantity))
                 })
                 .OrderByDescending(x => x.Count)
                 .ToListAsync();
@@ -274,17 +279,17 @@ namespace SkuVaultSaaS.Api.Controllers
 
             _logger.LogInformation("GetPickerPerformance parsed: from={From}, to={To}", fromDate, toDate);
 
-            var query = _context.InventoryMovements.AsNoTracking().Where(t => t.CustomerId == customerId);
+            var query = _context.Transactions.AsNoTracking().Where(t => t.CustomerId == customerId);
             
             if (fromDate != null)
             {
                 var fromDateUtc = fromDate.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(fromDate.Value, DateTimeKind.Utc) : fromDate.Value;
-                query = query.Where(t => t.OccurredAtUtc >= fromDateUtc);
+                query = query.Where(t => t.TransactionDate >= fromDateUtc);
             }
             if (toDate != null)
             {
                 var toDateUtc = toDate.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(toDate.Value, DateTimeKind.Utc) : toDate.Value;
-                query = query.Where(t => t.OccurredAtUtc <= toDateUtc);
+                query = query.Where(t => t.TransactionDate <= toDateUtc);
             }
 
             // Determine if grouping by hour (same day) or date (multi-day)
@@ -301,7 +306,7 @@ namespace SkuVaultSaaS.Api.Controllers
             {
                 // Group by hour and picker for same-day ranges
                 performance = await query
-                    .GroupBy(t => new { Hour = t.OccurredAtUtc.Hour, Picker = t.PerformedBy })
+                    .GroupBy(t => new { Hour = t.TransactionDate.Hour, Picker = t.User })
                     .Select(g => new
                     {
                         Hour = g.Key.Hour,
@@ -317,7 +322,7 @@ namespace SkuVaultSaaS.Api.Controllers
             {
                 // Group by date and picker for multi-day ranges
                 performance = await query
-                    .GroupBy(t => new { Date = t.OccurredAtUtc.Date, Picker = t.PerformedBy })
+                    .GroupBy(t => new { Date = t.TransactionDate.Date, Picker = t.User })
                     .Select(g => new
                     {
                         Date = g.Key.Date,

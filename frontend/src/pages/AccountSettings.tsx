@@ -20,6 +20,8 @@ interface AccountInfo {
 const SkuVaultCredentialsButton: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [credentials, setCredentials] = useState({ username: '', password: '' });
+  const [tokens, setTokens] = useState({ tenantToken: '', userToken: '' });
+  const [useTokens, setUseTokens] = useState(false);
   const [loading, setLoading] = useState(false);
   const [testing, setTesting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -36,15 +38,22 @@ const SkuVaultCredentialsButton: React.FC = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          email: credentials.username,
-          password: credentials.password
-        }),
+        body: JSON.stringify(
+          useTokens
+            ? {
+                tenantToken: tokens.tenantToken,
+                userToken: tokens.userToken
+              }
+            : {
+                email: credentials.username,
+                password: credentials.password
+              }
+        ),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        setError(errorData.message || 'Test failed. Please check your credentials.');
+        setError(errorData.message || 'Test failed. Please check your credentials or tokens.');
         setTestPassed(false);
       } else {
         setTestPassed(true);
@@ -77,6 +86,7 @@ const SkuVaultCredentialsButton: React.FC = () => {
         setShowModal(false);
         setTestPassed(false);
         setCredentials({ username: '', password: '' });
+        setTokens({ tenantToken: '', userToken: '' });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to refresh tokens');
@@ -95,10 +105,17 @@ const SkuVaultCredentialsButton: React.FC = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          email: credentials.username,
-          password: credentials.password
-        }),
+        body: JSON.stringify(
+          useTokens
+            ? {
+                tenantToken: tokens.tenantToken,
+                userToken: tokens.userToken
+              }
+            : {
+                email: credentials.username,
+                password: credentials.password
+              }
+        ),
       });
 
       if (!response.ok) {
@@ -108,6 +125,7 @@ const SkuVaultCredentialsButton: React.FC = () => {
         setShowModal(false);
         setTestPassed(false);
         setCredentials({ username: '', password: '' });
+        setTokens({ tenantToken: '', userToken: '' });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save credentials');
@@ -131,30 +149,76 @@ const SkuVaultCredentialsButton: React.FC = () => {
 
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-96">
-            <h3 className="text-lg font-semibold mb-4">SkuVault Credentials</h3>
+          <div className="bg-white rounded-lg p-6 w-96 max-h-96 overflow-y-auto">
+            <h3 className="text-lg font-semibold mb-2">SkuVault Credentials</h3>
+            
+            {/* Toggle Link */}
+            <div className="text-center mb-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setUseTokens(!useTokens);
+                  setError('');
+                }}
+                className="text-sm text-blue-600 hover:text-blue-700 underline"
+              >
+                {useTokens
+                  ? 'Prefer to use your login credentials instead?'
+                  : 'Not comfortable entering your login? Use API tokens instead.'}
+              </button>
+            </div>
+
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <input
-                  type="email"
-                  value={credentials.username}
-                  onChange={(e) => setCredentials({...credentials, username: e.target.value})}
-                  placeholder="your@skuvault.com"
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  disabled={testPassed}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                <input
-                  type="password"
-                  value={credentials.password}
-                  onChange={(e) => setCredentials({...credentials, password: e.target.value})}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  disabled={testPassed}
-                />
-              </div>
+              {!useTokens ? (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input
+                      type="email"
+                      value={credentials.username}
+                      onChange={(e) => setCredentials({...credentials, username: e.target.value})}
+                      placeholder="your@skuvault.com"
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      disabled={testPassed}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                    <input
+                      type="password"
+                      value={credentials.password}
+                      onChange={(e) => setCredentials({...credentials, password: e.target.value})}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      disabled={testPassed}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Tenant Token</label>
+                    <input
+                      type="password"
+                      value={tokens.tenantToken}
+                      onChange={(e) => setTokens({...tokens, tenantToken: e.target.value})}
+                      placeholder="Your tenant token"
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      disabled={testPassed}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">User Token</label>
+                    <input
+                      type="password"
+                      value={tokens.userToken}
+                      onChange={(e) => setTokens({...tokens, userToken: e.target.value})}
+                      placeholder="Your user token"
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      disabled={testPassed}
+                    />
+                  </div>
+                </>
+              )}
               {error && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-800">
                   {error}
@@ -172,7 +236,9 @@ const SkuVaultCredentialsButton: React.FC = () => {
                   setShowModal(false);
                   setTestPassed(false);
                   setCredentials({ username: '', password: '' });
+                  setTokens({ tenantToken: '', userToken: '' });
                   setError('');
+                  setUseTokens(false);
                 }}
                 className="px-4 py-2 text-gray-600 hover:text-gray-800"
               >
@@ -181,7 +247,7 @@ const SkuVaultCredentialsButton: React.FC = () => {
               {!testPassed ? (
                 <button
                   onClick={handleTest}
-                  disabled={testing || !credentials.username || !credentials.password}
+                  disabled={testing || (useTokens ? !tokens.tenantToken || !tokens.userToken : !credentials.username || !credentials.password)}
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
                 >
                   {testing ? 'Testing...' : 'Test'}
@@ -647,7 +713,12 @@ const AccountSettings: React.FC = () => {
   const [showReceiptsModal, setShowReceiptsModal] = useState(false);
   const [twoFactorStatus, setTwoFactorStatus] = useState<{ isEnabled: boolean; backupCodesRemaining: number } | null>(null);
 
-  const customerId = user?.customerId || 1;
+  // Check if admin is viewing as another customer
+  const adminViewingData = sessionStorage.getItem('adminViewingAs');
+  const adminViewingCustomerId = adminViewingData ? JSON.parse(adminViewingData).customerId : null;
+  
+  // Use impersonated customer ID if admin is viewing as, otherwise use user's own customer ID
+  const customerId = adminViewingCustomerId || user?.customerId || 1;
 
   // Fetch 2FA status
   const { data: accountInfo, isLoading } = useQuery<AccountInfo>({

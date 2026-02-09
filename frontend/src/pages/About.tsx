@@ -39,7 +39,7 @@ export default function About() {
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Our Story</h2>
           <div className="prose max-w-none text-gray-600">
             <p className="mb-4">
-              Founded in 2024, JUSTSKU emerged from a simple observation: while SkuVault provides excellent 
+              Founded in 2025, JUSTSKU emerged from a simple observation: while SkuVault provides excellent 
               warehouse management capabilities, businesses needed deeper insights and advanced analytics to 
               truly optimize their operations.
             </p>

@@ -260,12 +260,22 @@ namespace SkuVaultSaaS.Api.Controllers
                 var last30Days = now.AddDays(-30);
                 var last7Days = now.AddDays(-7);
 
-                // Get KPI data
-                var transactions = await _context.Transactions
+                // Get KPI data using database aggregation (not in-memory)
+                var kpiData = await _context.Transactions
+                    .AsNoTracking()
                     .Where(t => t.CustomerId == customerId && t.TransactionDate >= last30Days)
-                    .ToListAsync();
+                    .GroupBy(t => 1)
+                    .Select(g => new
+                    {
+                        TotalTransactions = g.Count(),
+                        TotalQuantity = g.Sum(t => Math.Abs(t.Quantity)),
+                        ActiveUsers = g.Select(t => t.User).Distinct().Count(),
+                        PickCount = g.Count(t => t.TransactionType == "Pick")
+                    })
+                    .FirstOrDefaultAsync();
 
                 var recentTransactions = await _context.Transactions
+                    .AsNoTracking()
                     .Where(t => t.CustomerId == customerId && t.TransactionDate >= last7Days)
                     .OrderByDescending(t => t.TransactionDate)
                     .Take(10)
@@ -280,55 +290,62 @@ namespace SkuVaultSaaS.Api.Controllers
                     })
                     .ToListAsync();
 
-                var movements = await _context.Transactions
-                    .Where(t => t.CustomerId == customerId && t.TransactionDate >= last30Days)
-                    .ToListAsync();
-
                 var kpis = new[]
                 {
                     new
                     {
                         label = "Total Transactions",
-                        value = transactions.Count,
+                        value = kpiData?.TotalTransactions ?? 0,
                         trend = "+5%"
                     },
                     new
                     {
                         label = "Total Quantity Moved",
-                        value = movements.Sum(m => Math.Abs(m.Quantity)),
+                        value = kpiData?.TotalQuantity ?? 0,
                         trend = "+3%"
                     },
                     new
                     {
                         label = "Active Users",
-                        value = movements.Select(m => m.User).Distinct().Count(),
+                        value = kpiData?.ActiveUsers ?? 0,
                         trend = "No change"
                     },
                     new
                     {
                         label = "Picks",
-                        value = movements.Count(m => m.TransactionType == "Pick"),
+                        value = kpiData?.PickCount ?? 0,
                         trend = "+2%"
                     }
                 };
 
+                var byType = await _context.Transactions
+                    .AsNoTracking()
+                    .Where(t => t.CustomerId == customerId && t.TransactionDate >= last30Days)
+                    .GroupBy(t => t.TransactionType)
+                    .Select(g => new { type = g.Key, count = g.Count() })
+                    .ToListAsync();
+
                 var activitySummary = new
                 {
-                    totalTransactions = transactions.Count,
-                    uniqueUsers = movements.Select(m => m.User).Distinct().Count(),
-                    totalQuantity = movements.Sum(m => Math.Abs(m.Quantity)),
-                    byType = movements
-                        .GroupBy(m => m.TransactionType)
-                        .Select(g => new { type = g.Key, count = g.Count() })
-                        .ToList()
+                    totalTransactions = kpiData?.TotalTransactions ?? 0,
+                    uniqueUsers = kpiData?.ActiveUsers ?? 0,
+                    totalQuantity = kpiData?.TotalQuantity ?? 0,
+                    byType = byType
                 };
 
-                return Ok(new
+                var result = Ok(new
                 {
                     kpis,
                     activitySummary,
                     recentTransactions
                 });
+
+                // Clear collections for GC
+                recentTransactions.Clear();
+                byType.Clear();
+                GC.Collect(generation: 0, mode: GCCollectionMode.Optimized);
+
+                return result;
             }
             catch (Exception ex)
             {
@@ -438,23 +455,22 @@ namespace SkuVaultSaaS.Api.Controllers
 
             try
             {
-                // Get all transactions for the customer
-                var allTransactions = await _context.Transactions
+                // Get ONLY current inventory state using database-level grouping to minimize memory
+                // Use window functions in database to get most recent transaction per (SKU, LocationId)
+                var currentInventoryState = await _context.Transactions
                     .AsNoTracking()
-                    .Where(t => t.CustomerId == customerId)
-                    .OrderBy(t => t.TransactionDate)
+                    .Where(t => t.CustomerId == customerId && t.QuantityAfter > 0)
+                    .GroupBy(t => new { t.Sku, t.LocationId })
+                    .Select(g => new
+                    {
+                        g.Key.Sku,
+                        g.Key.LocationId,
+                        MostRecentTransaction = g.OrderByDescending(t => t.TransactionDate).FirstOrDefault()
+                    })
                     .ToListAsync();
 
-                // Get all locations for the customer (for lookup)
-                var locations = await _context.Locations
-                    .AsNoTracking()
-                    .Where(l => l.CustomerId == customerId)
-                    .ToDictionaryAsync(l => l.Id);
-
-                var agingResults = new List<AgingInventoryItem>();
-
-                // If no transactions exist, return empty result
-                if (!allTransactions.Any())
+                // If no inventory exists, return empty result immediately
+                if (!currentInventoryState.Any())
                 {
                     var emptySummary = new AgingInventorySummary
                     {
@@ -470,11 +486,31 @@ namespace SkuVaultSaaS.Api.Controllers
                     {
                         reportDate = DateTime.UtcNow,
                         summary = emptySummary,
-                        details = agingResults
+                        details = new List<AgingInventoryItem>()
                     });
                 }
 
-                // Group by SKU and LocationId, include all pairs
+                // Get ALL transactions ONLY for SKU+Location combinations that have current inventory
+                // This early filtering significantly reduces memory usage
+                var skuLocationPairs = currentInventoryState.Select(x => new { x.Sku, x.LocationId }).Distinct().ToList();
+                
+                var allTransactions = await _context.Transactions
+                    .AsNoTracking()
+                    .Where(t => t.CustomerId == customerId && 
+                                skuLocationPairs.Any(p => p.Sku == t.Sku && p.LocationId == t.LocationId))
+                    .OrderBy(t => t.TransactionDate)
+                    .ToListAsync();
+
+                // Get only locations for SKUs that have current inventory (memory optimization)
+                var locationIds = currentInventoryState.Where(x => x.LocationId.HasValue).Select(x => x.LocationId.Value).Distinct().ToList();
+                var locations = await _context.Locations
+                    .AsNoTracking()
+                    .Where(l => l.CustomerId == customerId && (locationIds.Count == 0 || locationIds.Contains(l.Id)))
+                    .ToDictionaryAsync(l => l.Id);
+
+                var agingResults = new List<AgingInventoryItem>();
+
+                // Group only the filtered transactions by SKU and LocationId
                 var grouped = allTransactions
                     .GroupBy(t => new { t.Sku, t.LocationId })
                     .ToList();
@@ -614,12 +650,21 @@ namespace SkuVaultSaaS.Api.Controllers
                     Days90Plus_Total = agingResults.Sum(x => x.Days90Plus)
                 };
 
-                return Ok(new
+                var result = Ok(new
                 {
                     reportDate = DateTime.UtcNow,
                     summary,
                     details = agingResults.OrderBy(x => x.Sku).ThenBy(x => x.LocationCode).ToList()
                 });
+
+                // Clear collections to allow garbage collection
+                agingResults.Clear();
+                grouped.Clear();
+                allTransactions.Clear();
+                currentInventoryState.Clear();
+                GC.Collect(generation: 1, mode: GCCollectionMode.Optimized);
+
+                return result;
             }
             catch (Exception ex)
             {

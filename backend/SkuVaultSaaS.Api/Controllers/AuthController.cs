@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using SkuVaultSaaS.Api.Models;
@@ -25,6 +26,7 @@ namespace SkuVaultSaaS.Api.Controllers
         private readonly ITwoFactorService _twoFactorService;
         private readonly ILogger<AuthController> _logger;
         private readonly ApplicationDbContext _context;
+        private readonly IMemoryCache _cache;
 
         public AuthController(UserManager<ApplicationUser> userManager,
             SignInManager<ApplicationUser> signInManager,
@@ -32,7 +34,8 @@ namespace SkuVaultSaaS.Api.Controllers
             IEmailService emailService,
             ITwoFactorService twoFactorService,
             ILogger<AuthController> logger,
-            ApplicationDbContext context)
+            ApplicationDbContext context,
+            IMemoryCache cache)
         {
             _userManager = userManager;
             _signInManager = signInManager;
@@ -41,6 +44,7 @@ namespace SkuVaultSaaS.Api.Controllers
             _twoFactorService = twoFactorService;
             _logger = logger;
             _context = context;
+            _cache = cache;
             _logger = logger;
         }
 
@@ -160,6 +164,109 @@ namespace SkuVaultSaaS.Api.Controllers
             }
 
             return Ok(new { message = "Password changed successfully." });
+        }
+
+        [HttpPost("forgot-password")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.Email))
+            {
+                return BadRequest("Email is required.");
+            }
+
+            var user = await _userManager.FindByEmailAsync(request.Email);
+            if (user == null)
+            {
+                _logger.LogWarning("Password reset requested for non-existent email: {Email}", request.Email);
+                return Ok(new { message = "If an account with that email exists, a password reset link will be sent." });
+            }
+
+            // Generate the actual password reset token from Identity
+            var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
+            
+            // Generate a simple alphanumeric token (no special characters)
+            var simpleToken = Guid.NewGuid().ToString("N").Substring(0, 32);
+            
+            // Store the real token in cache with 1-hour expiration
+            var cacheKey = $"pwd_reset_{simpleToken}";
+            var cacheOptions = new MemoryCacheEntryOptions()
+                .SetAbsoluteExpiration(TimeSpan.FromHours(1))
+                .SetSize(1);
+            _cache.Set(cacheKey, resetToken, cacheOptions);
+            
+            // Create reset URL with simple token (no special characters)
+            var resetUrl = $"{Request.Scheme}://{Request.Host}/reset-password?email={Uri.EscapeDataString(user.Email)}&token={simpleToken}";
+
+            try
+            {
+                // Pass only the URL - the real token is now in cache, not in the email
+                await _emailService.SendPasswordResetEmailAsync(user.Email, string.Empty, resetUrl);
+                _logger.LogInformation("Password reset email sent to: {Email}", user.Email);
+                return Ok(new { message = "If an account with that email exists, a password reset link will be sent." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send password reset email to {Email}", user.Email);
+                return StatusCode(500, "An error occurred while sending the password reset email.");
+            }
+        }
+
+        [HttpPost("reset-password")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Token) || string.IsNullOrWhiteSpace(request.NewPassword))
+            {
+                return BadRequest("Email, token, and new password are required.");
+            }
+
+            if (request.NewPassword != request.ConfirmPassword)
+            {
+                return BadRequest("New password and confirmation password do not match.");
+            }
+
+            if (request.NewPassword.Length < 6)
+            {
+                return BadRequest("Password must be at least 6 characters long.");
+            }
+
+            var user = await _userManager.FindByEmailAsync(request.Email);
+            if (user == null)
+            {
+                return BadRequest("Invalid email or reset token.");
+            }
+
+            try
+            {
+                // Retrieve the actual reset token from cache using the simple token
+                var cacheKey = $"pwd_reset_{request.Token}";
+                if (!_cache.TryGetValue(cacheKey, out string? actualToken) || string.IsNullOrEmpty(actualToken))
+                {
+                    _logger.LogWarning("Password reset token expired or invalid for {Email}", request.Email);
+                    return BadRequest("Password reset link has expired. Please request a new one.");
+                }
+                
+                _logger.LogInformation("Reset password attempt for {Email}. Token found in cache.", request.Email);
+
+                var result = await _userManager.ResetPasswordAsync(user, actualToken, request.NewPassword);
+                if (!result.Succeeded)
+                {
+                    var errorMessage = string.Join(", ", result.Errors.Select(e => e.Description));
+                    _logger.LogWarning("Failed to reset password for {Email}: {Errors}", request.Email, errorMessage);
+                    return BadRequest($"Failed to reset password: {errorMessage}");
+                }
+                
+                // Delete the token from cache after successful use
+                _cache.Remove(cacheKey);
+                _logger.LogInformation("Password reset successfully for: {Email}", user.Email);
+                return Ok(new { message = "Password has been reset successfully. You can now log in with your new password." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error resetting password for {Email}", request.Email);
+                return BadRequest("An error occurred while resetting your password.");
+            }
         }
 
         [HttpPost("2fa/setup")]

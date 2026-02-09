@@ -97,7 +97,12 @@ const SAMPLE_PROFITABILITY_DATA: ProfitabilityResponse = {
 export default function ProfitabilityReport() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const customerId = user?.customerId || 1
+  // Check if admin is viewing as another customer
+  const adminViewingData = sessionStorage.getItem('adminViewingAs');
+  const adminViewingCustomerId = adminViewingData ? JSON.parse(adminViewingData).customerId : null;
+  
+  // Use impersonated customer ID if admin is viewing as, otherwise use user's own customer ID
+  const customerId = adminViewingCustomerId || user?.customerId || 1
   const [data, setData] = useState<ProfitabilityResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -461,7 +466,7 @@ export default function ProfitabilityReport() {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase w-32 max-w-32">SKU</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
                         onClick={() => setSortBy('unitsSold')}>
@@ -499,7 +504,7 @@ export default function ProfitabilityReport() {
                 <tbody className="divide-y divide-gray-200">
                   {sortedItems.map((item) => (
                     <tr key={item.sku} className={`hover:bg-gray-50 ${getMarginBorder(item.profitMargin)}`}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">{item.sku}</td>
+                      <td className="px-6 py-4 text-sm font-mono text-gray-900 w-32 max-w-32 truncate" title={item.sku}>{item.sku}</td>
                       <td className="px-6 py-4 text-sm text-gray-900">
                         <div>{item.productName}</div>
                         <div className="text-xs text-gray-500">{item.category}</div>

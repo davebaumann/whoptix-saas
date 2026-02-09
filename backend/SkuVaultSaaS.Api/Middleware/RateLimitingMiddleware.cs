@@ -22,6 +22,14 @@ namespace SkuVaultSaaS.Api.Middleware
 
         public async Task InvokeAsync(HttpContext context)
         {
+            // Exempt certain paths from rate limiting
+            var path = context.Request.Path.Value?.ToLower() ?? "";
+            if (IsExemptPath(path))
+            {
+                await _next(context);
+                return;
+            }
+            
             var clientId = GetClientIdentifier(context);
             
             if (IsRateLimited(clientId))
@@ -37,6 +45,15 @@ namespace SkuVaultSaaS.Api.Middleware
             }
 
             await _next(context);
+        }
+
+        private bool IsExemptPath(string path)
+        {
+            // Exempt authentication and health check endpoints from rate limiting
+            return path.Contains("/api/auth/") ||
+                   path.Contains("/health") ||
+                   path.Contains("/api/status") ||
+                   path == "/";
         }
 
         private string GetClientIdentifier(HttpContext context)

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, Link } from 'react-router-dom'
 
 interface LoginForm {
   email: string
@@ -223,6 +223,15 @@ export default function Login() {
                 'Sign in'
               )}
             </button>
+
+            <div className="text-center">
+              <Link
+                to="/forgot-password"
+                className="text-sm text-blue-600 hover:text-blue-500 font-medium"
+              >
+                Forgot your password?
+              </Link>
+            </div>
           </form>
         ) : (
           <form className="mt-8 space-y-6" onSubmit={handleTwoFactorSubmit}>

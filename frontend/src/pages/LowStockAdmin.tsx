@@ -63,7 +63,12 @@ const LowStockAdmin: React.FC = () => {
   });
 
   // Get customer ID from user context (assuming it's available)
-  const customerId = user?.customerId || 1;
+  // Check if admin is viewing as another customer
+  const adminViewingData = sessionStorage.getItem('adminViewingAs');
+  const adminViewingCustomerId = adminViewingData ? JSON.parse(adminViewingData).customerId : null;
+  
+  // Use impersonated customer ID if admin is viewing as, otherwise use user's own customer ID
+  const customerId = adminViewingCustomerId || user?.customerId || 1;
   console.log('🔍 LowStockAdmin customerId:', customerId);
 
   // Early loading state

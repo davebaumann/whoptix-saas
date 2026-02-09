@@ -24,7 +24,12 @@ const METRIC_TOOLTIPS: Tooltip = {
 const PickerAnalyticsContent: React.FC = () => {
   const [hoveredTooltip, setHoveredTooltip] = useState<string | null>(null)
   const { user } = useAuth()
-  const customerId = user?.customerId || 1
+  // Check if admin is viewing as another customer
+  const adminViewingData = sessionStorage.getItem('adminViewingAs');
+  const adminViewingCustomerId = adminViewingData ? JSON.parse(adminViewingData).customerId : null;
+  
+  // Use impersonated customer ID if admin is viewing as, otherwise use user's own customer ID
+  const customerId = adminViewingCustomerId || user?.customerId || 1
 
   const renderTooltip = (key: string) => (
     <div className="relative group inline-block ml-1">

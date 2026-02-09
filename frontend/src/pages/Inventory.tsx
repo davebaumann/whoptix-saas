@@ -35,7 +35,12 @@ export default function Inventory() {
   const [selectedWarehouse, setSelectedWarehouse] = useState('');
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
 
-  const customerId = user?.customerId || 1;
+  // Check if admin is viewing as another customer
+  const adminViewingData = sessionStorage.getItem('adminViewingAs');
+  const adminViewingCustomerId = adminViewingData ? JSON.parse(adminViewingData).customerId : null;
+  
+  // Use impersonated customer ID if admin is viewing as, otherwise use user's own customer ID
+  const customerId = adminViewingCustomerId || user?.customerId || 1;
 
   const { data: inventoryData, isLoading, error } = useQuery<InventoryOverview>({
     queryKey: ['inventory', customerId],

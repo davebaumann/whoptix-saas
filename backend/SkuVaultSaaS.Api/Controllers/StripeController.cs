@@ -6,6 +6,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.Identity;
 using System.Security.Claims;
 using SkuVaultSaaS.Infrastructure.Data;
+using SkuVaultSaaS.Infrastructure.Services;
 using SkuVaultSaaS.Core.Models;
 using SkuVaultSaaS.Core.Enums;
 using Stripe;
@@ -22,17 +23,20 @@ namespace SkuVaultSaaS.Api.Controllers
         private readonly ILogger<StripeController> _logger;
         private readonly IConfiguration _configuration;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly IEmailService _emailService;
 
         public StripeController(
             ApplicationDbContext context,
             ILogger<StripeController> logger,
             IConfiguration configuration,
-            UserManager<ApplicationUser> userManager)
+            UserManager<ApplicationUser> userManager,
+            IEmailService emailService)
         {
             _context = context;
             _logger = logger;
             _configuration = configuration;
             _userManager = userManager;
+            _emailService = emailService;
 
             // Initialize Stripe
             StripeConfiguration.ApiKey = _configuration["Stripe:SecretKey"];
@@ -99,7 +103,7 @@ namespace SkuVaultSaaS.Api.Controllers
                         ExternalId = Guid.NewGuid().ToString(),
                         TenantId = tenant.Id,
                         MembershipLevel = MembershipLevel.Basic,
-                        IsActive = true,
+                        IsActive = false,  // NOT active until payment is confirmed by webhook
                         LastSyncedAt = DateTime.UtcNow
                     };
                     _context.Customers.Add(customer);
@@ -189,7 +193,11 @@ namespace SkuVaultSaaS.Api.Controllers
                         { "customer_id", customer.Id.ToString() },
                         { "price_id", request.PriceId }
                     },
-                    SetupFutureUsage = "off_session" // For recurring payments
+                    SetupFutureUsage = "off_session", // For recurring payments
+                    PaymentMethodTypes = new List<string> 
+                    { 
+                        "card"
+                    }
                 };
 
                 var paymentIntent = await paymentIntentService.CreateAsync(paymentIntentOptions);
@@ -432,6 +440,19 @@ namespace SkuVaultSaaS.Api.Controllers
                         _logger.LogInformation(
                             "Updated customer {CustomerId} to membership level {Level} ({LevelValue}) via Stripe payment {PaymentIntentId}",
                             customerId, newLevel.Value, (int)newLevel.Value, paymentIntent.Id);
+
+                        // Send service agreement email
+                        try
+                        {
+                            var tierName = GetTierNameFromMembershipLevel(newLevel.Value);
+                            await _emailService.SendServiceAgreementAsync(customer.Email, customer.Name ?? "Valued Customer", tierName);
+                            _logger.LogInformation("Service agreement email sent to {Email} for customer {CustomerId}", customer.Email, customerId);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Failed to send service agreement email to {Email}", customer.Email);
+                            // Don't fail the entire payment process if email fails
+                        }
                     }
                     else
                     {
@@ -731,6 +752,18 @@ namespace SkuVaultSaaS.Api.Controllers
             _logger.LogInformation("GetMembershipLevelFromPriceId result: {Result} ({ResultValue}) for configKey {ConfigKey}", 
                 result?.ToString() ?? "(null)", result.HasValue ? (int)result.Value : -1, configKey);
             return result;
+        }
+
+        private string GetTierNameFromMembershipLevel(MembershipLevel level)
+        {
+            return level switch
+            {
+                MembershipLevel.Basic => "Basic",
+                MembershipLevel.Standard => "Standard",
+                MembershipLevel.Premium => "Premium",
+                MembershipLevel.Enterprise => "Enterprise",
+                _ => "Unknown"
+            };
         }
 
         private MembershipLevel? GetMembershipLevelFromSubscriptionItemPrice(string? stripePriceId)

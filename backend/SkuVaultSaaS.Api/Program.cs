@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.DataProtection;
 using SkuVaultSaaS.Infrastructure.Data;
 using SkuVaultSaaS.Infrastructure.SkuVaultSaaSApi;
 using SkuVaultSaaS.Infrastructure.Secrets;
@@ -15,8 +16,28 @@ using SkuVaultSaaS.Core.Models;
 using SkuVaultSaaS.Core.Services;
 using Amazon.SimpleSystemsManagement;
 using Amazon.SimpleSystemsManagement.Model;
+using Serilog;
+using SkuVaultSaaS.Api.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure Serilog for comprehensive logging
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()  // Log INFO and above
+    .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning)
+    .MinimumLevel.Override("System", Serilog.Events.LogEventLevel.Warning)
+    .Enrich.FromLogContext()
+    .Enrich.WithEnvironmentUserName()
+    .Enrich.WithMachineName()
+    .WriteTo.Console()
+    .CreateLogger();
+
+builder.Host.UseSerilog();
+
+// Log startup for verification
+Log.Information("=== API STARTUP INITIATED === Environment: {Environment}, Timestamp: {Timestamp}", 
+    Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production",
+    DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss.fff zzz"));
 
 // Load environment variables from .env file
 DotNetEnv.Env.Load();
@@ -34,7 +55,11 @@ builder.Services.AddSingleton<SkuVaultSaaS.Infrastructure.Secrets.ISecretProvide
 
 // SkuVault API config and client
 builder.Services.Configure<SkuVaultApiOptions>(builder.Configuration.GetSection("SkuVaultApi"));
-builder.Services.AddHttpClient<ISkuVaultApiClient, SkuVaultApiClient>();
+builder.Services.AddHttpClient<ISkuVaultApiClient, SkuVaultApiClient>()
+    .ConfigureHttpClient(client =>
+    {
+        client.Timeout = TimeSpan.FromSeconds(300); // 5 minutes - SkuVault API is heavily throttled
+    });
 
 // SkuVault Sync Service
 builder.Services.AddScoped<SkuVaultSaaS.Infrastructure.Services.ISkuVaultSyncService, SkuVaultSaaS.Infrastructure.Services.SkuVaultSyncService>();
@@ -105,6 +130,9 @@ builder.Services.AddHostedService<SkuVaultSaaS.Infrastructure.HostedServices.Cus
 
 // Enable demo data refresh service (daily at 6 AM ET)
 builder.Services.AddHostedService<DemoDataRefreshService>();
+
+// Enable error alerting service (checks logs every 10 minutes and sends email alerts)
+builder.Services.AddHostedService<ErrorAlertingService>();
 
 // Note: SkuVaultSyncJob is disabled for local development against the managed remote DB
 // because the hosted DB schema on the provider doesn't match migrations and the sync
@@ -337,6 +365,17 @@ builder.Services.AddDefaultIdentity<ApplicationUser>(options => {
 .AddRoles<IdentityRole>()
 .AddEntityFrameworkStores<ApplicationDbContext>();
 
+// Configure Data Protection (for protecting sensitive data like authentication tokens/keys)
+// This suppresses the warning about unencrypted XML keys
+var dataProtectionPath = Path.Combine("/app/data-protection-keys"); // Docker mounted volume
+if (!Directory.Exists(dataProtectionPath))
+{
+    Directory.CreateDirectory(dataProtectionPath);
+}
+builder.Services.AddDataProtection()
+    .SetApplicationName("SkuVaultSaaS")
+    .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionPath));
+
 // JWT Authentication
 var jwtSection = builder.Configuration.GetSection("Jwt");
 var jwtKey = jwtSection.GetValue<string>("Key");
@@ -491,6 +530,9 @@ app.UseSwaggerUI(c =>
     c.RoutePrefix = "swagger";
 });
 
+// Add global exception handler middleware for structured logging
+app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
+
 // Add global exception handler for generic error responses (security hardening)
 app.UseExceptionHandler(exceptionHandlerApp =>
 {
@@ -542,13 +584,6 @@ app.UseMiddleware<SkuVaultSaaS.Api.Middleware.RateLimitingMiddleware>(
 
 // Enable response caching
 app.UseResponseCaching();
-
-// Run data migration to encrypt plaintext credentials (one-time, idempotent)
-using (var scope = app.Services.CreateScope())
-{
-    var dataMigrationService = scope.ServiceProvider.GetRequiredService<DataMigrationService>();
-    await dataMigrationService.EncryptPlaintextSkuVaultCredentialsAsync();
-}
 
 // Enable HTTPS redirection
 if (app.Environment.IsDevelopment())

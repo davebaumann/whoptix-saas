@@ -12,6 +12,7 @@ namespace SkuVaultSaaS.Infrastructure.Services
         Task SendSuggestionEmailAsync(string userEmail, string message);
         Task SendContactInquiryAsync(string userEmail, string subject, string message);
         Task SendTechSupportRequestAsync(string userEmail, string priority, string category, string subject, string message);
+        Task SendServiceAgreementAsync(string toEmail, string customerName, string tierName);
     }
 
     public class EmailService : IEmailService
@@ -149,6 +150,96 @@ namespace SkuVaultSaaS.Infrastructure.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to send tech support request email from {Email}", userEmail);
+                throw;
+            }
+        }
+
+        public async Task SendServiceAgreementAsync(string toEmail, string customerName, string tierName)
+        {
+            try
+            {
+                var mimeMessage = new MimeMessage();
+                var fromEmail = _emailSettings.GetEmailAddress("Billing");
+                mimeMessage.From.Add(new MailboxAddress(_emailSettings.FromName, fromEmail));
+                mimeMessage.To.Add(new MailboxAddress(customerName, toEmail));
+                mimeMessage.Subject = "Your JUSTSKU Service Agreement";
+                
+                if (_emailSettings.ShouldAddReplyTo(fromEmail))
+                {
+                    mimeMessage.ReplyTo.Add(new MailboxAddress("JUSTSKU Support", _emailSettings.ReplyToEmail));
+                }
+
+                var bodyBuilder = new BodyBuilder
+                {
+                    HtmlBody = $@"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <title>Service Agreement</title>
+</head>
+<body style='font-family: Arial, sans-serif; line-height: 1.6; margin: 0; padding: 0; background-color: #f4f4f4;'>
+    <div style='max-width: 600px; margin: 0 auto; background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1);'>
+        <div style='text-align: center; margin-bottom: 30px; border-bottom: 2px solid #2563eb; padding-bottom: 20px;'>
+            <h1 style='color: #2563eb; margin: 0;'>JUSTSKU</h1>
+            <p style='color: #666; margin: 10px 0 0 0; font-size: 16px;'>Service Agreement</p>
+        </div>
+        
+        <p style='color: #333; margin: 0 0 20px 0;'>Dear {customerName},</p>
+        
+        <p style='color: #333; margin: 0 0 20px 0;'>
+            Thank you for subscribing to JUSTSKU's {tierName} plan! We're excited to help optimize your warehouse management operations.
+        </p>
+
+        <div style='background-color: #eff6ff; border-left: 4px solid #2563eb; padding: 15px; margin: 20px 0; border-radius: 4px;'>
+            <p style='color: #1e40af; margin: 0 0 10px 0; font-weight: bold;'>📋 Your Service Agreement</p>
+            <p style='color: #333; margin: 0;'>
+                Your complete service agreement has been saved to your account and is available for review at any time by logging into your JUSTSKU dashboard.
+            </p>
+        </div>
+
+        <p style='color: #333; margin: 0 0 20px 0;'>
+            <strong>Key Points:</strong>
+        </p>
+        
+        <ul style='color: #333; margin: 0 0 20px 0; padding-left: 20px;'>
+            <li>Your subscription has been activated for your {tierName} plan</li>
+            <li>Automatic renewal is set for 12 months from today</li>
+            <li>You can cancel anytime with 30 days written notice before renewal</li>
+            <li>Late cancellation (within 30 days of renewal) incurs a 2-month fee</li>
+            <li>Payment details are securely managed through Stripe</li>
+        </ul>
+
+        <div style='background-color: #ecfdf5; border-left: 4px solid #10b981; padding: 15px; margin: 20px 0; border-radius: 4px;'>
+            <p style='color: #047857; margin: 0; font-weight: bold;'>✓ Next Steps</p>
+            <p style='color: #333; margin: 10px 0 0 0;'>Connect your SkuVault account to start syncing data and leveraging the full power of JUSTSKU analytics.</p>
+        </div>
+
+        <p style='color: #666; margin: 0 0 20px 0; font-size: 14px;'>
+            If you have any questions about your subscription or need support, please don't hesitate to contact us.
+        </p>
+
+        <div style='text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;'>
+            <p style='color: #888; font-size: 12px; margin: 0;'>
+                This is an automated confirmation email from JUSTSKU Warehouse Management.
+            </p>
+            <p style='color: #888; font-size: 12px; margin: 5px 0 0 0;'>
+                Sent on {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC
+            </p>
+        </div>
+    </div>
+</body>
+</html>"
+                };
+                mimeMessage.Body = bodyBuilder.ToMessageBody();
+
+                await SendEmailAsync(mimeMessage);
+                
+                _logger.LogInformation("Service agreement email sent to {Email} for tier {TierName}", toEmail, tierName);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send service agreement email to {Email}", toEmail);
                 throw;
             }
         }

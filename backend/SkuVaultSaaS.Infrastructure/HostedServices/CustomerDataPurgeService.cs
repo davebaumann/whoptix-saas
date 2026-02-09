@@ -82,11 +82,6 @@ namespace SkuVaultSaaS.Infrastructure.HostedServices
                     .ToListAsync();
                 context.Transactions.RemoveRange(transactions);
 
-                var inventoryMovements = await context.InventoryMovements
-                    .Where(im => im.CustomerId == customer.Id)
-                    .ToListAsync();
-                context.InventoryMovements.RemoveRange(inventoryMovements);
-
                 var inventoryLevels = await context.InventoryLevels
                     .Where(il => il.CustomerId == customer.Id)
                     .ToListAsync();

@@ -10,7 +10,12 @@ const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'
 
 export default function ChannelPerformance() {
   const { user } = useAuth()
-  const customerId = user?.customerId || 1
+  // Check if admin is viewing as another customer
+  const adminViewingData = sessionStorage.getItem('adminViewingAs');
+  const adminViewingCustomerId = adminViewingData ? JSON.parse(adminViewingData).customerId : null;
+  
+  // Use impersonated customer ID if admin is viewing as, otherwise use user's own customer ID
+  const customerId = adminViewingCustomerId || user?.customerId || 1
   const [dateRange, setDateRange] = useState<'today' | 'last7' | 'last30' | 'custom'>('last30')
   const [fromDate, setFromDate] = useState<string | undefined>()
   const [toDate, setToDate] = useState<string | undefined>()

@@ -34,10 +34,10 @@ namespace SkuVaultSaaS.Api.Controllers
                 _ => DateTime.UtcNow.Date
             };
 
-            var pickerSummary = await _context.InventoryMovements
+            var pickerSummary = await _context.Transactions
                 .Where(t => t.CustomerId == customerId && 
                            !string.IsNullOrEmpty(t.PerformedBy) &&
-                           t.OccurredAtUtc >= fromDate)
+                           t.TransactionDate >= fromDate)
                 .GroupBy(t => t.PerformedBy)
                 .Select(g => new
                 {
@@ -47,11 +47,11 @@ namespace SkuVaultSaaS.Api.Controllers
                     removeCount = g.Count(t => t.TransactionType == "Remove"),
                     addCount = g.Count(t => t.TransactionType == "Add"),
                     createCount = g.Count(t => t.TransactionType == "Create"),
-                    totalQuantity = g.Sum(t => Math.Abs(t.QuantityChange)),
-                    pickQuantity = g.Where(t => t.TransactionType == "Pick").Sum(t => Math.Abs(t.QuantityChange)),
-                    hoursWorked = (g.Max(t => t.OccurredAtUtc) - g.Min(t => t.OccurredAtUtc)).TotalHours,
-                    firstTransaction = g.Min(t => t.OccurredAtUtc),
-                    lastTransaction = g.Max(t => t.OccurredAtUtc)
+                    totalQuantity = g.Sum(t => Math.Abs(t.Quantity)),
+                    pickQuantity = g.Where(t => t.TransactionType == "Pick").Sum(t => Math.Abs(t.Quantity)),
+                    hoursWorked = (g.Max(t => t.TransactionDate) - g.Min(t => t.TransactionDate)).TotalHours,
+                    firstTransaction = g.Min(t => t.TransactionDate),
+                    lastTransaction = g.Max(t => t.TransactionDate)
                 })
                 .AsNoTracking()
                 .ToListAsync();
@@ -84,21 +84,21 @@ namespace SkuVaultSaaS.Api.Controllers
         [HttpGet("customer/{customerId}/debug")]
         public async Task<IActionResult> DebugPickerData(int customerId)
         {
-            var transactionTypes = await _context.InventoryMovements
+            var transactionTypes = await _context.Transactions
                 .Where(t => t.CustomerId == customerId)
                 .GroupBy(t => t.TransactionType)
                 .Select(g => new { TransactionType = g.Key, Count = g.Count() })
                 .ToListAsync();
 
-            var pickerNames = await _context.InventoryMovements
+            var pickerNames = await _context.Transactions
                 .Where(t => t.CustomerId == customerId && !string.IsNullOrEmpty(t.PerformedBy))
                 .Select(t => t.PerformedBy)
                 .Distinct()
                 .ToListAsync();
 
-            var sampleMovements = await _context.InventoryMovements
+            var sampleMovements = await _context.Transactions
                 .Where(t => t.CustomerId == customerId)
-                .Select(t => new { t.PerformedBy, t.OccurredAtUtc, t.TransactionType })
+                .Select(t => new { t.PerformedBy, t.TransactionDate, t.TransactionType })
                 .Take(20)
                 .ToListAsync();
 
@@ -147,20 +147,20 @@ namespace SkuVaultSaaS.Api.Controllers
             // Debug logging
             Console.WriteLine($"Searching for picker: '{pickerName}', customerId: {customerId}, from: {fromDate}, to: {toDate}");
 
-            // First check what users exist
-            var allUsers = await _context.InventoryMovements
+            // First check what users exist in Transactions table
+            var allUsers = await _context.Transactions
                 .Where(t => t.CustomerId == customerId)
                 .Select(t => t.PerformedBy)
                 .Distinct()
                 .ToListAsync();
             Console.WriteLine($"Available users: {string.Join(", ", allUsers)}");
 
-            var transactions = await _context.InventoryMovements
+            var transactions = await _context.Transactions
                 .Where(t => t.CustomerId == customerId && 
                            t.PerformedBy == pickerName &&
-                           t.OccurredAtUtc >= fromDate && 
-                           t.OccurredAtUtc <= toDate)
-                .Select(t => new { TransactionDate = t.OccurredAtUtc, Quantity = t.QuantityChange, t.TransactionType })
+                           t.TransactionDate >= fromDate && 
+                           t.TransactionDate <= toDate)
+                .Select(t => new { TransactionDate = t.TransactionDate, Quantity = t.Quantity, t.TransactionType })
                 .AsNoTracking()
                 .ToListAsync();
 

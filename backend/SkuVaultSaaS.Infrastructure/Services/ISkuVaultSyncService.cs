@@ -27,12 +27,12 @@ namespace SkuVaultSaaS.Infrastructure.Services
         /// <summary>
         /// Synchronizes inventory movements for a specific customer
         /// </summary>
-        Task SyncInventoryMovementsAsync(int customerId, DateTime? since = null);
+        // DECOMMISSIONED: Task SyncInventoryMovementsAsync(int customerId, DateTime? since = null);
 
         /// <summary>
         /// Synchronizes transactions from SkuVault for a specific customer
         /// </summary>
-        Task SyncTransactionsAsync(int customerId, DateTime syncStartTime);
+        Task SyncTransactionsAsync(int customerId, DateTime syncStartTime, DateTime syncFromDate);
 
         /// <summary>
         /// Synchronizes all customers for all tenants
@@ -40,13 +40,38 @@ namespace SkuVaultSaaS.Infrastructure.Services
         Task SyncAllCustomersAsync();
 
         /// <summary>
+        /// Gets raw transaction data from SkuVault API for export/comparison (Admin use only)
+        /// </summary>
+        Task<List<dynamic>> GetApiTransactionsForExport(string tenantToken, string userToken, DateTime fromDate, DateTime toDate);
+
+        /// <summary>
         /// Synchronizes sales for a specific customer
         /// </summary>
-        Task SyncSalesAsync(int customerId, DateTime syncStartTime);
+        Task SyncSalesAsync(int customerId, DateTime syncStartTime, DateTime syncFromDate);
 
         /// <summary>
         /// Synchronizes shipments for a specific customer
         /// </summary>
         Task SyncShipmentsAsync(int customerId);
+
+        /// <summary>
+        /// Synchronizes active (non-completed) purchase orders for a specific customer
+        /// </summary>
+        Task SyncPurchaseOrdersAsync(int customerId, DateTime? syncFromDate = null);
+
+        /// <summary>
+        /// Synchronizes completed purchase orders for a specific customer (for historical/lead time analysis)
+        /// </summary>
+        Task SyncPurchaseOrdersCompletedAsync(int customerId, DateTime? syncFromDate = null);
+
+        /// <summary>
+        /// Synchronizes purchase order receives history for a specific customer (for item-level lead time analysis)
+        /// </summary>
+        Task SyncReceivesHistoryAsync(int customerId, DateTime? syncFromDate = null);
+
+        /// <summary>
+        /// Synchronizes integrations for a specific customer
+        /// </summary>
+        Task SyncIntegrationsAsync(int customerId);
     }
 }

@@ -81,6 +81,7 @@ export default function ContractReview() {
                       <li>No early termination except bankruptcy, or approved closure or disaster</li>
                       <li>Reports depend on your data and warehouse processes</li>
                       <li>Late invoices incur monthly surcharges and may go to collections</li>
+                      <li>Optional fourteen (14) day free trial prior to subscription commencement</li>
                     </ul>
                     <p className="mt-2 font-medium">
                       The full agreement below is legally binding:
@@ -103,6 +104,11 @@ export default function ContractReview() {
                       "Services" means the hosted software platform, related features, and documentation made available by Company. 
                       "Order Form" means any written or electronic ordering document referencing this Agreement. 
                       "Subscription Term" means the initial twelve month term and any renewal terms.
+                      "Trial Period" means a one-time, fourteen (14) consecutive calendar day evaluation period
+                        during which Customer may access the Services without charge, beginning on the date
+                        Company grants access, unless otherwise stated in the applicable Order Form. Services used
+                        beyond the Trial Period shall automatically convert into a paid Subscription Term unless
+                        Customer provides written notice of non-continuation prior to expiration of the Trial Period."
                     </p>
                   </section>
 
@@ -112,6 +118,38 @@ export default function ContractReview() {
                       Company shall provide Customer with access to the Services during the Subscription Term, subject to this 
                       Agreement. Company may modify, update, or enhance the Services from time to time, provided such changes do not materially 
                       reduce the core functionality purchased.
+                    </p>
+                  </section>
+
+                  <section>
+                    <h4 className="font-semibold text-gray-900 mb-2">3A. Free Trial Period</h4>
+                    <p className="mb-2"><strong>3A.1 Trial Access</strong></p>
+                    <p className="mb-2">
+                      Company may, at its sole discretion, provide Customer access to the Services during a Trial
+                      Period. The Trial Period is provided for evaluation purposes only.
+                    </p>
+                    <p className="mb-2"><strong>3A.2 No Fees During Trial</strong></p>
+                    <p className="mb-2">
+                      No subscription fees accrue or are due during the Trial Period unless otherwise expressly
+                      stated in writing in the applicable Order Form.
+                    </p>
+                    <p className="mb-2"><strong>3A.3 No Obligation to Continue</strong></p>
+                    <p className="mb-2">
+                      Customer may elect not to proceed with a paid subscription at any time during the Trial Period
+                      by providing written notice to Company. If such notice is provided before expiration of the Trial
+                      Period, this Agreement shall terminate with no fees, penalties, or further obligations owed by
+                      either party.
+                    </p>
+                    <p className="mb-2"><strong>3A.4 Automatic Conversion to Paid Subscription</strong></p>
+                    <p className="mb-2">
+                      If Customer does not provide written notice of non-continuation prior to expiration of the Trial
+                      Period, the Trial Period shall automatically convert into a paid twelve (12) month Subscription
+                      Term subject to all terms of this Agreement and the applicable Order Form.
+                    </p>
+                    <p className="mb-2"><strong>3A.5 Exclusion from Cancellation and Penalty Provisions</strong></p>
+                    <p>
+                      The Trial Period is not a Subscription Term. Sections 7 and 8 of this Agreement do not apply
+                      during the Trial Period.
                     </p>
                   </section>
 

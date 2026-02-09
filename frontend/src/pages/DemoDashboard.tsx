@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Users, Package, AlertCircle } from 'lucide-react'
+import DemoAgingInventoryReport from './DemoAgingInventoryReport'
 
 export default function DemoDashboard() {
   const navigate = useNavigate()
@@ -265,26 +266,6 @@ export default function DemoDashboard() {
     const url = URL.createObjectURL(blob)
     link.setAttribute('href', url)
     link.setAttribute('download', `low-stock-report-${new Date().toISOString().split('T')[0]}.csv`)
-    link.style.visibility = 'hidden'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-  }
-
-  const exportAgingInventoryCSV = () => {
-    if (!agingInventoryData?.skus) return
-    
-    const rows: string[] = ['"SKU","PRODUCT","AGE (DAYS)","QUANTITY","VALUE","LOCATION"']
-    agingInventoryData.skus.forEach((item: any) => {
-      rows.push(`"${item.sku}","${item.name}",${item.ageInDays},${item.quantity},${item.value},"${item.location}"`)
-    })
-    
-    const csv = rows.join('\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    const url = URL.createObjectURL(blob)
-    link.setAttribute('href', url)
-    link.setAttribute('download', `aging-inventory-${new Date().toISOString().split('T')[0]}.csv`)
     link.style.visibility = 'hidden'
     document.body.appendChild(link)
     link.click()
@@ -894,123 +875,7 @@ export default function DemoDashboard() {
             </div>
           </div>
         ) : currentReport === 'aging-inventory' && agingInventoryData ? (
-          <div className="space-y-6">
-            {/* Aging Inventory Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-              <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
-                <p className="text-sm text-gray-600">Total Items</p>
-                <p className="text-2xl font-bold text-gray-900 mt-2">{agingInventoryData.totalItems}</p>
-              </div>
-              <div className="bg-white p-4 rounded-lg shadow border-l-4 border-purple-500">
-                <p className="text-sm text-gray-600">Total Value</p>
-                <p className="text-2xl font-bold text-gray-900 mt-2">${(agingInventoryData.totalValue / 1000).toFixed(1)}k</p>
-              </div>
-              <div className="bg-white p-4 rounded-lg shadow border-l-4 border-amber-500">
-                <p className="text-sm text-gray-600">Average Age</p>
-                <p className="text-2xl font-bold text-gray-900 mt-2">{agingInventoryData.averageAge}d</p>
-              </div>
-              <div className="bg-white p-4 rounded-lg shadow border-l-4 border-red-500">
-                <p className="text-sm text-gray-600">Oldest Item</p>
-                <p className="text-2xl font-bold text-gray-900 mt-2">{agingInventoryData.oldestItem}d</p>
-              </div>
-              <div className="bg-white p-4 rounded-lg shadow border-l-4 border-orange-500">
-                <p className="text-sm text-gray-600">Over 180 Days</p>
-                <p className="text-2xl font-bold text-gray-900 mt-2">{agingInventoryData.itemsOver180Days}</p>
-              </div>
-            </div>
-
-            {/* Age Bracket Summary */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <div className="bg-green-50 p-3 rounded-lg text-center">
-                <p className="text-xs text-green-700 font-semibold">0-30 Days</p>
-                <p className="text-lg font-bold text-green-900 mt-1">{agingInventoryData.items.filter((i: any) => i.daysInInventory <= 30).length}</p>
-              </div>
-              <div className="bg-blue-50 p-3 rounded-lg text-center">
-                <p className="text-xs text-blue-700 font-semibold">30-60 Days</p>
-                <p className="text-lg font-bold text-blue-900 mt-1">{agingInventoryData.items.filter((i: any) => i.daysInInventory > 30 && i.daysInInventory <= 60).length}</p>
-              </div>
-              <div className="bg-yellow-50 p-3 rounded-lg text-center">
-                <p className="text-xs text-yellow-700 font-semibold">60-90 Days</p>
-                <p className="text-lg font-bold text-yellow-900 mt-1">{agingInventoryData.items.filter((i: any) => i.daysInInventory > 60 && i.daysInInventory <= 90).length}</p>
-              </div>
-              <div className="bg-orange-50 p-3 rounded-lg text-center">
-                <p className="text-xs text-orange-700 font-semibold">90-180 Days</p>
-                <p className="text-lg font-bold text-orange-900 mt-1">{agingInventoryData.items.filter((i: any) => i.daysInInventory > 90 && i.daysInInventory <= 180).length}</p>
-              </div>
-              <div className="bg-red-50 p-3 rounded-lg text-center">
-                <p className="text-xs text-red-700 font-semibold">180+ Days</p>
-                <p className="text-lg font-bold text-red-900 mt-1">{agingInventoryData.items.filter((i: any) => i.daysInInventory > 180).length}</p>
-              </div>
-            </div>
-
-            {/* Aging Inventory Table */}
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-              <div className="px-6 py-4 bg-gray-50 border-b flex items-center justify-between">
-                <h3 className="font-semibold text-gray-900">Aging Inventory Details</h3>
-                <button onClick={exportAgingInventoryCSV} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
-                  ⬇ Export CSV
-                </button>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-gray-100 border-b">
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">SKU</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Product Name</th>
-                      <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900">Days in Inventory</th>
-                      <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900">Quantity</th>
-                      <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">Cost Value</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Location</th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Last Sale Date</th>
-                      <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900">Age Group</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {agingInventoryData.items.map((item: any, idx: number) => (
-                      <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{item.sku}</td>
-                        <td className="px-6 py-4 text-sm text-gray-700">{item.productName}</td>
-                        <td className="px-6 py-4 text-center text-sm font-bold text-gray-900">{item.daysInInventory}d</td>
-                        <td className="px-6 py-4 text-center text-sm text-gray-600">{item.quantity}</td>
-                        <td className="px-6 py-4 text-right text-sm text-gray-700">${item.costValue.toFixed(2)}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{item.location}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{item.lastSaleDate}</td>
-                        <td className="px-6 py-4 text-center">
-                          {item.ageGroup === '0-30 days' && (
-                            <span className="px-2 py-1 text-xs font-semibold bg-green-100 text-green-800 rounded">FRESH</span>
-                          )}
-                          {item.ageGroup === '30-60 days' && (
-                            <span className="px-2 py-1 text-xs font-semibold bg-blue-100 text-blue-800 rounded">AGING</span>
-                          )}
-                          {item.ageGroup === '60-90 days' && (
-                            <span className="px-2 py-1 text-xs font-semibold bg-yellow-100 text-yellow-800 rounded">OLD</span>
-                          )}
-                          {item.ageGroup === '90-180 days' && (
-                            <span className="px-2 py-1 text-xs font-semibold bg-orange-100 text-orange-800 rounded">VERY OLD</span>
-                          )}
-                          {item.ageGroup === 'Over 180 days' && (
-                            <span className="px-2 py-1 text-xs font-semibold bg-red-100 text-red-800 rounded">OBSOLETE</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Info Banner */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-start">
-                <AlertCircle className="w-5 h-5 text-blue-600 mr-3 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-sm text-blue-800">
-                    <strong>Try the full version</strong> - This demo showcases the Aging Inventory Report with detailed analysis of slow-moving and obsolete stock. Upgrade to access markdown suggestions, liquidation planning, ABC-XYZ analysis, and automated reorder optimization.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+          <DemoAgingInventoryReport agingInventoryData={agingInventoryData} />
         ) : currentReport === 'low-stock' ? (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
             <p className="text-sm text-yellow-800">Unable to load low stock data. Please try again later.</p>

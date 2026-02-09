@@ -217,11 +217,11 @@ namespace SkuVaultSaaS.Api.Controllers
                     }
                 });
 
-                _context.InventoryMovements.AddRange(movements);
+                // DECOMMISSIONED: InventoryMovements no longer used for seeding
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("Successfully created sample data: {ProductCount} products, {LocationCount} locations, {MovementCount} movements",
-                    products.Length, locations.Length, movements.Count);
+                _logger.LogInformation("Successfully created sample data: {ProductCount} products, {LocationCount} locations",
+                    products.Length, locations.Length);
 
                 return Ok(new
                 {
@@ -277,83 +277,8 @@ namespace SkuVaultSaaS.Api.Controllers
         {
             try
             {
-                // Check if historical movements already exist
-                var existingHistoricalMovements = await _context.InventoryMovements
-                    .Where(im => im.OccurredAtUtc < DateTime.UtcNow.Date.AddDays(-1))
-                    .AnyAsync();
-                
-                if (existingHistoricalMovements)
-                {
-                    return Ok(new { message = "Historical movement data already exists" });
-                }
-
-                var customer = await _context.Customers.FirstAsync();
-                var products = await _context.Products.Where(p => p.CustomerId == customer.Id).ToListAsync();
-                var locations = await _context.Locations.Where(l => l.CustomerId == customer.Id).ToListAsync();
-
-                if (!products.Any() || !locations.Any())
-                {
-                    return BadRequest("No products or locations found. Please create sample data first.");
-                }
-
-                var historicalMovements = new List<InventoryMovement>();
-                var random = new Random();
-
-                // Create 60 days of historical data for performance report analysis
-                for (int daysBack = 1; daysBack <= 60; daysBack++)
-                {
-                    var movementDate = DateTime.UtcNow.Date.AddDays(-daysBack);
-                    
-                    // Create 2-8 movements per day
-                    var movementsPerDay = random.Next(2, 9);
-                    
-                    for (int i = 0; i < movementsPerDay; i++)
-                    {
-                        var product = products[random.Next(products.Count)];
-                        var location = locations[random.Next(locations.Count)];
-                        var hour = random.Next(8, 18); // Business hours 8 AM - 6 PM
-                        var minute = random.Next(0, 60);
-                        
-                        // Mix of transaction types with realistic weights
-                        var transactionTypes = new[] { "Pick", "Receive", "Put-away", "Adjust", "Transfer", "Sale" };
-                        var transactionWeights = new[] { 30, 15, 15, 5, 10, 25 }; // Pick and Sale most common
-                        var transactionType = GetWeightedRandomChoice(transactionTypes, transactionWeights, random);
-                        
-                        // Quantity based on transaction type
-                        int quantity = transactionType switch
-                        {
-                            "Pick" or "Sale" => -random.Next(1, 11), // Outbound (negative)
-                            "Receive" => random.Next(5, 51), // Inbound (positive)
-                            "Put-away" => random.Next(1, 26), // Inbound (positive)
-                            "Adjust" => random.Next(-5, 6), // Can be positive or negative
-                            "Transfer" => -random.Next(1, 6), // Outbound from one location
-                            _ => random.Next(1, 11)
-                        };
-
-                        historicalMovements.Add(new InventoryMovement
-                        {
-                            CustomerId = customer.Id,
-                            ProductId = product.Id,
-                            LocationId = location.Id,
-                            QuantityChange = quantity,
-                            TransactionType = transactionType,
-                            Reason = GenerateReason(transactionType, random),
-                            Reference = GenerateReference(transactionType, random, daysBack),
-                            PerformedBy = GetRandomUser(random),
-                            OccurredAtUtc = movementDate.AddHours(hour).AddMinutes(minute),
-                            CreatedAtUtc = movementDate.AddHours(hour).AddMinutes(minute).AddMinutes(5)
-                        });
-                    }
-                }
-
-                _context.InventoryMovements.AddRange(historicalMovements);
-                await _context.SaveChangesAsync();
-
-                return Ok(new { 
-                    message = "Historical movement data created successfully!",
-                    movementsCreated = historicalMovements.Count,
-                    daysSpanned = 60
-                });
+                // DECOMMISSIONED: Historical movements seeding removed with InventoryMovements table decommission
+                return Ok(new { message = "Historical movement data seeding is deprecated" });
             }
             catch (Exception ex)
             {

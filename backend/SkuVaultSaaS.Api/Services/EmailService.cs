@@ -3,6 +3,8 @@ using Microsoft.Extensions.Logging;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using MimeKit;
+using Amazon.SimpleSystemsManagement;
+using Amazon.SimpleSystemsManagement.Model;
 
 namespace SkuVaultSaaS.Api.Services
 {
@@ -61,10 +63,35 @@ namespace SkuVaultSaaS.Api.Services
             return emailSettings["FromEmail"] ?? "noreply@justsku.com";
         }
 
+        /// <summary>
+        /// Fetch the zeptomail API key from AWS Parameter Store
+        /// </summary>
+        private async Task<string?> GetZeptoApiKeyAsync()
+        {
+            try
+            {
+                using var ssmClient = new AmazonSimpleSystemsManagementClient(Amazon.RegionEndpoint.USEast1);
+                var request = new GetParameterRequest
+                {
+                    Name = "zepto_apikey",
+                    WithDecryption = true
+                };
+                
+                var response = await ssmClient.GetParameterAsync(request);
+                return response.Parameter?.Value;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to fetch zeptomail API key from Parameter Store");
+                return null;
+            }
+        }
+
         public async Task SendPasswordResetEmailAsync(string email, string resetToken, string resetUrl)
         {
             _logger.LogInformation("Password reset requested for: {Email}", email);
-            var fullResetUrl = $"{resetUrl}?token={resetToken}&email={email}";
+            // With cache-based tokens, resetUrl already contains the token parameter
+            var fullResetUrl = resetUrl;
             _logger.LogInformation("Reset URL: {ResetUrl}", fullResetUrl);
 
             try
@@ -73,13 +100,23 @@ namespace SkuVaultSaaS.Api.Services
                 var smtpHost = emailSettings["SmtpHost"];
                 var smtpPort = int.Parse(emailSettings["SmtpPort"] ?? "587");
                 var username = emailSettings["Username"];
-                var password = emailSettings["Password"];
+                
+                // Fetch password from Parameter Store first, fallback to config
+                var password = await GetZeptoApiKeyAsync();
+                if (string.IsNullOrEmpty(password))
+                {
+                    password = emailSettings["Password"];
+                }
+                
                 var fromEmail = GetEmailAddress("Verification");
                 var fromName = emailSettings["FromName"];
                 var useSsl = bool.Parse(emailSettings["UseSsl"] ?? "true");
 
                 _logger.LogInformation("SendPasswordResetEmailAsync: Config loaded - Host={Host}, Port={Port}, Username={Username}, FromEmail={FromEmail}, PasswordProvided={PasswordProvided}",
                     smtpHost, smtpPort, username, fromEmail, !string.IsNullOrEmpty(password));
+                
+                _logger.LogInformation("SendPasswordResetEmailAsync: Password length={PasswordLength}, First 10 chars={FirstChars}", 
+                    password?.Length ?? 0, password?.Substring(0, Math.Min(10, password?.Length ?? 0)) ?? "null");
 
                 var message = new MimeMessage();
                 message.From.Add(new MailboxAddress(fromName, fromEmail));

@@ -3,11 +3,58 @@ import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
 import { apiClient } from '../api/client'
 import { format, startOfToday, endOfToday, subDays, startOfDay, endOfDay } from 'date-fns'
+import { Info } from 'lucide-react'
 import PickerPerformanceDetail from '../components/PickerPerformanceDetail'
 import PickerPerformanceChart from '../components/PickerPerformanceChart'
 
+interface Tooltip {
+  [key: string]: string
+}
+
+const METRIC_TOOLTIPS: Tooltip = {
+  totalMovements: 'Total count of all transaction entries (picks, adds, removes, adjustments) by all users during the selected period',
+  totalQuantity: 'Sum of all item quantities affected by transactions during the selected period',
+  picksPerHour: 'Total picks divided by hours in the selected period. Measures average picking productivity/efficiency',
+  usersActive: 'Number of unique users/pickers who performed transactions during the selected period'
+}
+
 export default function Dashboard() {
   const { user } = useAuth()
+  const [hoveredTooltip, setHoveredTooltip] = useState<string | null>(null)
+  
+  const renderTooltip = (key: string) => (
+    <div className="relative group inline-block">
+      <Info 
+        className="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help"
+        onMouseEnter={() => setHoveredTooltip(key)}
+        onMouseLeave={() => setHoveredTooltip(null)}
+      />
+      {hoveredTooltip === key && (
+        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-56 bg-gray-900 text-white text-xs rounded p-2 z-10 pointer-events-none">
+          {METRIC_TOOLTIPS[key]}
+          <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+        </div>
+      )}
+    </div>
+  )
+  
+  // Check if admin is impersonating a customer
+  const getCustomerIdFromContext = () => {
+    const adminViewingData = sessionStorage.getItem('adminViewingAs')
+    if (adminViewingData) {
+      try {
+        const data = JSON.parse(adminViewingData)
+        if (data.customerId) {
+          console.log('Using impersonated customer ID:', data.customerId)
+          return data.customerId
+        }
+      } catch (e) {
+        console.error('Failed to parse admin viewing context:', e)
+      }
+    }
+    return null
+  }
+  
   // For now, we'll use a simple mapping. In production, this would come from user profile/customer association
   const getCustomerIdFromUser = (email: string) => {
     // Simple mapping - in production this would be stored in database
@@ -16,7 +63,11 @@ export default function Dashboard() {
     return 1 // Default for demo
   }
   
-  const [customerId] = useState(() => getCustomerIdFromUser(user?.email || ''))
+  const [customerId] = useState(() => {
+    const impersonatedId = getCustomerIdFromContext()
+    if (impersonatedId) return impersonatedId
+    return getCustomerIdFromUser(user?.email || '')
+  })
   const [dateRange, setDateRange] = useState<'today' | 'yesterday' | 'last7' | 'custom'>('today')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
@@ -24,31 +75,52 @@ export default function Dashboard() {
 
   const dateParams = useMemo(() => {
     const now = new Date()
+    
+    // Helper to convert local time to UTC ISO string
+    const toUTC = (date: Date): string => {
+      return date.toISOString()
+    }
+    
     switch (dateRange) {
       case 'today':
+        // Get start and end of today in local timezone, then convert to UTC
+        const startLocal = startOfToday()
+        const endLocal = endOfToday()
         return {
-          from: format(startOfToday(), "yyyy-MM-dd'T'HH:mm:ss") + 'Z',
-          to: format(endOfToday(), "yyyy-MM-dd'T'HH:mm:ss") + 'Z'
+          from: toUTC(startLocal),
+          to: toUTC(endLocal)
         }
       case 'yesterday':
         const yesterday = subDays(now, 1)
+        const startYesterdayLocal = startOfDay(yesterday)
+        const endYesterdayLocal = endOfDay(yesterday)
         return {
-          from: format(startOfDay(yesterday), "yyyy-MM-dd'T'HH:mm:ss") + 'Z',
-          to: format(endOfDay(yesterday), "yyyy-MM-dd'T'HH:mm:ss") + 'Z'
+          from: toUTC(startYesterdayLocal),
+          to: toUTC(endYesterdayLocal)
         }
       case 'last7':
+        const sevenDaysAgo = subDays(now, 7)
+        const startSevenLocal = startOfDay(sevenDaysAgo)
+        const endSevenLocal = endOfToday()
         return {
-          from: format(subDays(now, 7), "yyyy-MM-dd'T'HH:mm:ss") + 'Z',
-          to: format(endOfToday(), "yyyy-MM-dd'T'HH:mm:ss") + 'Z'
+          from: toUTC(startSevenLocal),
+          to: toUTC(endSevenLocal)
         }
       case 'custom':
         if (fromDate && !toDate) {
-          return { from: fromDate + 'T00:00:00Z', to: format(endOfToday(), "yyyy-MM-dd'T'HH:mm:ss") + 'Z' }
+          const customStart = new Date(fromDate + 'T00:00:00')
+          const customEnd = endOfToday()
+          return { from: toUTC(customStart), to: toUTC(customEnd) }
         }
-        return fromDate && toDate ? { 
-          from: fromDate + 'T00:00:00Z', 
-          to: toDate + 'T23:59:59Z'
-        } : undefined
+        if (fromDate && toDate) {
+          const customStart = new Date(fromDate + 'T00:00:00')
+          const customEnd = new Date(toDate + 'T23:59:59')
+          return { 
+            from: toUTC(customStart), 
+            to: toUTC(customEnd)
+          }
+        }
+        return undefined
       default:
         return undefined
     }
@@ -61,7 +133,7 @@ export default function Dashboard() {
       case 'today':
         return {
           from: format(startOfToday(), 'yyyy-MM-dd'),
-          to: format(endOfToday(), "yyyy-MM-dd'T'HH:mm:ss")
+          to: format(now, "yyyy-MM-dd'T'HH:mm:ss")  // Use current time, not end of day
         }
       case 'yesterday':
         const yesterday = subDays(now, 1)
@@ -72,11 +144,11 @@ export default function Dashboard() {
       case 'last7':
         return {
           from: format(subDays(now, 7), 'yyyy-MM-dd'),
-          to: format(endOfToday(), "yyyy-MM-dd'T'HH:mm:ss")
+          to: format(now, "yyyy-MM-dd'T'HH:mm:ss")  // Use current time, not end of day
         }
       case 'custom':
         if (fromDate && !toDate) {
-          return { from: fromDate, to: format(endOfToday(), "yyyy-MM-dd'T'HH:mm:ss") }
+          return { from: fromDate, to: format(now, "yyyy-MM-dd'T'HH:mm:ss") }
         }
         return fromDate && toDate ? { 
           from: fromDate, 
@@ -87,41 +159,38 @@ export default function Dashboard() {
     }
   }, [dateRange, fromDate, toDate])
 
-  const { data: transactions, isLoading: loadingTransactions } = useQuery({
-    queryKey: ['transactions', customerId, dateParams],
-    queryFn: () => {
-      if (dateRange === 'today') {
-        return apiClient.getTransactionsToday(customerId)
-      }
-      return apiClient.getTransactions(
-        customerId,
-        dateParams?.from,
-        dateParams?.to
-      )
-    },
-    enabled: !!dateParams || dateRange === 'today',
-  })
-
   const { data: summary, isLoading: loadingSummary } = useQuery({
     queryKey: ['summary', customerId, dateParams],
     queryFn: () => {
-      if (dateRange === 'today') {
-        return apiClient.getTransactionsSummaryToday(customerId)
-      }
+      // Always use the date-range version to respect timezone
       return apiClient.getTransactionsSummary(
         customerId,
         dateParams?.from,
         dateParams?.to
       )
     },
-    enabled: !!dateParams || dateRange === 'today',
+    enabled: !!dateParams,
   })
 
   const stats = summary?.summary.reduce((acc, item) => {
     acc.totalMoves += item.count
     acc.totalQuantity += Math.abs(item.totalQuantity)
+    if (item.transactionType === 'Pick') {
+      acc.totalPicks += item.count
+    }
     return acc
-  }, { totalMoves: 0, totalQuantity: 0 }) || { totalMoves: 0, totalQuantity: 0 }
+  }, { totalMoves: 0, totalQuantity: 0, totalPicks: 0 }) || { totalMoves: 0, totalQuantity: 0, totalPicks: 0 }
+
+  // Calculate hours from date range
+  const calculateHours = () => {
+    if (!dateParams?.from || !dateParams?.to) return 1
+    const from = new Date(dateParams.from)
+    const to = new Date(dateParams.to)
+    const hours = (to.getTime() - from.getTime()) / (1000 * 60 * 60)
+    return Math.max(hours, 1) // Minimum 1 hour to avoid division by zero
+  }
+
+  const picksPerHour = dateParams ? (stats.totalPicks / calculateHours()).toFixed(1) : '0'
 
   return (
     <div className="space-y-6">
@@ -202,25 +271,37 @@ export default function Dashboard() {
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white p-6 rounded-lg shadow">
-          <p className="text-sm font-medium text-gray-600">Total Movements</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium text-gray-600">Total Movements</p>
+            {renderTooltip('totalMovements')}
+          </div>
           <p className="mt-2 text-3xl font-semibold text-gray-900">
             {loadingSummary ? '...' : stats.totalMoves.toLocaleString()}
           </p>
         </div>
         <div className="bg-white p-6 rounded-lg shadow">
-          <p className="text-sm font-medium text-gray-600">Total Quantity</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium text-gray-600">Total Quantity</p>
+            {renderTooltip('totalQuantity')}
+          </div>
           <p className="mt-2 text-3xl font-semibold text-gray-900">
             {loadingSummary ? '...' : stats.totalQuantity.toLocaleString()}
           </p>
         </div>
         <div className="bg-white p-6 rounded-lg shadow">
-          <p className="text-sm font-medium text-gray-600">Transactions</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium text-gray-600">Picks Per Hour</p>
+            {renderTooltip('picksPerHour')}
+          </div>
           <p className="mt-2 text-3xl font-semibold text-gray-900">
-            {loadingTransactions ? '...' : transactions?.totalCount.toLocaleString() || 0}
+            {loadingSummary ? '...' : picksPerHour}
           </p>
         </div>
         <div className="bg-white p-6 rounded-lg shadow">
-          <p className="text-sm font-medium text-gray-600">Users Active</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium text-gray-600">Users Active</p>
+            {renderTooltip('usersActive')}
+          </div>
           <p className="mt-2 text-3xl font-semibold text-gray-900">
             {loadingSummary
               ? '...'
@@ -419,81 +500,6 @@ export default function Dashboard() {
           />
         );
       })()}
-
-      {/* Transactions Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Recent Transactions</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Time
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  SKU
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Type
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Quantity
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Location
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  User
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {loadingTransactions ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">
-                    Loading...
-                  </td>
-                </tr>
-              ) : transactions?.transactions.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">
-                    No transactions for selected period
-                  </td>
-                </tr>
-              ) : (
-                transactions?.transactions.map((tx) => (
-                  <tr key={tx.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {format(new Date(tx.occurredAtUtc), 'MMM d, h:mm a')}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {tx.sku}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded">
-                        {tx.transactionType || 'N/A'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <span className={tx.quantityChange < 0 ? 'text-red-600' : 'text-green-600'}>
-                        {tx.quantityChange > 0 ? '+' : ''}{tx.quantityChange}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {tx.location?.code || 'N/A'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {tx.performedBy?.split('@')[0] || 'Unknown'}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
 
       {/* Picker Performance Modal */}
       {selectedPicker && (

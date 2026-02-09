@@ -9,8 +9,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 
 -- Drop tables
 DROP TABLE `InventoryLevels`;
-DROP TABLE `SkuVaultProducts`;
-DROP TABLE `SkuVaultLocations`;
+
 
 -- Recreate InventoryLevels with correct schema and FKs
 CREATE TABLE `InventoryLevels` (

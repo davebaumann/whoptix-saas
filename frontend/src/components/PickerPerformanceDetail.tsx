@@ -1,7 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { X, BarChart3, TrendingUp, Calendar, User } from 'lucide-react';
+import { X, BarChart3, TrendingUp, Calendar, User, Info } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { format, startOfToday, subDays } from 'date-fns';
+import { apiClient } from '../api/client';
+
+interface PickerTooltip {
+  [key: string]: string
+}
+
+const PICKER_METRIC_TOOLTIPS: PickerTooltip = {
+  totalTransactions: 'Total count of all transactions (picks, adds, removes, etc.) performed by this picker during the selected period',
+  totalQuantity: 'Sum of all item quantities affected by this picker\'s transactions during the selected period',
+  averagePerDay: 'Average number of transactions per day this picker performed during the selected period',
+  picksPerHour: 'Average number of picks (inventory removals) per hour - a measure of this picker\'s productivity'
+}
 
 interface PickerPerformanceDetailProps {
   customerId: number;
@@ -17,35 +30,61 @@ const PickerPerformanceDetail: React.FC<PickerPerformanceDetailProps> = ({
   dateRange
 }) => {
   const [period, setPeriod] = useState<'day' | 'week' | 'month'>('day');
+  const [hoveredTooltip, setHoveredTooltip] = useState<string | null>(null);
 
+  const renderTooltip = (key: string) => (
+    <div className="relative group inline-block">
+      <Info 
+        className="w-3 h-3 text-gray-400 hover:text-gray-600 cursor-help inline"
+        onMouseEnter={() => setHoveredTooltip(key)}
+        onMouseLeave={() => setHoveredTooltip(null)}
+      />
+      {hoveredTooltip === key && (
+        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-xs rounded p-2 z-20 pointer-events-none">
+          {PICKER_METRIC_TOOLTIPS[key]}
+          <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+        </div>
+      )}
+    </div>
+  );
 
+  // Calculate date range based on selected period
+  const calculatedDateRange = useMemo(() => {
+    const now = new Date();
+    switch (period) {
+      case 'day':
+        return {
+          from: format(startOfToday(), 'yyyy-MM-dd'),
+          to: format(now, "yyyy-MM-dd'T'HH:mm:ss")
+        };
+      case 'week':
+        return {
+          from: format(subDays(now, 7), 'yyyy-MM-dd'),
+          to: format(now, "yyyy-MM-dd'T'HH:mm:ss")
+        };
+      case 'month':
+        return {
+          from: format(subDays(now, 30), 'yyyy-MM-dd'),
+          to: format(now, "yyyy-MM-dd'T'HH:mm:ss")
+        };
+      default:
+        return dateRange || { from: '', to: '' };
+    }
+  }, [period, dateRange]);
 
   const { data: performanceData, isLoading, error } = useQuery({
-    queryKey: ['picker-detail', customerId, pickerName, period, dateRange],
+    queryKey: ['picker-detail', customerId, pickerName, period],
     queryFn: async () => {
-      const params = new URLSearchParams({
+      console.log('Fetching picker data:', { customerId, pickerName, period, dateRange: calculatedDateRange });
+
+      const data = await apiClient.getPickerDetail(
+        customerId,
+        pickerName,
         period,
-        ...(dateRange?.from && { from: dateRange.from }),
-        ...(dateRange?.to && { to: dateRange.to })
-      });
-
-      console.log('Fetching picker data:', { customerId, pickerName, period, dateRange });
-
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/api/Picker/customer/${customerId}/picker/${encodeURIComponent(pickerName)}?${params}`,
-        {
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' }
-        }
+        calculatedDateRange.from,
+        calculatedDateRange.to
       );
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('API Error:', response.status, errorText);
-        throw new Error(`Failed to fetch picker performance data: ${response.status}`);
-      }
-
-      const data = await response.json();
       console.log('Received picker data:', data);
       return data;
     }
@@ -61,8 +100,20 @@ const PickerPerformanceDetail: React.FC<PickerPerformanceDetailProps> = ({
       case 'month':
         return 'Daily Performance (Month View)'
       default:
-        return 'Performance Over Time'
+        return 'Performance over Time'
     }
+  };
+
+  // Calculate picks per hour based on date range
+  const calculatePicksPerHour = () => {
+    if (!calculatedDateRange.from || !calculatedDateRange.to) return 0;
+    if (!performanceData?.summary?.pickCount) return 0;
+
+    const from = new Date(calculatedDateRange.from);
+    const to = new Date(calculatedDateRange.to);
+    const hours = Math.max((to.getTime() - from.getTime()) / (1000 * 60 * 60), 1);
+    
+    return (performanceData.summary.pickCount / hours).toFixed(1);
   };
 
   return (
@@ -132,10 +183,13 @@ const PickerPerformanceDetail: React.FC<PickerPerformanceDetailProps> = ({
               {/* Summary Cards */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                 <div className="bg-blue-50 rounded-lg p-4">
-                  <div className="flex items-center">
-                    <BarChart3 className="h-8 w-8 text-blue-600" />
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-blue-600">Total Transactions</p>
+                  <div className="flex items-start">
+                    <BarChart3 className="h-8 w-8 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <div className="ml-3 flex-1">
+                      <div className="flex items-center gap-1">
+                        <p className="text-sm font-medium text-blue-600">Total Transactions</p>
+                        {renderTooltip('totalTransactions')}
+                      </div>
                       <p className="text-2xl font-bold text-blue-900">
                         {performanceData?.summary?.totalTransactions?.toLocaleString() || '0'}
                       </p>
@@ -144,10 +198,13 @@ const PickerPerformanceDetail: React.FC<PickerPerformanceDetailProps> = ({
                 </div>
 
                 <div className="bg-green-50 rounded-lg p-4">
-                  <div className="flex items-center">
-                    <TrendingUp className="h-8 w-8 text-green-600" />
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-green-600">Total Quantity</p>
+                  <div className="flex items-start">
+                    <TrendingUp className="h-8 w-8 text-green-600 mt-0.5 flex-shrink-0" />
+                    <div className="ml-3 flex-1">
+                      <div className="flex items-center gap-1">
+                        <p className="text-sm font-medium text-green-600">Total Quantity</p>
+                        {renderTooltip('totalQuantity')}
+                      </div>
                       <p className="text-2xl font-bold text-green-900">
                         {performanceData?.summary?.totalQuantity?.toLocaleString() || '0'}
                       </p>
@@ -156,10 +213,13 @@ const PickerPerformanceDetail: React.FC<PickerPerformanceDetailProps> = ({
                 </div>
 
                 <div className="bg-purple-50 rounded-lg p-4">
-                  <div className="flex items-center">
-                    <Calendar className="h-8 w-8 text-purple-600" />
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-purple-600">Average Per Day</p>
+                  <div className="flex items-start">
+                    <Calendar className="h-8 w-8 text-purple-600 mt-0.5 flex-shrink-0" />
+                    <div className="ml-3 flex-1">
+                      <div className="flex items-center gap-1">
+                        <p className="text-sm font-medium text-purple-600">Average Per Day</p>
+                        {renderTooltip('averagePerDay')}
+                      </div>
                       <p className="text-2xl font-bold text-purple-900">
                         {Math.round(performanceData?.summary?.averagePerDay || 0)}
                       </p>
@@ -168,14 +228,17 @@ const PickerPerformanceDetail: React.FC<PickerPerformanceDetailProps> = ({
                 </div>
 
                 <div className="bg-orange-50 rounded-lg p-4">
-                  <div className="flex items-center">
-                    <div className="h-8 w-8 bg-orange-600 rounded-full flex items-center justify-center text-white font-bold">
+                  <div className="flex items-start">
+                    <div className="h-8 w-8 bg-orange-600 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0">
                       P
                     </div>
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-orange-600">Pick Count</p>
+                    <div className="ml-3 flex-1">
+                      <div className="flex items-center gap-1">
+                        <p className="text-sm font-medium text-orange-600">Picks Per Hour</p>
+                        {renderTooltip('picksPerHour')}
+                      </div>
                       <p className="text-2xl font-bold text-orange-900">
-                        {performanceData?.summary?.pickCount || 0}
+                        {calculatePicksPerHour()}
                       </p>
                     </div>
                   </div>

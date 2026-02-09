@@ -1,14 +1,17 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, ArrowRight, AlertCircle, CheckCircle } from 'lucide-react';
+import { Lock, ArrowRight, AlertCircle, CheckCircle, Key } from 'lucide-react';
 
 export default function SkuVaultConnection() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [tenantToken, setTenantToken] = useState('');
+  const [userToken, setUserToken] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [useTokens, setUseTokens] = useState(false);
 
   const handleConnect = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -16,8 +19,14 @@ export default function SkuVaultConnection() {
     setIsLoading(true);
 
     try {
-      if (!email || !password) {
-        throw new Error('Please enter both email and password');
+      if (useTokens) {
+        if (!tenantToken || !userToken) {
+          throw new Error('Please enter both tenant token and user token');
+        }
+      } else {
+        if (!email || !password) {
+          throw new Error('Please enter both email and password');
+        }
       }
 
       const response = await fetch(`/api/customers/connect-skuvault`, {
@@ -26,10 +35,11 @@ export default function SkuVaultConnection() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          email,
-          password
-        }),
+        body: JSON.stringify(
+          useTokens 
+            ? { tenantToken, userToken }
+            : { email, password }
+        ),
       });
 
       if (!response.ok) {
@@ -82,8 +92,12 @@ export default function SkuVaultConnection() {
       <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full">
         {/* Header */}
         <div className="flex justify-center mb-6">
-          <div className="bg-blue-100 rounded-full p-4">
-            <Lock className="w-8 h-8 text-blue-600" />
+          <div className={`${useTokens ? 'bg-purple-100' : 'bg-blue-100'} rounded-full p-4`}>
+            {useTokens ? (
+              <Key className="w-8 h-8 text-purple-600" />
+            ) : (
+              <Lock className="w-8 h-8 text-blue-600" />
+            )}
           </div>
         </div>
 
@@ -92,52 +106,110 @@ export default function SkuVaultConnection() {
         </h1>
 
         <p className="text-center text-gray-600 mb-6">
-          Enter your SkuVault account credentials to enable automatic syncing of your inventory data.
+          {useTokens
+            ? 'Enter your SkuVault API tokens to enable automatic syncing.'
+            : 'Enter your SkuVault account credentials to enable automatic syncing of your inventory data.'}
         </p>
 
         {/* Info Box */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-          <p className="text-sm text-blue-900">
-            <strong>Using your SkuVault login:</strong>
+        <div className={`${useTokens ? 'bg-purple-50 border-purple-200' : 'bg-blue-50 border-blue-200'} border rounded-lg p-4 mb-6`}>
+          <p className={`text-sm ${useTokens ? 'text-purple-900' : 'text-blue-900'} font-semibold`}>
+            {useTokens ? 'Using API Tokens:' : 'Using your SkuVault login:'}
           </p>
-          <p className="text-sm text-blue-800 mt-2">
-            Enter the same email and password you use to log in to SkuVault.
+          <p className={`text-sm ${useTokens ? 'text-purple-800' : 'text-blue-800'} mt-2`}>
+            {useTokens
+              ? 'Get your tokens from your SkuVault account settings. They work just like your credentials.'
+              : 'Enter the same email and password you use to log in to SkuVault.'}
           </p>
+        </div>
+
+        {/* Toggle Link */}
+        <div className="text-center mb-6">
+          <button
+            type="button"
+            onClick={() => {
+              setUseTokens(!useTokens);
+              setError(null);
+            }}
+            className="text-sm text-blue-600 hover:text-blue-700 underline"
+          >
+            {useTokens
+              ? 'Prefer to use your login credentials instead?'
+              : 'Not comfortable entering your login? Use API tokens instead.'}
+          </button>
         </div>
 
         {/* Form */}
         <form onSubmit={handleConnect} className="space-y-4">
-          {/* Email Input */}
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-              SkuVault Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="your@skuvault.com"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              disabled={isLoading}
-            />
-          </div>
+          {!useTokens ? (
+            <>
+              {/* Email Input */}
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                  SkuVault Email
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="your@skuvault.com"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  disabled={isLoading}
+                />
+              </div>
 
-          {/* Password Input */}
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-              SkuVault Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your SkuVault password"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              disabled={isLoading}
-            />
-          </div>
+              {/* Password Input */}
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                  SkuVault Password
+                </label>
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your SkuVault password"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  disabled={isLoading}
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Tenant Token Input */}
+              <div>
+                <label htmlFor="tenantToken" className="block text-sm font-medium text-gray-700 mb-1">
+                  SkuVault Tenant Token
+                </label>
+                <input
+                  id="tenantToken"
+                  type="password"
+                  value={tenantToken}
+                  onChange={(e) => setTenantToken(e.target.value)}
+                  placeholder="Your tenant token"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                  disabled={isLoading}
+                />
+              </div>
+
+              {/* User Token Input */}
+              <div>
+                <label htmlFor="userToken" className="block text-sm font-medium text-gray-700 mb-1">
+                  SkuVault User Token
+                </label>
+                <input
+                  id="userToken"
+                  type="password"
+                  value={userToken}
+                  onChange={(e) => setUserToken(e.target.value)}
+                  placeholder="Your user token"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                  disabled={isLoading}
+                />
+              </div>
+            </>
+          )}
 
           {/* Error Message */}
           {error && (
@@ -151,7 +223,7 @@ export default function SkuVaultConnection() {
           <div className="space-y-3 pt-4">
             <button
               type="submit"
-              disabled={isLoading || !email || !password}
+              disabled={isLoading || (useTokens ? !tenantToken || !userToken : !email || !password)}
               className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? (
@@ -184,7 +256,7 @@ export default function SkuVaultConnection() {
         {/* Security Note */}
         <p className="text-xs text-gray-500 text-center mt-6 flex items-center justify-center gap-1">
           <Lock className="w-3 h-3" />
-          Your credentials are encrypted and stored securely.
+          Your credentials and tokens are encrypted and stored securely.
         </p>
       </div>
     </div>

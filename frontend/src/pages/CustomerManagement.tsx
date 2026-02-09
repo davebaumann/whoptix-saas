@@ -117,6 +117,31 @@ export default function AdminDashboard() {
     },
   })
 
+  const refreshTokensMutation = useMutation({
+    mutationFn: (customerId: number) => {
+      const token = localStorage.getItem('token')
+      return fetch(`/api/customers/refresh-skuvault-tokens`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ customerId }),
+        credentials: 'include',
+      }).then(res => {
+        if (!res.ok) throw new Error('Failed to refresh tokens')
+        return res.json()
+      })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adminCustomers'] })
+      alert('SkuVault tokens refreshed successfully!')
+    },
+    onError: (error: Error) => {
+      alert(`Failed to refresh tokens: ${error.message}`)
+    },
+  })
+
   const handleMembershipEdit = (customer: AdminCustomerResponse) => {
     setSelectedCustomer(customer)
     const membershipCustomer = membershipCustomers?.find(mc => mc.id === customer.id)
@@ -125,17 +150,41 @@ export default function AdminDashboard() {
     setShowMembershipModal(true)
   }
 
-  const handleViewAsCustomer = (customer: AdminCustomerResponse) => {
-    // Store admin context and switch to customer view
-    sessionStorage.setItem('adminViewingAs', JSON.stringify({
-      adminId: 'current-admin-id', // You'd get this from auth context
-      customerId: customer.id,
-      customerName: customer.name,
-      timestamp: new Date().toISOString()
-    }))
-    
-    // Navigate to customer dashboard
-    window.location.href = '/app/dashboard'
+  const handleViewAsCustomer = async (customer: AdminCustomerResponse) => {
+    try {
+      // Call backend endpoint to verify impersonation is allowed
+      const response = await fetch(`/api/admin/impersonate/${customer.id}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        credentials: 'include',
+      })
+      
+      if (!response.ok) {
+        alert('Failed to impersonate customer')
+        return
+      }
+
+      const impersonationData = await response.json()
+
+      // Store admin impersonation context in sessionStorage
+      sessionStorage.setItem('adminViewingAs', JSON.stringify({
+        adminId: 'current-admin-id',
+        customerId: customer.id,
+        customerName: customer.name,
+        customerEmail: customer.email,
+        membershipLevel: impersonationData.membershipLevel,
+        tenantId: impersonationData.tenantId,
+        timestamp: new Date().toISOString()
+      }))
+      
+      // Navigate to customer dashboard
+      // The AdminViewingBanner component will show that admin is viewing as customer
+      window.location.href = '/app/dashboard'
+    } catch (error) {
+      alert(`Failed to impersonate customer: ${error}`)
+    }
   }
 
   const handleCustomerDetails = async (customer: AdminCustomerResponse) => {
@@ -227,7 +276,7 @@ export default function AdminDashboard() {
           </button>
         </div>
 
-        <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="bg-white rounded-lg shadow overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -313,6 +362,14 @@ export default function AdminDashboard() {
                           >
                             <Activity className="w-3 h-3 mr-1" />
                             {syncMutation.isPending ? 'Syncing...' : 'Sync'}
+                          </button>
+                          <button
+                            onClick={() => refreshTokensMutation.mutate(customer.id)}
+                            disabled={refreshTokensMutation.isPending}
+                            className="inline-flex items-center px-2 py-1 text-xs font-medium text-orange-600 bg-orange-50 rounded hover:bg-orange-100 disabled:opacity-50"
+                            title="Refresh SkuVault tokens using saved credentials"
+                          >
+                            {refreshTokensMutation.isPending ? 'Refreshing...' : 'Refresh Tokens'}
                           </button>
                           <button
                             onClick={() => handleViewAsCustomer(customer)}

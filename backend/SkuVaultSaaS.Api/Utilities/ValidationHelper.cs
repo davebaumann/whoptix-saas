@@ -36,13 +36,15 @@ namespace SkuVaultSaaS.Api.Utilities
                 return (false, $"Start date must be within {MaxDaysInPast / 365} years.");
             }
 
-            // Check if dates are in future
-            if (startDate.Value > DateTime.UtcNow)
+            // Check if dates are in future (allow times throughout current day)
+            var tomorrowStart = DateTime.UtcNow.Date.AddDays(1);
+            
+            if (startDate.Value >= tomorrowStart)
             {
                 return (false, "Start date cannot be in the future.");
             }
 
-            if (endDate.Value > DateTime.UtcNow)
+            if (endDate.Value >= tomorrowStart)
             {
                 return (false, "End date cannot be in the future.");
             }

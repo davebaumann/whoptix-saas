@@ -35,11 +35,17 @@ export default function LowStockReport() {
     )
   }
 
-  const customerId = user.customerId || 1 // Fallback to customer 1 if no association
+  // Check if admin is viewing as another customer
+  const adminViewingData = sessionStorage.getItem('adminViewingAs');
+  const adminViewingCustomerId = adminViewingData ? JSON.parse(adminViewingData).customerId : null;
+  
+  // Use impersonated customer ID if admin is viewing as, otherwise use user's own customer ID
+  const customerId = adminViewingCustomerId || user.customerId || 1 // Fallback to customer 1 if no association
   
   // Debug logging
   console.log('LowStockReport - User:', user)
-  console.log('LowStockReport - Customer ID:', customerId)
+  console.log('LowStockReport - Admin Viewing As:', adminViewingCustomerId)
+  console.log('LowStockReport - Effective Customer ID:', customerId)
 
   const { data: lowStockData, isLoading } = useQuery({
     queryKey: ['lowStockReport', customerId, threshold, currentPage],

@@ -12,7 +12,11 @@ namespace SkuVaultSaaS.Infrastructure.SkuVaultSaaSApi
         Task<List<SkuVaultInventoryDto>> GetInventoryAsync(string tenantToken, string userToken);
         Task<List<SkuVaultInventoryMovementDto>> GetInventoryMovementsAsync(string tenantToken, string userToken, DateTime? fromDate = null, DateTime? toDate = null);
         Task<List<SkuVaultSaleDto>> GetSalesAsync(string tenantToken, string userToken, DateTime? fromDate = null, DateTime? toDate = null);
-        Task<List<SkuVaultShipmentDto>> GetShipmentsAsync(string tenantToken, string userToken, DateTime? fromDate = null, DateTime? toDate = null);
+        Task<List<SkuVaultSaleDto>> GetSalesByDateAsync(string tenantToken, string userToken, DateTime? fromDate = null, DateTime? toDate = null);
+        Task<List<SkuVaultShipmentDto>> GetShipmentsAsync(string tenantToken, string userToken, List<string>? saleIds = null);
+        Task<List<SkuVaultPurchaseOrderDto>> GetPurchaseOrdersAsync(string tenantToken, string userToken, DateTime? fromDate = null, DateTime? toDate = null, string? status = null);
+        Task<SkuVaultReceivesHistoryDto> GetReceivesHistoryAsync(string tenantToken, string userToken, DateTime? fromDate = null, DateTime? toDate = null, List<string>? poNumberFilter = null);
+        Task<List<SkuVaultIntegrationDto>> GetIntegrationsAsync(string tenantToken, string userToken);
     }
 
     public class SkuVaultTokensDto
@@ -78,14 +82,26 @@ namespace SkuVaultSaaS.Infrastructure.SkuVaultSaaSApi
     public class SkuVaultShipmentDto
     {
         public string ShipmentId { get; set; } = string.Empty;
+        public string SaleId { get; set; } = string.Empty;
         public string OrderId { get; set; } = string.Empty;
+        public string Source { get; set; } = string.Empty;
         public string TrackingNumber { get; set; } = string.Empty;
         public string Carrier { get; set; } = string.Empty;
         public string Service { get; set; } = string.Empty;
+        public string Class { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
         public DateTime ShippedDate { get; set; }
         public DateTime CreatedDate { get; set; }
         public DateTime UpdatedDate { get; set; }
+        public DateTime EstimatedShipDate { get; set; }
+        public DateTime EstimatedDeliveryDate { get; set; }
         public string Status { get; set; } = string.Empty;
+        public string AlternateId { get; set; } = string.Empty;
+        public string ManifestId { get; set; } = string.Empty;
+        public string Note { get; set; } = string.Empty;
+        public decimal TotalWeight { get; set; }
+        public string WeightUnit { get; set; } = string.Empty;
+        public string TrackingUrl { get; set; } = string.Empty;
         public decimal ShippingCost { get; set; }
         public string RecipientName { get; set; } = string.Empty;
         public string RecipientAddress { get; set; } = string.Empty;
@@ -93,6 +109,77 @@ namespace SkuVaultSaaS.Infrastructure.SkuVaultSaaSApi
         public string RecipientState { get; set; } = string.Empty;
         public string RecipientZip { get; set; } = string.Empty;
         public string RecipientCountry { get; set; } = string.Empty;
+    }
+
+    public class SkuVaultIntegrationDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string? LongId { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
+    }
+
+    public class SkuVaultPurchaseOrderDto
+    {
+        public string PoId { get; set; } = string.Empty;
+        public string PoNumber { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public string PaymentStatus { get; set; } = string.Empty;
+        public string SentStatus { get; set; } = string.Empty;
+        public string SupplierName { get; set; } = string.Empty;
+        public DateTime CreatedDate { get; set; }
+        public DateTime OrderDate { get; set; }
+        public DateTime OrderCancelDate { get; set; }
+        public DateTime ArrivalDueDate { get; set; }
+        public DateTime RequestedShipDate { get; set; }
+        public DateTime ActualShippedDate { get; set; }
+        public string TrackingInfo { get; set; } = string.Empty;
+        public string PublicNotes { get; set; } = string.Empty;
+        public string PrivateNotes { get; set; } = string.Empty;
+        public string TermsName { get; set; } = string.Empty;
+        public string ShipToWarehouse { get; set; } = string.Empty;
+        public string ShipToAddress { get; set; } = string.Empty;
+        public string CarrierName { get; set; } = string.Empty;
+        public string ClassName { get; set; } = string.Empty;
+        public int LineItemCount { get; set; }
+        public decimal TotalCost { get; set; }
+    }
+
+    public class SkuVaultReceiveDto
+    {
+        public string Code { get; set; } = string.Empty;
+        public string PONumber { get; set; } = string.Empty;
+        public string PartNumber { get; set; } = string.Empty;
+        public string SKU { get; set; } = string.Empty;
+        public int Quantity { get; set; }
+        public int Quantity3pl { get; set; }
+        public int QuantityToLocation { get; set; }
+        public DateTime ReceiptDate { get; set; }
+        public DateTime ReceivedDate { get; set; }
+        public string Location { get; set; } = string.Empty;
+        public string Warehouse { get; set; } = string.Empty;
+        public string Username { get; set; } = string.Empty;
+    }
+
+    public class SkuVaultReceiveCorrectionDto
+    {
+        public string Code { get; set; } = string.Empty;
+        public string PONumber { get; set; } = string.Empty;
+        public string PartNumber { get; set; } = string.Empty;
+        public string SKU { get; set; } = string.Empty;
+        public int OldQuantity { get; set; }
+        public int NewQuantity { get; set; }
+        public int OldQuantity3pl { get; set; }
+        public int NewQuantity3pl { get; set; }
+        public DateTime CorrectedDate { get; set; }
+        public DateTime ReceivedDate { get; set; }
+        public string Username { get; set; } = string.Empty;
+    }
+
+    public class SkuVaultReceivesHistoryDto
+    {
+        public List<SkuVaultReceiveDto> Receives { get; set; } = new();
+        public List<SkuVaultReceiveCorrectionDto> Corrections { get; set; } = new();
     }
 }
 

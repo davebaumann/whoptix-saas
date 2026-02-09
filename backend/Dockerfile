@@ -30,6 +30,9 @@ COPY --from=publish /app/publish .
 # Copy appsettings files directly from source context (not from build stage)
 COPY SkuVaultSaaS.Api/appsettings.Production.json ./
 
+# Create directory for data protection keys
+RUN mkdir -p /app/data-protection-keys
+
 # Expose port (App Runner uses 8080 by default)
 EXPOSE 8080
 

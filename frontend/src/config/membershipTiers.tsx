@@ -25,11 +25,12 @@ export const MEMBERSHIP_TIERS: MembershipTier[] = [
     description: 'Essential SkuVault optimization features for growing businesses',
     features: [
       'SkuVault Integration',
-      'Low Stock Alerts',
+      'Low Stock Reports',
       'Email Notifications',
       'Threshold Management',
       'Inventory Reports',
-      'Priority Support'
+      '2 Users',
+      'Email Support'
     ]
   },
   {
@@ -43,12 +44,15 @@ export const MEMBERSHIP_TIERS: MembershipTier[] = [
     description: 'Comprehensive analytics and reporting for established businesses',
     features: [
       'All Standard Features',
+      'Low Stock Email Alerts',
       'Aging Inventory Reports',
       'Profitability Analysis',
       'Demand Forecasting',
       'Financial Warehouse Reports',
       'Location Optimization',
       'Advanced Analytics',
+      '5 Users',
+      'Email Support',
       'Phone Support'
     ],
     popular: true
@@ -70,6 +74,7 @@ export const MEMBERSHIP_TIERS: MembershipTier[] = [
       'Growth Trends',
       'Top/Bottom Performers',
       'Custom Integrations',
+      '10 Users',
       'Dedicated Account Manager'
     ],
     popular: false

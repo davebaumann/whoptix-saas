@@ -74,7 +74,12 @@ export default function FinancialWarehouseReport() {
     )
   }
 
-  const customerId = user.customerId || 1
+  // Check if admin is viewing as another customer
+  const adminViewingData = sessionStorage.getItem('adminViewingAs');
+  const adminViewingCustomerId = adminViewingData ? JSON.parse(adminViewingData).customerId : null;
+  
+  // Use impersonated customer ID if admin is viewing as, otherwise use user's own customer ID
+  const customerId = adminViewingCustomerId || user.customerId || 1
 
   const { data: financialData, isLoading } = useQuery<FinancialWarehouseResponse>({
     queryKey: ['financialWarehouseReport', customerId],

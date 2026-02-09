@@ -18,8 +18,27 @@ export const MembershipProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
 
+  // Get effective customer ID (impersonated or own)
+  const getEffectiveCustomerId = (): number | null => {
+    // Check if admin is impersonating a customer
+    const adminViewingAs = sessionStorage.getItem('adminViewingAs');
+    if (adminViewingAs) {
+      try {
+        const impersonationData = JSON.parse(adminViewingAs);
+        if (impersonationData.customerId) {
+          return impersonationData.customerId;
+        }
+      } catch (e) {
+        // Invalid impersonation data, fall through
+      }
+    }
+    return user?.customerId || null;
+  };
+
   const refreshMembership = async () => {
-    if (!user?.customerId) {
+    const effectiveCustomerId = getEffectiveCustomerId();
+    
+    if (!effectiveCustomerId) {
       console.warn('MembershipProvider: No customerId found', { customerId: user?.customerId });
       setMembershipInfo(null);
       setLoading(false);
@@ -29,18 +48,18 @@ export const MembershipProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     try {
       setLoading(true);
       setError(null);
-      console.log('Fetching membership info for customerId:', user.customerId);
+      console.log('Fetching membership info for customerId:', effectiveCustomerId);
       
       // Small delay to ensure webhook has completed
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      const info = await membershipService.getMembershipInfo(user.customerId);
+      const info = await membershipService.getMembershipInfo(effectiveCustomerId);
       console.log('Membership info received:', info);
       setMembershipInfo(info);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to load membership information';
       setError(errorMsg);
-      console.error('Error loading membership info:', err, { customerId: user?.customerId });
+      console.error('Error loading membership info:', err, { customerId: effectiveCustomerId });
     } finally {
       setLoading(false);
     }
@@ -54,6 +73,23 @@ export const MembershipProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   useEffect(() => {
     refreshMembership();
   }, [user?.customerId]);
+
+  // Listen for changes to adminViewingAs in sessionStorage
+  useEffect(() => {
+    const handleStorageChange = () => {
+      console.log('[MembershipContext] Admin viewing context changed, refreshing membership');
+      refreshMembership();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    // Also listen for custom events from AdminViewingBanner
+    window.addEventListener('adminViewingAsChanged', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('adminViewingAsChanged', handleStorageChange);
+    };
+  }, []);
 
   const value: MembershipContextType = {
     membershipInfo,
