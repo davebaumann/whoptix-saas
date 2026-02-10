@@ -241,14 +241,6 @@ namespace SkuVaultSaaS.Api.Services
                 var fromName = emailSettings["FromName"];
                 var useSsl = bool.Parse(emailSettings["UseSsl"] ?? "true");
 
-                // Replace environment variable placeholder
-                if (password?.Contains("${EMAIL_PASSWORD}") == true)
-                {
-                    var envPassword = Environment.GetEnvironmentVariable("EMAIL_PASSWORD");
-                    password = password.Replace("${EMAIL_PASSWORD}", envPassword);
-                    _logger.LogInformation("Environment variable EMAIL_PASSWORD found: {Found}", !string.IsNullOrEmpty(envPassword));
-                }
-
                 _logger.LogInformation("SendEmailVerificationAsync: Config loaded - Host={Host}, Port={Port}, Username={Username}, FromEmail={FromEmail}, PasswordProvided={PasswordProvided}",
                     smtpHost, smtpPort, username, fromEmail, !string.IsNullOrEmpty(password));
 

@@ -22,7 +22,7 @@ namespace SkuVaultSaaS.Api.Controllers
         public int Days31_60 { get; set; }
         public int Days61_90 { get; set; }
         public int Days90Plus { get; set; }
-        public DateTime OldestReceiveDate { get; set; }
+        public DateTime? OldestReceiveDate { get; set; }
         public double AverageDaysOld { get; set; }
     }
 
@@ -452,197 +452,134 @@ namespace SkuVaultSaaS.Api.Controllers
             // Check tenant access and membership level
             var accessCheck = await CheckReportAccessAsync(customerId, "aging-inventory");
             if (accessCheck != null) return accessCheck;
+            
             try
             {
-                // Get ONLY current inventory state using database-level filtering to minimize memory
-                // Limit to most recent 50k transactions to prevent massive result set grouping
                 var cutoffDate = DateTime.UtcNow.Date;
-                var transactionHistoryCutoff = cutoffDate.AddYears(-3);
+                var transactionHistoryCutoff = cutoffDate.AddYears(-2); // Reduced from 3 to 2 years
                 
-                var currentInventoryState = await _context.Transactions
+                // Get current inventory with positive quantities
+                var currentInventory = await _context.InventoryLevels
                     .AsNoTracking()
-                    .Where(t => t.CustomerId == customerId && t.QuantityAfter > 0 && t.TransactionDate >= transactionHistoryCutoff)
-                    .OrderByDescending(t => t.TransactionDate)
-                    .Take(50000)  // Hard limit on transactions to group - prevents huge GroupBy result sets
-                    .GroupBy(t => new { t.Sku, t.LocationId })
-                    .Select(g => new
-                    {
-                        g.Key.Sku,
-                        g.Key.LocationId,
-                        MostRecentTransaction = g.OrderByDescending(t => t.TransactionDate).FirstOrDefault()
-                    })
+                    .Where(il => il.CustomerId == customerId && il.QuantityAvailable > 0)
+                    .Include(il => il.Product)
+                    .Include(il => il.Location)
                     .ToListAsync();
 
-                // If no inventory exists, return empty result immediately
-                if (!currentInventoryState.Any())
+                if (!currentInventory.Any())
                 {
-                    var emptySummary = new AgingInventorySummary
-                    {
-                        TotalSkus = 0,
-                        TotalQuantity = 0,
-                        Days0_30_Total = 0,
-                        Days31_60_Total = 0,
-                        Days61_90_Total = 0,
-                        Days90Plus_Total = 0
-                    };
-
                     return Ok(new
                     {
                         reportDate = DateTime.UtcNow,
-                        summary = emptySummary,
+                        summary = new AgingInventorySummary(),
                         details = new List<AgingInventoryItem>()
                     });
                 }
 
-                // Get ALL transactions ONLY for SKU+Location combinations that have current inventory
-                // Process each SKU+Location separately to avoid loading massive result sets into memory
-                // This prevents timeout and memory exhaustion on large datasets
-                var skuLocationPairs = currentInventoryState.Select(x => new { x.Sku, x.LocationId }).Distinct().ToList();
-                
-                // Get only locations for SKUs that have current inventory (memory optimization)
-                var locationIds = currentInventoryState.Where(x => x.LocationId.HasValue).Select(x => x.LocationId.Value).Distinct().ToList();
-                var locations = await _context.Locations
+                // Get SKUs and LocationIds that have current inventory
+                var skusWithInventory = currentInventory.Select(i => i.Product.Sku).Distinct().ToList();
+                var locationIdsWithInventory = currentInventory.Where(i => i.LocationId > 0).Select(i => i.LocationId).Distinct().ToList();
+
+                // Fetch ALL relevant transactions in ONE query (memory optimized with AsNoTracking)
+                var transactions = await _context.Transactions
                     .AsNoTracking()
-                    .Where(l => l.CustomerId == customerId && (locationIds.Count == 0 || locationIds.Contains(l.Id)))
-                    .ToDictionaryAsync(l => l.Id);
+                    .Where(t => t.CustomerId == customerId && 
+                                t.TransactionDate >= transactionHistoryCutoff &&
+                                skusWithInventory.Contains(t.Sku) &&
+                                (!t.LocationId.HasValue || locationIdsWithInventory.Contains(t.LocationId.Value)))
+                    .OrderBy(t => t.TransactionDate)
+                    .ToListAsync();
 
                 var agingResults = new List<AgingInventoryItem>();
 
-                // Process each SKU+LocationId pair individually to avoid loading massive datasets into memory
-                foreach (var pair in skuLocationPairs)
+                // Process each inventory item
+                foreach (var invLevel in currentInventory)
                 {
-                    var sku = pair.Sku;
-                    var locationId = pair.LocationId;
-                    
-                    // Fetch ONLY transactions for THIS SKU+Location AFTER the history cutoff
-                    // Add hard limit to prevent loading massive result sets for high-volume SKUs
-                    var transactions = await _context.Transactions
-                        .AsNoTracking()
-                        .Where(t => t.CustomerId == customerId && 
-                                    t.Sku == sku &&
-                                    (!locationId.HasValue || t.LocationId == locationId) &&
-                                    t.TransactionDate >= transactionHistoryCutoff)  // CRITICAL: Only recent history
-                        .OrderByDescending(t => t.TransactionDate)
-                        .Take(10000)  // Hard limit: most recent 10k transactions is enough for FIFO aging calc
-                        .OrderBy(t => t.TransactionDate)
-                        .ToListAsync();
-
                     try
                     {
-                        // Find the most recent transaction for this (SKU, Location)
-                        // If no recent transactions but we have current inventory, assume it arrived >3 years ago
-                        var mostRecent = transactions.LastOrDefault() ?? 
-                            (transactions.Count == 0 ? new Transaction { TransactionDate = transactionHistoryCutoff.AddDays(-1) } : null);
-                        int? mostRecentQtyAfter = mostRecent?.QuantityAfter;
+                        var sku = invLevel.Product.Sku;
+                        var locationId = invLevel.LocationId;
 
-                        // FIFO batch logic (as before)
-                        var receivedBatches = transactions
-                            .Where(t => (t.TransactionType == "Add" || t.TransactionType == "Return") && t.Quantity > 0)
-                            .OrderBy(t => t.TransactionDate)
-                            .Select(t => new { t.TransactionDate, t.Quantity })
+                        // Filter transactions for this SKU+Location from in-memory list
+                        var itemTransactions = transactions
+                            .Where(t => t.Sku == sku && (locationId == 0 || t.LocationId == locationId))
                             .ToList();
 
-                        var picks = transactions
-                            .Where(t => (t.TransactionType == "Pick" || t.TransactionType == "Remove") && t.Quantity > 0)
-                            .OrderBy(t => t.TransactionDate)
-                            .ToList();
-
-                        var remainingBatches = new List<(DateTime Date, int Quantity)>();
-                        foreach (var batch in receivedBatches)
+                        if (!itemTransactions.Any())
                         {
-                            remainingBatches.Add((batch.TransactionDate, batch.Quantity));
-                        }
-
-                        foreach (var pick in picks)
-                        {
-                            int qtyToRemove = pick.Quantity;
-                            for (int i = 0; i < remainingBatches.Count && qtyToRemove > 0; i++)
-                            {
-                                if (remainingBatches[i].Quantity >= qtyToRemove)
-                                {
-                                    remainingBatches[i] = (remainingBatches[i].Date, remainingBatches[i].Quantity - qtyToRemove);
-                                    qtyToRemove = 0;
-                                }
-                                else
-                                {
-                                    qtyToRemove -= remainingBatches[i].Quantity;
-                                    remainingBatches[i] = (remainingBatches[i].Date, 0);
-                                }
-                            }
-                        }
-
-                        int days0_30 = 0, days31_60 = 0, days61_90 = 0, days90Plus = 0;
-                        DateTime oldestDate = DateTime.UtcNow;
-                        int totalRemainingQty = 0;
-
-                        foreach (var batch in remainingBatches.Where(b => b.Quantity > 0))
-                        {
-                            var daysForThisBatch = (cutoffDate - batch.Date.Date).Days;
-                            daysForThisBatch = Math.Max(0, daysForThisBatch);
-                            totalRemainingQty += batch.Quantity;
-
-                            if (batch.Date < oldestDate)
-                                oldestDate = batch.Date;
-
-                            if (daysForThisBatch <= 30)
-                                days0_30 += batch.Quantity;
-                            else if (daysForThisBatch <= 60)
-                                days31_60 += batch.Quantity;
-                            else if (daysForThisBatch <= 90)
-                                days61_90 += batch.Quantity;
-                            else
-                                days90Plus += batch.Quantity;
-                        }
-
-                        // Lookup location details
-                        string locationCode = string.Empty, locationName = string.Empty, warehouse = string.Empty;
-                        if (locationId.HasValue && locations.TryGetValue(locationId.Value, out var loc))
-                        {
-                            locationCode = loc.Code;
-                            locationName = loc.Name ?? loc.Code;
-                            warehouse = loc.Warehouse ?? string.Empty;
-                        }
-
-                        // If the most recent transaction's QuantityAfter > 0, always include this location
-                        if (mostRecentQtyAfter.HasValue && mostRecentQtyAfter.Value > 0)
-                        {
-                            // If batch math matches, use batch math for aging buckets; otherwise, put all in 0-30
-                            int useQty = mostRecentQtyAfter.Value;
-                            if (totalRemainingQty == useQty)
-                            {
-                                // Use batch math as before
-                            }
-                            else
-                            {
-                                // If batch math doesn't match, assign all to 0-30 bucket and set oldestDate to most recent
-                                days0_30 = useQty;
-                                days31_60 = 0;
-                                days61_90 = 0;
-                                days90Plus = 0;
-                                oldestDate = mostRecent?.TransactionDate ?? DateTime.UtcNow;
-                            }
-
+                            // No transaction history - assign all inventory to 90+ bucket (data received before our history window)
                             agingResults.Add(new AgingInventoryItem
                             {
                                 Sku = sku,
                                 LocationId = locationId,
-                                LocationCode = locationCode,
-                                LocationName = locationName,
-                                Warehouse = warehouse,
-                                CurrentQuantity = useQty,
-                                Days0_30 = days0_30,
-                                Days31_60 = days31_60,
-                                Days61_90 = days61_90,
-                                Days90Plus = days90Plus,
-                                OldestReceiveDate = oldestDate,
-                                AverageDaysOld = 0 // Not meaningful if batch math doesn't match
+                                LocationCode = invLevel.Location?.Code ?? "",
+                                LocationName = invLevel.Location?.Name ?? "",
+                                Warehouse = invLevel.Location?.Warehouse ?? "",
+                                CurrentQuantity = invLevel.QuantityAvailable,
+                                Days0_30 = 0,
+                                Days31_60 = 0,
+                                Days61_90 = 0,
+                                Days90Plus = invLevel.QuantityAvailable,
+                                OldestReceiveDate = null,
+                                AverageDaysOld = 0
                             });
+                            continue;
                         }
+
+                        // Get the most recent Add/Return transaction to determine aging
+                        var mostRecentReceive = itemTransactions
+                            .Where(t => (t.TransactionType == "Add" || t.TransactionType == "Return") && t.Quantity > 0)
+                            .OrderByDescending(t => t.TransactionDate)
+                            .FirstOrDefault();
+
+                        int days0_30 = 0, days31_60 = 0, days61_90 = 0, days90Plus = 0;
+                        DateTime? oldestDate = null;
+                        var currentQty = invLevel.QuantityAvailable;
+
+                        if (mostRecentReceive != null)
+                        {
+                            // Calculate days since most recent receive
+                            var daysOld = (cutoffDate - mostRecentReceive.TransactionDate.Date).Days;
+                            daysOld = Math.Max(0, daysOld);
+                            oldestDate = mostRecentReceive.TransactionDate;
+
+                            // Assign all current quantity to appropriate aging bucket based on most recent receive
+                            if (daysOld <= 30)
+                                days0_30 = currentQty;
+                            else if (daysOld <= 60)
+                                days31_60 = currentQty;
+                            else if (daysOld <= 90)
+                                days61_90 = currentQty;
+                            else
+                                days90Plus = currentQty;
+                        }
+                        else
+                        {
+                            // No receive history in dataset - assign to 90+ bucket (data received before our history window)
+                            days90Plus = currentQty;
+                            oldestDate = null;
+                        }
+
+                        agingResults.Add(new AgingInventoryItem
+                        {
+                            Sku = sku,
+                            LocationId = locationId,
+                            LocationCode = invLevel.Location?.Code ?? "",
+                            LocationName = invLevel.Location?.Name ?? "",
+                            Warehouse = invLevel.Location?.Warehouse ?? "",
+                            CurrentQuantity = currentQty,
+                            Days0_30 = days0_30,
+                            Days31_60 = days31_60,
+                            Days61_90 = days61_90,
+                            Days90Plus = days90Plus,
+                            OldestReceiveDate = oldestDate,
+                            AverageDaysOld = 0
+                        });
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogWarning(ex, "Error calculating aging for SKU {Sku} LocationId {LocationId}", sku, locationId);
-                        // Continue processing other items
+                        _logger.LogWarning(ex, "Error calculating aging for SKU {Sku} LocationId {LocationId}", 
+                            invLevel.Product.Sku, invLevel.LocationId);
                     }
                 }
 
@@ -656,18 +593,16 @@ namespace SkuVaultSaaS.Api.Controllers
                     Days90Plus_Total = agingResults.Sum(x => x.Days90Plus)
                 };
 
-                var result = Ok(new
+                // Clear collections for GC
+                transactions.Clear();
+                currentInventory.Clear();
+                
+                return Ok(new
                 {
                     reportDate = DateTime.UtcNow,
                     summary,
                     details = agingResults.OrderBy(x => x.Sku).ThenBy(x => x.LocationCode).ToList()
                 });
-
-                // Clear collections to allow garbage collection
-                currentInventoryState.Clear();
-                GC.Collect(generation: 1, mode: GCCollectionMode.Optimized);
-
-                return result;
             }
             catch (Exception ex)
             {

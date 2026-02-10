@@ -439,12 +439,12 @@ if (!string.IsNullOrWhiteSpace(jwtKey))
     });
 }
 
-// Add response caching
-builder.Services.AddResponseCaching(options =>
-{
-    options.MaximumBodySize = 1024 * 1024; // 1MB
-    options.UseCaseSensitivePaths = false;
-});
+// Response caching disabled - reports can be very large and shouldn't be cached in memory
+// builder.Services.AddResponseCaching(options =>
+// {
+//     options.MaximumBodySize = 1024 * 1024; // 1MB
+//     options.UseCaseSensitivePaths = false;
+// });
 
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
@@ -585,8 +585,8 @@ app.UseMiddleware<SkuVaultSaaS.Api.Middleware.RateLimitingMiddleware>(
         MaxRequests = 100          // 100 requests per minute per user/IP
     });
 
-// Enable response caching
-app.UseResponseCaching();
+// Response caching disabled to reduce memory usage
+// app.UseResponseCaching();
 
 // Enable HTTPS redirection
 if (app.Environment.IsDevelopment())

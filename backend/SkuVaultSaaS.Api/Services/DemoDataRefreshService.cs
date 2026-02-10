@@ -29,12 +29,10 @@ namespace SkuVaultSaaS.Api.Services
             _logger.LogInformation("========== DemoDataRefreshService.ExecuteAsync() CALLED ==========");
             _logger.LogInformation("DemoDataRefreshService starting");
 
-            // Run immediately on startup to populate demo data
-            _logger.LogInformation("About to call RefreshDemoDataAsync()");
-            await RefreshDemoDataAsync();
-            _logger.LogInformation("RefreshDemoDataAsync() completed");
+            // Skip initial run on startup - only run at scheduled time to reduce memory usage during app startup
+            _logger.LogInformation("Skipping initial demo data refresh on startup");
 
-            // Then schedule to run at 6 AM Eastern Time daily
+            // Schedule to run at 6 AM Eastern Time daily
             var nextRun = GetNextRunTime();
             _timer = new Timer(async _ => await RefreshDemoDataAsync(), null, nextRun, TimeSpan.FromHours(24));
 

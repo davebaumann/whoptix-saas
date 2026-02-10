@@ -202,7 +202,7 @@ namespace SkuVaultSaaS.Infrastructure.SkuVaultSaaSApi
 
             if (!response.IsSuccessStatusCode)
             {
-                _logger?.LogError("SkuVault getReceivesHistory failed {Status}: {Body}", (int)response.StatusCode, Truncate(raw));
+                _logger?.LogError("SkuVault getReceivesHistory failed {Status}: {Body}", (int)response.StatusCode, raw);
                 throw new HttpRequestException($"{(int)response.StatusCode}: {raw}");
             }
 

@@ -221,14 +221,11 @@ namespace SkuVaultSaaS.Infrastructure.Services
 
             _logger.LogInformation("Received {Count} sales from SkuVault API for customer {CustomerId} (from {FromDate} to {ToDate})", allSales.Count, customerId, fromDate, toDate);
 
-            // Pre-load all existing sale IDs into memory to avoid N+1 query problem
-            var existingSaleIds = new HashSet<string>(
-                await _context.Sales
-                    .Where(s => s.CustomerId == customerId)
-                    .AsNoTracking()  // Reduce memory footprint - don't track these for updates
-                    .Select(s => s.SaleId)
-                    .ToListAsync()
-            );
+            // Batch load existing sales to avoid N+1 queries
+            var apiSaleIds = allSales.Select(s => s.Id ?? s.MarketplaceId ?? string.Empty).ToList();
+            var existingSales = await _context.Sales
+                .Where(s => s.CustomerId == customerId && apiSaleIds.Contains(s.SaleId))
+                .ToDictionaryAsync(s => s.SaleId, s => s);
 
             int added = 0, updated = 0, saleItemsAdded = 0;
             DateTime? latestSaleDate = null;
@@ -243,28 +240,23 @@ namespace SkuVaultSaaS.Infrastructure.Services
                 var saleId = apiSale.Id ?? apiSale.MarketplaceId ?? string.Empty;
                 
                 // Always save the sale record, even if it has no items
-                if (existingSaleIds.Contains(saleId))
+                if (existingSales.TryGetValue(saleId, out var existingSale))
                 {
-                    // For updates, we still need to fetch the existing record
-                    var existingSale = await _context.Sales.FirstOrDefaultAsync(s => s.SaleId == saleId && s.CustomerId == customerId);
-                    if (existingSale != null)
+                    // Update with first item if available
+                    var firstItem = merchantItems?.FirstOrDefault() ?? fulfilledItems?.FirstOrDefault();
+                    if (firstItem != null)
                     {
-                        // Update with first item if available
-                        var firstItem = merchantItems?.FirstOrDefault() ?? fulfilledItems?.FirstOrDefault();
-                        if (firstItem != null)
-                        {
-                            existingSale.Sku = firstItem.Sku;
-                            existingSale.Quantity = firstItem.Quantity;
-                            existingSale.Price = firstItem.UnitPrice?.a ?? 0;
-                        }
-                        existingSale.SaleDate = apiSale.SaleDate;
-                        existingSale.Channel = apiSale.Marketplace;
-                        existingSale.ChannelId = apiSale.ChannelId ?? string.Empty;
-                        existingSale.OrderNumber = apiSale.MarketplaceId ?? string.Empty;
-                        existingSale.CustomerName = apiSale.ShippingInfo?.City ?? string.Empty;
-                        existingSale.CustomerEmail = string.Empty;
-                        updated++;
+                        existingSale.Sku = firstItem.Sku;
+                        existingSale.Quantity = firstItem.Quantity;
+                        existingSale.Price = firstItem.UnitPrice?.a ?? 0;
                     }
+                    existingSale.SaleDate = apiSale.SaleDate;
+                    existingSale.Channel = apiSale.Marketplace;
+                    existingSale.ChannelId = apiSale.ChannelId ?? string.Empty;
+                    existingSale.OrderNumber = apiSale.MarketplaceId ?? string.Empty;
+                    existingSale.CustomerName = apiSale.ShippingInfo?.City ?? string.Empty;
+                    existingSale.CustomerEmail = string.Empty;
+                    updated++;
                 }
                 else
                 {
@@ -357,8 +349,10 @@ namespace SkuVaultSaaS.Infrastructure.Services
             allSales = null;
             saleItemsToAdd?.Clear();
             saleItemsToAdd = null;
-            existingSaleIds?.Clear();
-            existingSaleIds = null;
+            apiSaleIds?.Clear();
+            apiSaleIds = null;
+            existingSales?.Clear();
+            existingSales = null;
 
             // CRITICAL: Clear EF Core change tracker to release all tracked entities from memory
             _context.ChangeTracker.Clear();
@@ -442,6 +436,7 @@ namespace SkuVaultSaaS.Infrastructure.Services
             }
 
             var saved = await _context.SaveChangesAsync();
+            var productCount = apiProducts?.Count ?? 0;
             
             // Clear collections to free memory
             localProducts?.Clear();
@@ -450,11 +445,15 @@ namespace SkuVaultSaaS.Infrastructure.Services
             localSkuSet = null;
             apiProducts?.Clear();
             apiProducts = null;
+            apiSkus?.Clear();
+            apiSkus = null;
+            toDelete?.Clear();
+            toDelete = null;
             
             // CRITICAL: Clear EF Core change tracker to release all tracked entities from memory
             _context.ChangeTracker.Clear();
             
-            _logger.LogInformation("Saved {SavedCount} changes. Synced {Count} products for customer {CustomerId}", saved, apiProducts?.Count ?? 0, customerId);
+            _logger.LogInformation("Saved {SavedCount} changes. Synced {Count} products for customer {CustomerId}", saved, productCount, customerId);
         }
 
         public async Task SyncLocationsAsync(int customerId)
@@ -476,13 +475,16 @@ namespace SkuVaultSaaS.Infrastructure.Services
             var userToken = DecryptToken(customer.Tenant.SkuVaultUserToken)!;
 
             var apiLocations = await _apiClient.GetLocationsAsync(tenantToken, userToken);
+            
+            // Batch load existing locations
+            var locationCodes = apiLocations.Select(l => l.LocationCode).ToList();
+            var existingLocations = await _context.Locations
+                .Where(l => l.CustomerId == customerId && locationCodes.Contains(l.Code))
+                .ToDictionaryAsync(l => l.Code, l => l);
 
             foreach (var apiLocation in apiLocations)
             {
-                var existingLocation = await _context.Locations
-                    .FirstOrDefaultAsync(l => l.CustomerId == customerId && l.Code == apiLocation.LocationCode);
-
-                if (existingLocation != null)
+                if (existingLocations.TryGetValue(apiLocation.LocationCode, out var existingLocation))
                 {
                     // Update existing location
                     existingLocation.Name = apiLocation.LocationName;
@@ -508,7 +510,12 @@ namespace SkuVaultSaaS.Infrastructure.Services
             }
 
             await _context.SaveChangesAsync();
-            _logger.LogInformation("Synced {Count} locations for customer {CustomerId}", apiLocations.Count, customerId);
+            
+            apiLocations?.Clear();
+            apiLocations = null;
+            _context.ChangeTracker.Clear();
+            
+            _logger.LogInformation("Synced {Count} locations for customer {CustomerId}", apiLocations?.Count ?? 0, customerId);
         }
 
         public async Task SyncInventoryLevelsAsync(int customerId)
@@ -533,10 +540,12 @@ namespace SkuVaultSaaS.Infrastructure.Services
 
             // Load all products and locations for this customer to map SKU/LocationCode to IDs
             var products = await _context.Products
+                .AsNoTracking()
                 .Where(p => p.CustomerId == customerId)
                 .ToDictionaryAsync(p => p.Sku, p => p.Id);
 
             var locations = await _context.Locations
+                .AsNoTracking()
                 .Where(l => l.CustomerId == customerId)
                 .ToListAsync();
 
@@ -613,7 +622,22 @@ namespace SkuVaultSaaS.Infrastructure.Services
             }
 
             await _context.SaveChangesAsync();
-            _logger.LogInformation("Synced {Count} inventory levels for customer {CustomerId}", apiInventory.Count, customerId);
+            
+            products?.Clear();
+            products = null;
+            locations?.Clear();
+            locations = null;
+            locationDict?.Clear();
+            locationDict = null;
+            apiInventory?.Clear();
+            apiInventory = null;
+            localLevels?.Clear();
+            localLevels = null;
+            processedKeys?.Clear();
+            processedKeys = null;
+            _context.ChangeTracker.Clear();
+            
+            _logger.LogInformation("Synced inventory levels for customer {CustomerId}", customerId);
         }
 
         // DECOMMISSIONED: SyncInventoryMovementsAsync - use SyncTransactionsAsync instead
@@ -679,10 +703,12 @@ namespace SkuVaultSaaS.Infrastructure.Services
             // Fetch and process transactions in 6-day chunks (stay under 7-day limit)
             // Process each chunk immediately during the delay period instead of accumulating all
             var products = await _context.Products
+                .AsNoTracking()
                 .Where(p => p.CustomerId == customerId)
                 .ToDictionaryAsync(p => p.Sku, p => p.Id);
 
             var locationList = await _context.Locations
+                .AsNoTracking()
                 .Where(l => l.CustomerId == customerId)
                 .ToListAsync();
 
@@ -845,6 +871,7 @@ namespace SkuVaultSaaS.Infrastructure.Services
                     {
                         _context.Transactions.AddRange(transactionsToAdd);
                         await _context.SaveChangesAsync();
+                        _context.ChangeTracker.Clear();
                         _logger.LogInformation("Batch saved {Count} transactions (chunk progress: {Progress}/{Total})", 
                             batchSize, chunkSyncedCount, chunkTransactions.Count);
                         transactionsToAdd.Clear();
@@ -860,8 +887,12 @@ namespace SkuVaultSaaS.Infrastructure.Services
             {
                 _context.Transactions.AddRange(transactionsToAdd);
                 await _context.SaveChangesAsync();
+                _context.ChangeTracker.Clear();
                 _logger.LogInformation("Final batch saved {Count} transactions from chunk", transactionsToAdd.Count);
             }
+            
+            transactionsToAdd?.Clear();
+            transactionsToAdd = null;
 
             return chunkSyncedCount;
         }
@@ -1203,6 +1234,13 @@ namespace SkuVaultSaaS.Infrastructure.Services
             {
                 await _context.SaveChangesAsync();
             }
+            
+            apiPos?.Clear();
+            apiPos = null;
+            existingPos?.Clear();
+            existingPos = null;
+            _context.ChangeTracker.Clear();
+            
             _logger.LogInformation("Purchase orders sync complete ({SyncType}) for customer {CustomerId}: {Added} added, {Updated} updated", syncType, customerId, added, updated);
             
             return (added, updated);
@@ -1229,13 +1267,16 @@ namespace SkuVaultSaaS.Infrastructure.Services
             var apiIntegrations = await _apiClient.GetIntegrationsAsync(tenantToken, userToken);
             _logger.LogInformation("Received {Count} integrations from SkuVault API for customer {CustomerId}", apiIntegrations.Count, customerId);
 
+            // Batch load existing integrations
+            var integrationIds = apiIntegrations.Select(i => i.Id).ToList();
+            var existingIntegrations = await _context.Integrations
+                .Where(i => i.TenantId == customer.TenantId && integrationIds.Contains(i.SkuVaultId))
+                .ToDictionaryAsync(i => i.SkuVaultId, i => i);
+
             int added = 0, updated = 0;
             foreach (var apiIntegration in apiIntegrations)
             {
-                var existingIntegration = await _context.Integrations.FirstOrDefaultAsync(i => 
-                    i.TenantId == customer.TenantId && i.SkuVaultId == apiIntegration.Id);
-
-                if (existingIntegration != null)
+                if (existingIntegrations.TryGetValue(apiIntegration.Id, out var existingIntegration))
                 {
                     existingIntegration.SkuVaultLongId = apiIntegration.LongId;
                     existingIntegration.Name = apiIntegration.Name;
@@ -1264,6 +1305,11 @@ namespace SkuVaultSaaS.Infrastructure.Services
             {
                 await _context.SaveChangesAsync();
             }
+            
+            apiIntegrations?.Clear();
+            apiIntegrations = null;
+            _context.ChangeTracker.Clear();
+            
             _logger.LogInformation("Integrations sync complete for customer {CustomerId}: {Added} added, {Updated} updated", customerId, added, updated);
         }
 
@@ -1309,8 +1355,9 @@ namespace SkuVaultSaaS.Infrastructure.Services
 
             try
             {
-                var tenantToken = customer.Tenant.SkuVaultTenantToken;
-                var userToken = customer.Tenant.SkuVaultUserToken;
+                // Decrypt tokens before sending to API (CRITICAL - tokens are stored encrypted)
+                var tenantToken = DecryptToken(customer.Tenant.SkuVaultTenantToken)!;
+                var userToken = DecryptToken(customer.Tenant.SkuVaultUserToken)!;
 
                 var fromDate = syncFromDate ?? (customer.LastSyncedAt != DateTime.MinValue ? customer.LastSyncedAt : DateTime.UtcNow.AddDays(-90));
                 _logger.LogInformation("Syncing receives history for customer {CustomerId} from {FromDate}", customerId, fromDate);
@@ -1403,6 +1450,12 @@ namespace SkuVaultSaaS.Infrastructure.Services
             {
                 await _context.SaveChangesAsync();
             }
+            
+            apiReceives?.Clear();
+            apiReceives = null;
+            existingReceives?.Clear();
+            existingReceives = null;
+            _context.ChangeTracker.Clear();
 
             return (added, updated);
         }
@@ -1463,6 +1516,12 @@ namespace SkuVaultSaaS.Infrastructure.Services
             {
                 await _context.SaveChangesAsync();
             }
+            
+            apiCorrections?.Clear();
+            apiCorrections = null;
+            existingCorrections?.Clear();
+            existingCorrections = null;
+            _context.ChangeTracker.Clear();
 
             return (added, updated);
         }

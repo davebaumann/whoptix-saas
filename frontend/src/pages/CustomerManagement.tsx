@@ -152,35 +152,21 @@ export default function AdminDashboard() {
 
   const handleViewAsCustomer = async (customer: AdminCustomerResponse) => {
     try {
-      // Call backend endpoint to verify impersonation is allowed
-      const response = await fetch(`/api/admin/impersonate/${customer.id}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-        credentials: 'include',
-      })
+      // Get membership level from membershipCustomers query
+      const membershipCustomer = membershipCustomers?.find(mc => mc.id === customer.id)
       
-      if (!response.ok) {
-        alert('Failed to impersonate customer')
-        return
-      }
-
-      const impersonationData = await response.json()
-
       // Store admin impersonation context in sessionStorage
       sessionStorage.setItem('adminViewingAs', JSON.stringify({
         adminId: 'current-admin-id',
         customerId: customer.id,
         customerName: customer.name,
         customerEmail: customer.email,
-        membershipLevel: impersonationData.membershipLevel,
-        tenantId: impersonationData.tenantId,
+        membershipLevel: membershipCustomer?.membershipLevel || 1,
+        tenantId: customer.tenantId,
         timestamp: new Date().toISOString()
       }))
       
       // Navigate to customer dashboard
-      // The AdminViewingBanner component will show that admin is viewing as customer
       window.location.href = '/app/dashboard'
     } catch (error) {
       alert(`Failed to impersonate customer: ${error}`)
