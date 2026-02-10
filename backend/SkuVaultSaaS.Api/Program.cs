@@ -375,9 +375,15 @@ if (!Directory.Exists(dataProtectionPath))
 {
     Directory.CreateDirectory(dataProtectionPath);
 }
-builder.Services.AddDataProtection()
+var dpBuilder = builder.Services.AddDataProtection()
     .SetApplicationName("SkuVaultSaaS")
     .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionPath));
+
+// On Linux (Docker), use environment-level encryption for stored keys
+if (Environment.OSVersion.Platform == PlatformID.Unix)
+{
+    dpBuilder.ProtectKeysWithDpapi(protectToLocalMachine: true);
+}
 
 // JWT Authentication
 var jwtSection = builder.Configuration.GetSection("Jwt");

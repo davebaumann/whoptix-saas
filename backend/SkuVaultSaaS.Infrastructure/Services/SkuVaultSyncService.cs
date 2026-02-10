@@ -476,15 +476,24 @@ namespace SkuVaultSaaS.Infrastructure.Services
 
             var apiLocations = await _apiClient.GetLocationsAsync(tenantToken, userToken);
             
-            // Batch load existing locations
-            var locationCodes = apiLocations.Select(l => l.LocationCode).ToList();
+            // Deduplicate API response - SkuVault may return duplicate locations for same warehouse+code
+            var deduplicatedLocations = apiLocations
+                .DistinctBy(l => $"{l.WarehouseName}|{l.LocationCode}")
+                .ToList();
+            
+            _logger.LogInformation("API returned {TotalCount} locations, {DeduplicatedCount} after deduplication", 
+                apiLocations.Count, deduplicatedLocations.Count);
+            
+            // Batch load existing locations - use composite key (Warehouse+Code) since location codes can be duplicated across warehouses
+            var locationCodes = deduplicatedLocations.Select(l => l.LocationCode).ToList();
             var existingLocations = await _context.Locations
                 .Where(l => l.CustomerId == customerId && locationCodes.Contains(l.Code))
-                .ToDictionaryAsync(l => l.Code, l => l);
+                .ToDictionaryAsync(l => $"{l.Warehouse}|{l.Code}", l => l);
 
-            foreach (var apiLocation in apiLocations)
+            foreach (var apiLocation in deduplicatedLocations)
             {
-                if (existingLocations.TryGetValue(apiLocation.LocationCode, out var existingLocation))
+                var compositeKey = $"{apiLocation.WarehouseName}|{apiLocation.LocationCode}";
+                if (existingLocations.TryGetValue(compositeKey, out var existingLocation))
                 {
                     // Update existing location
                     existingLocation.Name = apiLocation.LocationName;
