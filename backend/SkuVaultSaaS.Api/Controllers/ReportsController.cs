@@ -100,6 +100,42 @@ namespace SkuVaultSaaS.Api.Controllers
         public List<InventoryItem> Items { get; set; } = new List<InventoryItem>();
     }
 
+    public class LeadTimeByVendor
+    {
+        public string Vendor { get; set; } = string.Empty;
+        public int TotalOrders { get; set; }
+        public int CompletedOrders { get; set; }
+        public double AverageLeadTimeDays { get; set; }
+        public double MinLeadTimeDays { get; set; }
+        public double MaxLeadTimeDays { get; set; }
+        public int LatePurchaseOrders { get; set; }
+        public double LatePercentage { get; set; }
+    }
+
+    public class LeadTimeByItem
+    {
+        public string SKU { get; set; } = string.Empty;
+        public string PartNumber { get; set; } = string.Empty;
+        public string Vendor { get; set; } = string.Empty;
+        public int TotalReceipts { get; set; }
+        public double AverageLeadTimeDays { get; set; }
+        public double MinLeadTimeDays { get; set; }
+        public double MaxLeadTimeDays { get; set; }
+        public int TotalQuantityReceived { get; set; }
+        public double AvgQtyPerReceipt { get; set; }
+    }
+
+    public class LeadTimeReportSummary
+    {
+        public int TotalVendors { get; set; }
+        public int TotalSkus { get; set; }
+        public int TotalPurchaseOrders { get; set; }
+        public int TotalReceipts { get; set; }
+        public double OverallAverageLeadTimeDays { get; set; }
+        public int LatePoCount { get; set; }
+        public double LatePoPercentage { get; set; }
+    }
+
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
@@ -1751,6 +1787,123 @@ namespace SkuVaultSaaS.Api.Controllers
             if (hour >= 6 && hour < 14) return "Morning (6am-2pm)";
             if (hour >= 14 && hour < 22) return "Afternoon (2pm-10pm)";
             return "Night (10pm-6am)";
+        }
+
+        [HttpGet("customer/{customerId}/lead-time")]
+        public async Task<IActionResult> GetLeadTimeReport(int customerId)
+        {
+            var accessCheck = await CheckReportAccessAsync(customerId, "lead-time");
+            if (accessCheck != null) return accessCheck;
+
+            try
+            {
+                // Get all purchase orders with their receives
+                var purchaseOrders = await _context.PurchaseOrders
+                    .Where(po => po.CustomerId == customerId)
+                    .AsNoTracking()
+                    .ToListAsync();
+
+                var receives = await _context.PurchaseOrderReceives
+                    .Where(r => r.CustomerId == customerId)
+                    .AsNoTracking()
+                    .ToListAsync();
+
+                // Calculate Lead Time by Vendor
+                var leadTimeByVendor = purchaseOrders
+                    .GroupBy(po => po.SupplierName)
+                    .Select(g => {
+                        var orders = g.ToList();
+                        var completedOrders = orders.Where(po => po.Status == "Received" || po.Status == "Closed").ToList();
+                        
+                        var leadTimes = completedOrders
+                            .Where(po => po.ArrivalDueDate > DateTime.MinValue && po.ActualShippedDate > DateTime.MinValue)
+                            .Select(po => (po.ActualShippedDate - po.OrderDate).TotalDays)
+                            .ToList();
+
+                        var lateOrders = completedOrders.Count(po => po.ActualShippedDate > po.ArrivalDueDate);
+
+                        return new LeadTimeByVendor
+                        {
+                            Vendor = g.Key,
+                            TotalOrders = orders.Count,
+                            CompletedOrders = completedOrders.Count,
+                            AverageLeadTimeDays = leadTimes.Any() ? Math.Round(leadTimes.Average(), 2) : 0,
+                            MinLeadTimeDays = leadTimes.Any() ? Math.Round(leadTimes.Min(), 2) : 0,
+                            MaxLeadTimeDays = leadTimes.Any() ? Math.Round(leadTimes.Max(), 2) : 0,
+                            LatePurchaseOrders = lateOrders,
+                            LatePercentage = completedOrders.Any() ? Math.Round((lateOrders / (double)completedOrders.Count) * 100, 2) : 0
+                        };
+                    })
+                    .OrderByDescending(v => v.AverageLeadTimeDays)
+                    .ToList();
+
+                // Calculate Lead Time by Item
+                var leadTimeByItem = receives
+                    .GroupBy(r => new { r.SKU, r.PartNumber })
+                    .Select(g => {
+                        var poNumbers = g.Select(r => r.PONumber).Distinct().ToList();
+                        var relatedPos = purchaseOrders.Where(po => poNumbers.Contains(po.PoNumber)).ToList();
+                        var vendor = relatedPos.FirstOrDefault()?.SupplierName ?? "Unknown";
+
+                        var leadTimes = g
+                            .Select(r => {
+                                var po = relatedPos.FirstOrDefault(po => po.PoNumber == r.PONumber);
+                                if (po != null && po.OrderDate > DateTime.MinValue && r.ReceiptDate > DateTime.MinValue)
+                                {
+                                    return (r.ReceiptDate - po.OrderDate).TotalDays;
+                                }
+                                return 0;
+                            })
+                            .Where(lt => lt > 0)
+                            .ToList();
+
+                        return new LeadTimeByItem
+                        {
+                            SKU = g.Key.SKU,
+                            PartNumber = g.Key.PartNumber ?? string.Empty,
+                            Vendor = vendor,
+                            TotalReceipts = g.Count(),
+                            AverageLeadTimeDays = leadTimes.Any() ? Math.Round(leadTimes.Average(), 2) : 0,
+                            MinLeadTimeDays = leadTimes.Any() ? Math.Round(leadTimes.Min(), 2) : 0,
+                            MaxLeadTimeDays = leadTimes.Any() ? Math.Round(leadTimes.Max(), 2) : 0,
+                            TotalQuantityReceived = g.Sum(r => r.Quantity),
+                            AvgQtyPerReceipt = g.Count() > 0 ? Math.Round(g.Sum(r => r.Quantity) / (double)g.Count(), 2) : 0
+                        };
+                    })
+                    .OrderByDescending(i => i.AverageLeadTimeDays)
+                    .ToList();
+
+                // Calculate Summary
+                var allLeadTimes = purchaseOrders
+                    .Where(po => po.ArrivalDueDate > DateTime.MinValue && po.ActualShippedDate > DateTime.MinValue)
+                    .Select(po => (po.ActualShippedDate - po.OrderDate).TotalDays)
+                    .ToList();
+
+                var totalLatePos = purchaseOrders.Count(po => po.ActualShippedDate > po.ArrivalDueDate);
+
+                var summary = new LeadTimeReportSummary
+                {
+                    TotalVendors = leadTimeByVendor.Count,
+                    TotalSkus = leadTimeByItem.Count,
+                    TotalPurchaseOrders = purchaseOrders.Count,
+                    TotalReceipts = receives.Count,
+                    OverallAverageLeadTimeDays = allLeadTimes.Any() ? Math.Round(allLeadTimes.Average(), 2) : 0,
+                    LatePoCount = totalLatePos,
+                    LatePoPercentage = purchaseOrders.Any() ? Math.Round((totalLatePos / (double)purchaseOrders.Count) * 100, 2) : 0
+                };
+
+                return Ok(new
+                {
+                    summary,
+                    byVendor = leadTimeByVendor,
+                    byItem = leadTimeByItem
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching lead time report for customer {CustomerId}", customerId);
+                return StatusCode(500, new { message = "Error fetching lead time report" });
+            }
         }
     }
 

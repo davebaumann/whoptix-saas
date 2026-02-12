@@ -379,11 +379,9 @@ var dpBuilder = builder.Services.AddDataProtection()
     .SetApplicationName("SkuVaultSaaS")
     .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionPath));
 
-// On Linux (Docker), use environment-level encryption for stored keys
-if (Environment.OSVersion.Platform == PlatformID.Unix)
-{
-    dpBuilder.ProtectKeysWithDpapi(protectToLocalMachine: true);
-}
+// Note: DPAPI encryption is Windows-only. On Linux/Docker, keys are stored unencrypted in the mounted volume.
+// For production, consider using Azure Key Vault, AWS KMS, or similar for key management.
+// This is acceptable since the keys are only used for protecting session data and antiforgery tokens.
 
 // JWT Authentication
 var jwtSection = builder.Configuration.GetSection("Jwt");

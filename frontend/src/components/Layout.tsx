@@ -29,6 +29,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/app/demand-forecast', label: 'Demand Forecast', icon: '🔮', reportName: 'demand-forecast' },
     { path: '/app/financial-warehouse', label: 'Financial Report', icon: '💰', reportName: 'financial-warehouse' },
     { path: '/app/inventory', label: 'Inventory Report', icon: '📊', reportName: 'inventory' },
+    { path: '/app/lead-time', label: 'Lead Time Report', icon: '⏱️', reportName: 'lead-time' },
     { path: '/app/locations', label: 'Locations Report', icon: '📍', reportName: 'locations' },
     { path: '/app/low-stock', label: 'Low Stock Report', icon: '⚠️', reportName: 'low-stock' },
     { path: '/app/performance', label: 'Performance Metrics', icon: '📈', reportName: 'performance' },

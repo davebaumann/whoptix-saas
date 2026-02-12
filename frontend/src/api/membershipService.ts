@@ -178,7 +178,8 @@ export const membershipService = {
       'financial-warehouse': MEMBERSHIP_LEVELS.PREMIUM,
       'locations': MEMBERSHIP_LEVELS.PREMIUM,
       'performance': MEMBERSHIP_LEVELS.ENTERPRISE,
-      'picker-analytics': MEMBERSHIP_LEVELS.ENTERPRISE
+      'picker-analytics': MEMBERSHIP_LEVELS.ENTERPRISE,
+      'lead-time': MEMBERSHIP_LEVELS.ENTERPRISE
     };
 
     const requiredLevel = reportRequirements[reportName];
@@ -196,7 +197,8 @@ export const membershipService = {
       'financial-warehouse': MEMBERSHIP_LEVELS.PREMIUM,
       'locations': MEMBERSHIP_LEVELS.PREMIUM,
       'performance': MEMBERSHIP_LEVELS.ENTERPRISE,
-      'picker-analytics': MEMBERSHIP_LEVELS.ENTERPRISE
+      'picker-analytics': MEMBERSHIP_LEVELS.ENTERPRISE,
+      'lead-time': MEMBERSHIP_LEVELS.ENTERPRISE
     };
 
     return reportRequirements[reportName] || MEMBERSHIP_LEVELS.ENTERPRISE;

@@ -44,6 +44,7 @@ namespace SkuVaultSaaS.Core.Services
                 { "demand-forecast", 3 },
                 { "performance", 4 },
                 { "picker-analytics", 5 },
+                { "lead-time", 5 },
                 // Tier 5: Development/Testing tier for admin to test reports under development
                 // Add new reports here with tier 5, then promote to tier 2/3/4 when ready
             };

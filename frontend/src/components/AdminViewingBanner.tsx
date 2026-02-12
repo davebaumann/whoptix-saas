@@ -42,6 +42,7 @@ const AdminViewingBanner: React.FC = () => {
     { id: 'picker-analytics', name: 'Picker Analytics', path: '/app/picker-analytics' },
     { id: 'channel-performance', name: 'Channel Performance', path: '/app/channel-performance' },
     { id: 'inventory-turnover', name: 'Inventory Turnover', path: '/app/inventory-turnover' },
+    { id: 'lead-time', name: 'Lead Time Report', path: '/app/lead-time' },
   ];
 
   // Filter reports based on membership access

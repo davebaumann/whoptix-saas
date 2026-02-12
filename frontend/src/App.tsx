@@ -12,6 +12,7 @@ import Dashboard from './pages/Dashboard'
 import Inventory from './pages/Inventory'
 import AgingInventoryReport from './pages/AgingInventoryReport'
 import FinancialWarehouseReport from './pages/FinancialWarehouseReport'
+import LeadTimeReport from './pages/LeadTimeReport'
 import Locations from './pages/Locations'
 import Performance from './pages/Performance'
 import InventoryTurnoverReport from './pages/InventoryTurnoverReport'
@@ -97,6 +98,7 @@ function App() {
                           <Route path="/profitability" element={<ProfitabilityReport />} />
                           <Route path="/demand-forecast" element={<DemandForecast />} />
                           <Route path="/financial-warehouse" element={<FinancialWarehouseReport />} />
+                          <Route path="/lead-time" element={<LeadTimeReport />} />
                           <Route path="/locations" element={<Locations />} />
                           <Route path="/performance" element={<Performance />} />
                           <Route path="/picker-analytics" element={<PickerAnalytics />} />
