@@ -624,24 +624,39 @@ namespace SkuVaultSaaS.Infrastructure.SkuVaultSaaSApi
                 var properties = string.Join(", ", doc.RootElement.EnumerateObject().Select(p => p.Name));
                 _logger?.LogInformation("Response root properties: {Properties}", properties);
                 
-                if (doc.RootElement.TryGetProperty(primaryArrayProperty, out var arrayProp) && arrayProp.ValueKind == JsonValueKind.Array)
+                // Try the primary array property first (exact case)
+                if (doc.RootElement.TryGetProperty(primaryArrayProperty, out var arrayProp))
                 {
-                    var arrayLength = arrayProp.GetArrayLength();
-                    _logger?.LogInformation("Found {Property} array with {Count} items", primaryArrayProperty, arrayLength);
-                    
-                    var list = new List<T>();
-                    foreach (var item in arrayProp.EnumerateArray())
+                    if (arrayProp.ValueKind == JsonValueKind.Array)
                     {
-                        var model = item.Deserialize<T>(new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                        if (model != null) list.Add(model);
+                        var arrayLength = arrayProp.GetArrayLength();
+                        _logger?.LogInformation("Found {Property} array with {Count} items", primaryArrayProperty, arrayLength);
+                        
+                        var list = new List<T>();
+                        foreach (var item in arrayProp.EnumerateArray())
+                        {
+                            try
+                            {
+                                var model = item.Deserialize<T>(new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                                if (model != null) list.Add(model);
+                            }
+                            catch (Exception itemEx)
+                            {
+                                _logger?.LogWarning(itemEx, "Failed to deserialize individual item in {Property} array", primaryArrayProperty);
+                            }
+                        }
+                        _logger?.LogInformation("Successfully deserialized {Count} items of type {Type}", list.Count, typeof(T).Name);
+                        return list;
                     }
-                    _logger?.LogInformation("Successfully deserialized {Count} items of type {Type}", list.Count, typeof(T).Name);
-                    return list;
+                    else
+                    {
+                        _logger?.LogWarning("Property {Property} found but is not an array. Type: {ValueKind}", primaryArrayProperty, arrayProp.ValueKind);
+                    }
                 }
                 else
                 {
-                    _logger?.LogWarning("Property {Property} not found or not an array. Root element kind: {Kind}", 
-                        primaryArrayProperty, doc.RootElement.ValueKind);
+                    _logger?.LogWarning("Property {Property} not found. Available properties: {Properties}", 
+                        primaryArrayProperty, properties);
                 }
             }
             catch (JsonException ex)

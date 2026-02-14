@@ -76,7 +76,7 @@ namespace SkuVaultSaaS.Api.Controllers
                             await syncService.SyncPurchaseOrdersCompletedAsync(request.CustomerId, syncFromDate);
                             break;
                         case "receives":
-                            await syncService.SyncReceivesHistoryAsync(request.CustomerId, syncFromDate);
+                            await syncService.SyncReceivesHistoryAsync(request.CustomerId, syncFromDate, request.ToDate);
                             break;
                         case "all":
                             await syncService.SyncCustomerDataAsync(request.CustomerId);
@@ -105,6 +105,7 @@ namespace SkuVaultSaaS.Api.Controllers
             public int CustomerId { get; set; }
             public string? SyncType { get; set; }
             public DateTime? FromDate { get; set; }
+            public DateTime? ToDate { get; set; }
         }
     }
 }

@@ -273,7 +273,7 @@ namespace SkuVaultSaaS.Api.Controllers
         }
 
         [HttpPost("historical-movements")]
-        public async Task<IActionResult> CreateHistoricalMovements()
+        public IActionResult CreateHistoricalMovements()
         {
             try
             {

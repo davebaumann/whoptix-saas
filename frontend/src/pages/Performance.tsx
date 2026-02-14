@@ -14,7 +14,6 @@ const PerformanceContent: React.FC = () => {
   
   // Use impersonated customer ID if admin is viewing as, otherwise use user's own customer ID
   const customerId = adminViewingCustomerId || user?.customerId || 1
-  const [pickerModal, setPickerModal] = useState<{ pickerName: string | null }>({ pickerName: null });
 
   const { data: performanceData, isLoading, error } = useQuery({
     queryKey: ['performance-report', customerId, selectedTimeframe],
@@ -40,13 +39,6 @@ const PerformanceContent: React.FC = () => {
     },
     refetchInterval: 300000, // 5 minutes
   });
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(value);
-  };
 
   const formatNumber = (value: number) => {
     return new Intl.NumberFormat('en-US').format(value);
@@ -258,7 +250,7 @@ const PerformanceContent: React.FC = () => {
 
       {/* Detailed Metrics Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white rounded-lg shadow p-6 overflow-hidden">
           <h3 className="text-lg font-medium text-gray-900 mb-4">Velocity Distribution</h3>
           <div className="space-y-4">
             {velocityMetrics && (
@@ -271,8 +263,8 @@ const PerformanceContent: React.FC = () => {
                   
                   return (
                     <>
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm text-gray-600 min-w-fit">Fast Moving (≥10/day)</span>
+                      <div className="flex items-start gap-2">
+                        <span className="text-xs text-gray-600 flex-shrink-0 pt-1">Fast (≥10/day)</span>
                         <div className="flex-1 min-w-0 flex items-center gap-2">
                           <div className="flex-1 min-w-0 bg-gray-200 rounded-full h-2">
                             <div 
@@ -282,13 +274,13 @@ const PerformanceContent: React.FC = () => {
                               }}
                             ></div>
                           </div>
-                          <span className="text-sm font-semibold text-green-600 min-w-fit">
+                          <span className="text-xs font-semibold text-green-600 flex-shrink-0">
                             {fast}
                           </span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm text-gray-600 min-w-fit">Medium Moving (5-10/day)</span>
+                      <div className="flex items-start gap-2">
+                        <span className="text-xs text-gray-600 flex-shrink-0 pt-1">Medium (5-10/day)</span>
                         <div className="flex-1 min-w-0 flex items-center gap-2">
                           <div className="flex-1 min-w-0 bg-gray-200 rounded-full h-2">
                             <div 
@@ -298,13 +290,13 @@ const PerformanceContent: React.FC = () => {
                               }}
                             ></div>
                           </div>
-                          <span className="text-sm font-semibold text-blue-600 min-w-fit">
+                          <span className="text-xs font-semibold text-blue-600 flex-shrink-0">
                             {medium}
                           </span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm text-gray-600 min-w-fit">Slow Moving (1-5/day)</span>
+                      <div className="flex items-start gap-2">
+                        <span className="text-xs text-gray-600 flex-shrink-0 pt-1">Slow (1-5/day)</span>
                         <div className="flex-1 min-w-0 flex items-center gap-2">
                           <div className="flex-1 min-w-0 bg-gray-200 rounded-full h-2">
                             <div 
@@ -314,13 +306,13 @@ const PerformanceContent: React.FC = () => {
                               }}
                             ></div>
                           </div>
-                          <span className="text-sm font-semibold text-yellow-600 min-w-fit">
+                          <span className="text-xs font-semibold text-yellow-600 flex-shrink-0">
                             {slow}
                           </span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm text-gray-600 min-w-fit">Dead Stock (&lt;1/day)</span>
+                      <div className="flex items-start gap-2">
+                        <span className="text-xs text-gray-600 flex-shrink-0 pt-1">Dead (&lt;1/day)</span>
                         <div className="flex-1 min-w-0 flex items-center gap-2">
                           <div className="flex-1 min-w-0 bg-gray-200 rounded-full h-2">
                             <div 
@@ -330,7 +322,7 @@ const PerformanceContent: React.FC = () => {
                               }}
                             ></div>
                           </div>
-                          <span className="text-sm font-semibold text-red-600 min-w-fit">
+                          <span className="text-xs font-semibold text-red-600 flex-shrink-0">
                             {velocityMetrics?.deadStockCount || 0}
                           </span>
                         </div>
@@ -398,8 +390,8 @@ const PerformanceContent: React.FC = () => {
             <div className="mt-5">
               <div className="flow-root">
                 <ul className="-my-5 divide-y divide-gray-200">
-                  {topPerformers?.slice(0, 5).map((performer: any, index: number) => (
-                    <li key={index} className="py-4 cursor-pointer hover:bg-blue-50 rounded" onClick={() => setPickerModal({ pickerName: performer.sku })}>
+                  {topPerformers && topPerformers.length > 0 ? topPerformers?.slice(0, 5).map((performer: any, index: number) => (
+                    <li key={index} className="py-4">
                       <div className="flex items-center space-x-4">
                         <div className="flex-shrink-0">
                           <div className="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center">
@@ -415,13 +407,13 @@ const PerformanceContent: React.FC = () => {
                           </p>
                         </div>
                         <div className="flex-shrink-0 text-sm text-green-600 font-semibold">
-                          {formatCurrency(performer.revenue)}
+                          {performer.velocity?.toFixed(1)}/day
                         </div>
                       </div>
                     </li>
-                  )) || (
+                  )) : (
                     <li className="py-4 text-center text-gray-500">
-                      No performance data available
+                      No top performers yet
                     </li>
                   )}
                 </ul>
@@ -436,8 +428,8 @@ const PerformanceContent: React.FC = () => {
             <div className="mt-5">
               <div className="flow-root">
                 <ul className="-my-5 divide-y divide-gray-200">
-                  {underPerformers?.slice(0, 5).map((performer: any, index: number) => (
-                    <li key={index} className="py-4 cursor-pointer hover:bg-red-50 rounded" onClick={() => setPickerModal({ pickerName: performer.sku })}>
+                  {underPerformers && underPerformers.length > 0 ? underPerformers?.slice(0, 5).map((performer: any, index: number) => (
+                    <li key={index} className="py-4">
                       <div className="flex items-center space-x-4">
                         <div className="flex-shrink-0">
                           <div className="h-8 w-8 bg-red-100 rounded-full flex items-center justify-center">
@@ -457,9 +449,9 @@ const PerformanceContent: React.FC = () => {
                         </div>
                       </div>
                     </li>
-                  )) || (
+                  )) : (
                     <li className="py-4 text-center text-gray-500">
-                      No performance data available
+                      No underperformers
                     </li>
                   )}
                 </ul>
@@ -468,19 +460,6 @@ const PerformanceContent: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {/* PickerPerformanceDetail Modal (implement or import as needed) */}
-      {pickerModal.pickerName && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-30">
-          <div className="bg-white p-6 rounded shadow-lg">
-            <h2 className="text-lg font-bold mb-2">Picker Details</h2>
-            <p>Picker: {pickerModal.pickerName}</p>
-            <button className="mt-4 px-4 py-2 bg-blue-600 text-white rounded" onClick={() => setPickerModal({ pickerName: null })}>
-              Close
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

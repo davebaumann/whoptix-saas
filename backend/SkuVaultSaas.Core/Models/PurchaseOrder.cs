@@ -29,5 +29,8 @@ namespace SkuVaultSaaS.Core.Models
         public decimal TotalCost { get; set; }
         public DateTime CreatedDateUtc { get; set; }
         public DateTime UpdatedDateUtc { get; set; }
+        
+        // Navigation property
+        public ICollection<PurchaseOrderLineItem> LineItems { get; set; } = new List<PurchaseOrderLineItem>();
     }
 }

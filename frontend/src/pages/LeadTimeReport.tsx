@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
 import { Download } from 'lucide-react'
+import { format, subDays } from 'date-fns'
 
 interface LeadTimeByVendor {
   vendor: string
@@ -48,9 +49,45 @@ export default function LeadTimeReport() {
   const [currentItemPage, setCurrentItemPage] = useState(1)
   const [vendorSort, setVendorSort] = useState<{ field: keyof LeadTimeByVendor; dir: 'asc' | 'desc' }>({ field: 'averageLeadTimeDays', dir: 'desc' })
   const [itemSort, setItemSort] = useState<{ field: keyof LeadTimeByItem; dir: 'asc' | 'desc' }>({ field: 'averageLeadTimeDays', dir: 'desc' })
+  const [dateRange, setDateRange] = useState<'last30' | 'last90' | 'last365' | 'custom'>('last90')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
   const [vendorSearch, setVendorSearch] = useState('')
   const [itemSearch, setItemSearch] = useState('')
   const pageSize = 25
+
+  // Calculate date params
+  const dateParams = useMemo(() => {
+    const now = new Date()
+    
+    switch (dateRange) {
+      case 'last30':
+        return {
+          from: format(subDays(now, 30), 'yyyy-MM-dd'),
+          to: format(now, 'yyyy-MM-dd')
+        }
+      case 'last90':
+        return {
+          from: format(subDays(now, 90), 'yyyy-MM-dd'),
+          to: format(now, 'yyyy-MM-dd')
+        }
+      case 'last365':
+        return {
+          from: format(subDays(now, 365), 'yyyy-MM-dd'),
+          to: format(now, 'yyyy-MM-dd')
+        }
+      case 'custom':
+        if (fromDate && toDate) {
+          return {
+            from: fromDate,
+            to: toDate
+          }
+        }
+        return null
+      default:
+        return null
+    }
+  }, [dateRange, fromDate, toDate])
 
   if (authLoading) {
     return (
@@ -80,10 +117,16 @@ export default function LeadTimeReport() {
   const adminViewingCustomerId = adminViewingData ? JSON.parse(adminViewingData).customerId : null
   const customerId = adminViewingCustomerId || user.customerId || 1
 
+  // Build query URL with date parameters
+  const queryUrl = dateParams 
+    ? `${import.meta.env.VITE_API_BASE_URL}/api/reports/customer/${customerId}/lead-time?fromDate=${dateParams.from}T00:00:00Z&toDate=${dateParams.to}T23:59:59Z`
+    : null
+
   const { data: leadTimeData, isLoading } = useQuery<LeadTimeResponse>({
-    queryKey: ['leadTimeReport', customerId],
+    queryKey: ['leadTimeReport', customerId, dateParams],
     queryFn: async () => {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/reports/customer/${customerId}/lead-time`, {
+      if (!queryUrl) throw new Error('Invalid date params')
+      const response = await fetch(queryUrl, {
         credentials: 'include'
       })
       if (!response.ok) {
@@ -91,6 +134,7 @@ export default function LeadTimeReport() {
       }
       return response.json()
     },
+    enabled: !!queryUrl
   })
 
   const handleVendorSort = (field: keyof LeadTimeByVendor) => {
@@ -222,6 +266,82 @@ export default function LeadTimeReport() {
     <div className="space-y-6 p-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">Lead Time Report</h1>
+      </div>
+
+      {/* Date Range Controls */}
+      <div className="bg-white p-4 rounded-lg shadow">
+        <div className="flex items-center gap-4 flex-wrap">
+          <label className="text-sm font-medium text-gray-700">Date Range:</label>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => setDateRange('last30')}
+              className={`px-4 py-2 text-sm font-medium rounded-md ${
+                dateRange === 'last30'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Last 30 Days
+            </button>
+            <button
+              onClick={() => setDateRange('last90')}
+              className={`px-4 py-2 text-sm font-medium rounded-md ${
+                dateRange === 'last90'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Last 90 Days
+            </button>
+            <button
+              onClick={() => setDateRange('last365')}
+              className={`px-4 py-2 text-sm font-medium rounded-md ${
+                dateRange === 'last365'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Last Year
+            </button>
+            <button
+              onClick={() => setDateRange('custom')}
+              className={`px-4 py-2 text-sm font-medium rounded-md ${
+                dateRange === 'custom'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Custom
+            </button>
+          </div>
+        </div>
+        
+        {/* Custom Date Pickers */}
+        {dateRange === 'custom' && (
+          <div className="mt-4 flex gap-4 items-end flex-wrap">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            {!dateParams && (
+              <div className="text-sm text-orange-600">Please select both dates</div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Summary Cards */}

@@ -216,7 +216,7 @@ namespace SkuVaultSaaS.Api.Controllers
                     _logger.LogInformation("Using credential-based authentication for email: {Email}", request.Email);
 
                     // Validate SkuVault credentials
-                    if (!ValidateSkuVaultCredentials(request.Email, request.Password))
+                    if (!ValidateSkuVaultCredentials(request.Email ?? "", request.Password ?? ""))
                     {
                         _logger.LogWarning("Invalid SkuVault credentials for customer {CustomerId}", customer.Id);
                         return BadRequest(new { message = "Invalid SkuVault credentials. Please check your email and password." });
@@ -224,7 +224,7 @@ namespace SkuVaultSaaS.Api.Controllers
 
                     // Get SkuVault tokens using the credentials
                     _logger.LogInformation("Fetching SkuVault tokens for email: {Email}", request.Email);
-                    tokens = await GetSkuVaultTokens(request.Email, request.Password);
+                    tokens = await GetSkuVaultTokens(request.Email ?? "", request.Password ?? "");
                     
                     if (tokens == null)
                     {
@@ -429,7 +429,7 @@ namespace SkuVaultSaaS.Api.Controllers
                 {
                     // Test credentials
                     _logger.LogInformation("Testing SkuVault credentials for email: {Email}", request.Email);
-                    if (!ValidateSkuVaultCredentials(request.Email, request.Password))
+                    if (!ValidateSkuVaultCredentials(request.Email ?? "", request.Password ?? ""))
                     {
                         return BadRequest(new { message = "Invalid SkuVault email or password" });
                     }
@@ -441,7 +441,7 @@ namespace SkuVaultSaaS.Api.Controllers
                     _logger.LogInformation("Testing SkuVault tokens");
                     
                     // Try to make a simple API call to validate tokens (e.g., get products list)
-                    bool tokensValid = await ValidateSkuVaultTokens(request.TenantToken, request.UserToken);
+                    bool tokensValid = await ValidateSkuVaultTokens(request.TenantToken ?? "", request.UserToken ?? "");
                     
                     if (!tokensValid)
                     {

@@ -196,12 +196,12 @@ namespace SkuVaultSaaS.Api.Controllers
             _cache.Set(cacheKey, resetToken, cacheOptions);
             
             // Create reset URL with simple token (no special characters)
-            var resetUrl = $"{Request.Scheme}://{Request.Host}/reset-password?email={Uri.EscapeDataString(user.Email)}&token={simpleToken}";
+            var resetUrl = $"{Request.Scheme}://{Request.Host}/reset-password?email={Uri.EscapeDataString(user.Email ?? "")}&token={simpleToken}";
 
             try
             {
                 // Pass only the URL - the real token is now in cache, not in the email
-                await _emailService.SendPasswordResetEmailAsync(user.Email, string.Empty, resetUrl);
+                await _emailService.SendPasswordResetEmailAsync(user.Email ?? "", string.Empty, resetUrl);
                 _logger.LogInformation("Password reset email sent to: {Email}", user.Email);
                 return Ok(new { message = "If an account with that email exists, a password reset link will be sent." });
             }

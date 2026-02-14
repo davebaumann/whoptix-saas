@@ -6,6 +6,7 @@ export default function AdminSyncPage() {
   const [customerId, setCustomerId] = useState('');
   const [syncType, setSyncType] = useState('sales');
   const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState('');
@@ -42,6 +43,10 @@ export default function AdminSyncPage() {
 
       if ((syncType === 'sales' || syncType === 'transactions' || syncType === 'pos' || syncType === 'pos-completed' || syncType === 'receives') && fromDate) {
         body.fromDate = new Date(fromDate).toISOString();
+      }
+
+      if ((syncType === 'sales' || syncType === 'transactions' || syncType === 'pos' || syncType === 'pos-completed' || syncType === 'receives') && toDate) {
+        body.toDate = new Date(toDate).toISOString();
       }
 
       const url = '/api/admin/sync/trigger';
@@ -136,17 +141,31 @@ export default function AdminSyncPage() {
 
           {/* From Date (only for sales, transactions, purchase orders, and receives) */}
           {(syncType === 'sales' || syncType === 'transactions' || syncType === 'pos' || syncType === 'pos-completed' || syncType === 'receives') && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                From Date (optional - defaults to 30/365 days ago)
-              </label>
-              <input
-                type="date"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  From Date (optional - defaults to 30/365 days ago)
+                </label>
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  To Date (optional - defaults to today)
+                </label>
+                <input
+                  type="date"
+                  value={toDate}
+                  onChange={(e) => setToDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </>
           )}
 
           {/* Sync Button */}
@@ -180,6 +199,7 @@ export default function AdminSyncPage() {
             {result.syncType && <p>Sync Type: {result.syncType}</p>}
             {result.customerId && <p>Customer ID: {result.customerId}</p>}
             {result.fromDate && <p>From Date: {new Date(result.fromDate).toLocaleDateString()}</p>}
+            {result.toDate && <p>To Date: {new Date(result.toDate).toLocaleDateString()}</p>}
           </div>
         </div>
       )}

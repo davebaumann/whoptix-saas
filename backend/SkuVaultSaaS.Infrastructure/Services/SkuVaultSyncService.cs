@@ -144,7 +144,7 @@ namespace SkuVaultSaaS.Infrastructure.Services
                 try
                 {
                     _logger.LogInformation("[PO] About to sync active purchase orders for customer {CustomerId}", customerId);
-                    await SyncPurchaseOrdersAsync(customerId);
+                    await SyncPurchaseOrdersAsync(customerId, syncFromDate);
                     _logger.LogInformation("[PO] Completed active purchase orders sync for customer {CustomerId}", customerId);
                 }
                 catch (Exception ex)
@@ -157,7 +157,7 @@ namespace SkuVaultSaaS.Infrastructure.Services
                 try
                 {
                     _logger.LogInformation("[PO-COMPLETED] About to sync completed purchase orders for customer {CustomerId}", customerId);
-                    await SyncPurchaseOrdersCompletedAsync(customerId);
+                    await SyncPurchaseOrdersCompletedAsync(customerId, syncFromDate);
                     _logger.LogInformation("[PO-COMPLETED] Completed completed purchase orders sync for customer {CustomerId}", customerId);
                 }
                 catch (Exception ex)
@@ -200,350 +200,390 @@ namespace SkuVaultSaaS.Infrastructure.Services
 
         public async Task SyncSalesAsync(int customerId, DateTime syncStartTime, DateTime syncFromDate)
         {
-            _logger.LogInformation("Syncing sales for customer {CustomerId}", customerId);
+            // Collection declarations at method scope for guaranteed cleanup in finally block
+            List<SkuVaultSaleDto>? allSales = null;
+            List<string>? apiSaleIds = null;
+            Dictionary<string, Sale>? existingSales = null;
+            List<SaleItem>? saleItemsToAdd = null;
+            HashSet<string>? existingSaleItemKeys = null;
+            List<SaleItem>? newSaleItems = null;
 
-            var customer = await _context.Customers
-                .Include(c => c.Tenant)
-                .FirstOrDefaultAsync(c => c.Id == customerId);
-
-            if (customer?.Tenant?.SkuVaultTenantToken == null || string.IsNullOrWhiteSpace(customer.Tenant.SkuVaultUserToken))
+            try
             {
-                _logger.LogWarning("Customer {CustomerId} is missing SkuVault tokens (tenant or user)", customerId);
-                return;
-            }
+                _logger.LogInformation("Syncing sales for customer {CustomerId}", customerId);
 
-            // Use the syncFromDate passed from main sync method (not customer.LastSyncedAt which may have changed)
-            var fromDate = syncFromDate;
-            var toDate = DateTime.UtcNow;
+                var customer = await _context.Customers
+                    .Include(c => c.Tenant)
+                    .FirstOrDefaultAsync(c => c.Id == customerId);
 
-            // Decrypt tokens before sending to API
-            var tenantToken = DecryptToken(customer.Tenant.SkuVaultTenantToken)!;
-            var userToken = DecryptToken(customer.Tenant.SkuVaultUserToken)!;
-
-            // SkuVault API has a 7-day maximum date range, so chunk the requests
-            var allSales = new List<SkuVaultSaleDto>();
-            var chunkStart = fromDate;
-            const int daysPerChunk = 6; // Use 6 days to stay under the 7-day limit
-            const int delayBetweenChunksMs = 13000; // 13 seconds = 4.6 calls/min (safely under ~5/min limit)
-
-            while (chunkStart < toDate)
-            {
-                var chunkEnd = chunkStart.AddDays(daysPerChunk);
-                if (chunkEnd > toDate)
-                    chunkEnd = toDate;
-
-                _logger.LogInformation("Requesting sales chunk: {From} to {To}", chunkStart, chunkEnd);
-                
-                // Use /getsalesbydate endpoint for incremental sales sync
-                try
+                if (customer?.Tenant?.SkuVaultTenantToken == null || string.IsNullOrWhiteSpace(customer.Tenant.SkuVaultUserToken))
                 {
-                    var chunkSales = await _apiClient.GetSalesByDateAsync(tenantToken, userToken, chunkStart, chunkEnd);
-                    allSales.AddRange(chunkSales);
-                }
-                catch (HttpRequestException ex) when (ex.Message.Contains("429"))
-                {
-                    _logger.LogWarning("Rate limited while fetching sales chunk {ChunkStart} to {ChunkEnd}, skipping this chunk", chunkStart, chunkEnd);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to fetch sales for chunk {ChunkStart} to {ChunkEnd}", chunkStart, chunkEnd);
+                    _logger.LogWarning("Customer {CustomerId} is missing SkuVault tokens (tenant or user)", customerId);
+                    return;
                 }
 
-                chunkStart = chunkEnd;
-                
-                // Add delay between chunks to avoid rate limiting
-                if (chunkStart < toDate)
+                // Use the syncFromDate passed from main sync method (not customer.LastSyncedAt which may have changed)
+                var fromDate = syncFromDate;
+                var toDate = DateTime.UtcNow;
+
+                // Decrypt tokens before sending to API
+                var tenantToken = DecryptToken(customer.Tenant.SkuVaultTenantToken)!;
+                var userToken = DecryptToken(customer.Tenant.SkuVaultUserToken)!;
+
+                // SkuVault API has a 7-day maximum date range, so chunk the requests
+                allSales = new List<SkuVaultSaleDto>();
+                var chunkStart = fromDate;
+                const int daysPerChunk = 6; // Use 6 days to stay under the 7-day limit
+                const int delayBetweenChunksMs = 13000; // 13 seconds = 4.6 calls/min (safely under ~5/min limit)
+
+                while (chunkStart < toDate)
                 {
-                    await Task.Delay(delayBetweenChunksMs);
-                }
-            }
+                    var chunkEnd = chunkStart.AddDays(daysPerChunk);
+                    if (chunkEnd > toDate)
+                        chunkEnd = toDate;
 
-            _logger.LogInformation("Received {Count} sales from SkuVault API for customer {CustomerId} (from {FromDate} to {ToDate})", allSales.Count, customerId, fromDate, toDate);
-
-            // Batch load existing sales to avoid N+1 queries
-            var apiSaleIds = allSales.Select(s => s.Id ?? s.MarketplaceId ?? string.Empty).ToList();
-            var existingSales = await _context.Sales
-                .Where(s => s.CustomerId == customerId && apiSaleIds.Contains(s.SaleId))
-                .ToDictionaryAsync(s => s.SaleId, s => s);
-
-            int added = 0, updated = 0, saleItemsAdded = 0;
-            DateTime? latestSaleDate = null;
-            var saleItemsToAdd = new List<SaleItem>();
-
-            foreach (var apiSale in allSales)
-            {
-                // Check for items in MerchantItems or FulfilledItems (not SaleItems which is rarely populated by API)
-                var merchantItems = apiSale.MerchantItems?.Count > 0 ? apiSale.MerchantItems : null;
-                var fulfilledItems = apiSale.FulfilledItems?.Count > 0 ? apiSale.FulfilledItems : null;
-                
-                var saleId = apiSale.Id ?? apiSale.MarketplaceId ?? string.Empty;
-                
-                // Always save the sale record, even if it has no items
-                if (existingSales.TryGetValue(saleId, out var existingSale))
-                {
-                    // Update with first item if available
-                    var firstItem = merchantItems?.FirstOrDefault() ?? fulfilledItems?.FirstOrDefault();
-                    if (firstItem != null)
-                    {
-                        existingSale.Sku = firstItem.Sku;
-                        existingSale.Quantity = firstItem.Quantity;
-                        existingSale.Price = firstItem.UnitPrice?.a ?? 0;
-                    }
-                    existingSale.SaleDate = apiSale.SaleDate;
-                    existingSale.Channel = apiSale.Marketplace;
-                    existingSale.ChannelId = apiSale.ChannelId ?? string.Empty;
-                    existingSale.OrderNumber = apiSale.MarketplaceId ?? string.Empty;
-                    existingSale.CustomerName = apiSale.ShippingInfo?.City ?? string.Empty;
-                    existingSale.CustomerEmail = string.Empty;
-                    updated++;
-                }
-                else
-                {
-                    // Create new sale record with first item data if available
-                    var firstItem = merchantItems?.FirstOrDefault() ?? fulfilledItems?.FirstOrDefault();
-                    var newSale = new SkuVaultSaaS.Core.Models.Sale
-                    {
-                        SaleId = saleId,
-                        Sku = firstItem?.Sku ?? string.Empty,
-                        Quantity = firstItem?.Quantity ?? 0,
-                        SaleDate = apiSale.SaleDate,
-                        Channel = apiSale.Marketplace,
-                        ChannelId = apiSale.ChannelId ?? string.Empty,
-                        OrderNumber = apiSale.MarketplaceId ?? string.Empty,
-                        Price = firstItem?.UnitPrice?.a ?? 0,
-                        CustomerName = apiSale.ShippingInfo?.City ?? string.Empty,
-                        CustomerEmail = string.Empty,
-                        CustomerId = customerId
-                    };
-                    _context.Sales.Add(newSale);
-                    added++;
+                    _logger.LogInformation("Requesting sales chunk: {From} to {To}", chunkStart, chunkEnd);
                     
-                    if ((merchantItems == null || merchantItems.Count == 0) && (fulfilledItems == null || fulfilledItems.Count == 0))
+                    // Use /getsalesbydate endpoint for incremental sales sync
+                    try
                     {
-                        _logger.LogWarning($"Sale {saleId} created with no items (MerchantItems and FulfilledItems both empty)");
+                        var chunkSales = await _apiClient.GetSalesByDateAsync(tenantToken, userToken, chunkStart, chunkEnd);
+                        allSales.AddRange(chunkSales);
+                    }
+                    catch (HttpRequestException ex) when (ex.Message.Contains("429"))
+                    {
+                        _logger.LogWarning("Rate limited while fetching sales chunk {ChunkStart} to {ChunkEnd}, skipping this chunk", chunkStart, chunkEnd);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to fetch sales for chunk {ChunkStart} to {ChunkEnd}", chunkStart, chunkEnd);
+                    }
+
+                    chunkStart = chunkEnd;
+                    
+                    // Add delay between chunks to avoid rate limiting
+                    if (chunkStart < toDate)
+                    {
+                        await Task.Delay(delayBetweenChunksMs);
                     }
                 }
 
-                // Capture all merchant items as SaleItems
-                if (merchantItems != null)
+                _logger.LogInformation("Received {Count} sales from SkuVault API for customer {CustomerId} (from {FromDate} to {ToDate})", allSales.Count, customerId, fromDate, toDate);
+
+                // Batch load existing sales to avoid N+1 queries
+                apiSaleIds = allSales.Select(s => s.Id ?? s.MarketplaceId ?? string.Empty).ToList();
+                existingSales = await _context.Sales
+                    .Where(s => s.CustomerId == customerId && apiSaleIds.Contains(s.SaleId))
+                    .ToDictionaryAsync(s => s.SaleId, s => s);
+
+                int added = 0, updated = 0, saleItemsAdded = 0;
+                DateTime? latestSaleDate = null;
+                saleItemsToAdd = new List<SaleItem>();
+
+                foreach (var apiSale in allSales)
                 {
-                    foreach (var item in merchantItems)
+                    // Check for items in MerchantItems or FulfilledItems (not SaleItems which is rarely populated by API)
+                    var merchantItems = apiSale.MerchantItems?.Count > 0 ? apiSale.MerchantItems : null;
+                    var fulfilledItems = apiSale.FulfilledItems?.Count > 0 ? apiSale.FulfilledItems : null;
+                    
+                    var saleId = apiSale.Id ?? apiSale.MarketplaceId ?? string.Empty;
+                    
+                    // Always save the sale record, even if it has no items
+                    if (existingSales.TryGetValue(saleId, out var existingSale))
                     {
-                        saleItemsToAdd.Add(new SaleItem
+                        // Update with first item if available
+                        var firstItem = merchantItems?.FirstOrDefault() ?? fulfilledItems?.FirstOrDefault();
+                        if (firstItem != null)
+                        {
+                            existingSale.Sku = firstItem.Sku;
+                            existingSale.Quantity = firstItem.Quantity;
+                            existingSale.Price = firstItem.UnitPrice?.a ?? 0;
+                        }
+                        existingSale.SaleDate = apiSale.SaleDate;
+                        existingSale.Channel = apiSale.Marketplace;
+                        existingSale.ChannelId = apiSale.ChannelId ?? string.Empty;
+                        existingSale.OrderNumber = apiSale.MarketplaceId ?? string.Empty;
+                        existingSale.CustomerName = apiSale.ShippingInfo?.City ?? string.Empty;
+                        existingSale.CustomerEmail = string.Empty;
+                        updated++;
+                    }
+                    else
+                    {
+                        // Create new sale record with first item data if available
+                        var firstItem = merchantItems?.FirstOrDefault() ?? fulfilledItems?.FirstOrDefault();
+                        var newSale = new SkuVaultSaaS.Core.Models.Sale
                         {
                             SaleId = saleId,
-                            CustomerId = customerId,
-                            Sku = item.Sku,
-                            Quantity = item.Quantity,
-                            UnitPrice = item.UnitPrice?.a ?? 0,
-                            ItemType = "MerchantItem",
-                            CreatedAtUtc = syncStartTime,
-                            UpdatedAtUtc = syncStartTime
-                        });
-                        saleItemsAdded++;
-                    }
-                }
-
-                // Capture all fulfilled items as SaleItems
-                if (fulfilledItems != null)
-                {
-                    foreach (var item in fulfilledItems)
-                    {
-                        saleItemsToAdd.Add(new SaleItem
+                            Sku = firstItem?.Sku ?? string.Empty,
+                            Quantity = firstItem?.Quantity ?? 0,
+                            SaleDate = apiSale.SaleDate,
+                            Channel = apiSale.Marketplace,
+                            ChannelId = apiSale.ChannelId ?? string.Empty,
+                            OrderNumber = apiSale.MarketplaceId ?? string.Empty,
+                            Price = firstItem?.UnitPrice?.a ?? 0,
+                            CustomerName = apiSale.ShippingInfo?.City ?? string.Empty,
+                            CustomerEmail = string.Empty,
+                            CustomerId = customerId
+                        };
+                        _context.Sales.Add(newSale);
+                        added++;
+                        
+                        if ((merchantItems == null || merchantItems.Count == 0) && (fulfilledItems == null || fulfilledItems.Count == 0))
                         {
-                            SaleId = saleId,
-                            CustomerId = customerId,
-                            Sku = item.Sku,
-                            Quantity = item.Quantity,
-                            UnitPrice = item.UnitPrice?.a ?? 0,
-                            ItemType = "FulfilledItem",
-                            CreatedAtUtc = syncStartTime,
-                            UpdatedAtUtc = syncStartTime
-                        });
-                        saleItemsAdded++;
+                            _logger.LogWarning($"Sale {saleId} created with no items (MerchantItems and FulfilledItems both empty)");
+                        }
                     }
-                }
 
-                // Track latest sale date
-                if (!latestSaleDate.HasValue || apiSale.SaleDate > latestSaleDate.Value)
-                {
-                    latestSaleDate = apiSale.SaleDate;
-                }
-            }
-
-            if (added > 0 || updated > 0)
-            {
-                await _context.SaveChangesAsync();
-            }
-
-            // Add all SaleItems in one batch, filtering out duplicates
-            if (saleItemsToAdd.Count > 0)
-            {
-                // Load only the composite keys (minimal memory footprint)
-                var existingSaleItemKeys = new HashSet<string>(
-                    await _context.SaleItems
-                        .Where(si => si.CustomerId == customerId && apiSaleIds.Contains(si.SaleId))
-                        .AsNoTracking()
-                        .Select(si => $"{si.SaleId}|{si.Sku}|{si.ItemType}")
-                        .ToListAsync()
-                );
-
-                var newSaleItems = new List<SaleItem>();
-                foreach (var item in saleItemsToAdd)
-                {
-                    var key = $"{item.SaleId}|{item.Sku}|{item.ItemType}";
-                    if (!existingSaleItemKeys.Contains(key))
+                    // Capture all merchant items as SaleItems
+                    if (merchantItems != null)
                     {
-                        newSaleItems.Add(item);
+                        foreach (var item in merchantItems)
+                        {
+                            saleItemsToAdd.Add(new SaleItem
+                            {
+                                SaleId = saleId,
+                                CustomerId = customerId,
+                                Sku = item.Sku,
+                                Quantity = item.Quantity,
+                                UnitPrice = item.UnitPrice?.a ?? 0,
+                                ItemType = "MerchantItem",
+                                CreatedAtUtc = syncStartTime,
+                                UpdatedAtUtc = syncStartTime
+                            });
+                            saleItemsAdded++;
+                        }
+                    }
+
+                    // Capture all fulfilled items as SaleItems
+                    if (fulfilledItems != null)
+                    {
+                        foreach (var item in fulfilledItems)
+                        {
+                            saleItemsToAdd.Add(new SaleItem
+                            {
+                                SaleId = saleId,
+                                CustomerId = customerId,
+                                Sku = item.Sku,
+                                Quantity = item.Quantity,
+                                UnitPrice = item.UnitPrice?.a ?? 0,
+                                ItemType = "FulfilledItem",
+                                CreatedAtUtc = syncStartTime,
+                                UpdatedAtUtc = syncStartTime
+                            });
+                            saleItemsAdded++;
+                        }
+                    }
+
+                    // Track latest sale date
+                    if (!latestSaleDate.HasValue || apiSale.SaleDate > latestSaleDate.Value)
+                    {
+                        latestSaleDate = apiSale.SaleDate;
                     }
                 }
 
-                if (newSaleItems.Count > 0)
+                if (added > 0 || updated > 0)
                 {
-                    _context.SaleItems.AddRange(newSaleItems);
                     await _context.SaveChangesAsync();
                 }
-                
-                int skipped = saleItemsToAdd.Count - newSaleItems.Count;
-                if (skipped > 0)
+
+                // Add all SaleItems in one batch, filtering out duplicates
+                if (saleItemsToAdd.Count > 0)
                 {
-                    _logger.LogInformation("Skipped {Count} duplicate sale items for customer {CustomerId}", skipped, customerId);
+                    // Load only the composite keys (minimal memory footprint)
+                    existingSaleItemKeys = new HashSet<string>(
+                        await _context.SaleItems
+                            .Where(si => si.CustomerId == customerId && apiSaleIds.Contains(si.SaleId))
+                            .AsNoTracking()
+                            .Select(si => $"{si.SaleId}|{si.Sku}|{si.ItemType}")
+                            .ToListAsync()
+                    );
+
+                    newSaleItems = new List<SaleItem>();
+                    foreach (var item in saleItemsToAdd)
+                    {
+                        var key = $"{item.SaleId}|{item.Sku}|{item.ItemType}";
+                        if (!existingSaleItemKeys.Contains(key))
+                        {
+                            newSaleItems.Add(item);
+                        }
+                    }
+
+                    if (newSaleItems.Count > 0)
+                    {
+                        _context.SaleItems.AddRange(newSaleItems);
+                        await _context.SaveChangesAsync();
+                    }
+                    
+                    int skipped = saleItemsToAdd.Count - newSaleItems.Count;
+                    if (skipped > 0)
+                    {
+                        _logger.LogInformation("Skipped {Count} duplicate sale items for customer {CustomerId}", skipped, customerId);
+                    }
                 }
-                
-                existingSaleItemKeys?.Clear();
-                newSaleItems?.Clear();
+
+                // LastSyncedAt will be updated once after all syncs complete (in SyncCustomerDataAsync)
+                _logger.LogInformation("Sales sync complete for customer {CustomerId}: {Added} sales added, {Updated} updated, {SaleItems} items added", customerId, added, updated, saleItemsAdded);
             }
-
-            // Clear collections to free memory immediately after processing
-            allSales?.Clear();
-            allSales = null;
-            saleItemsToAdd?.Clear();
-            saleItemsToAdd = null;
-            apiSaleIds?.Clear();
-            apiSaleIds = null;
-            existingSales?.Clear();
-            existingSales = null;
-
-            // CRITICAL: Clear EF Core change tracker to release all tracked entities from memory
-            _context.ChangeTracker.Clear();
-
-            // LastSyncedAt will be updated once after all syncs complete (in SyncCustomerDataAsync)
-            _logger.LogInformation("Sales sync complete for customer {CustomerId}: {Added} sales added, {Updated} updated, {SaleItems} items added", customerId, added, updated, saleItemsAdded);
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during sales sync for customer {CustomerId}. Clearing change tracker.", customerId);
+                _context.ChangeTracker.Clear();
+                throw;
+            }
+            finally
+            {
+                // Guaranteed cleanup even on exception
+                allSales?.Clear();
+                allSales = null;
+                saleItemsToAdd?.Clear();
+                saleItemsToAdd = null;
+                apiSaleIds?.Clear();
+                apiSaleIds = null;
+                existingSales?.Clear();
+                existingSales = null;
+                existingSaleItemKeys?.Clear();
+                existingSaleItemKeys = null;
+                newSaleItems?.Clear();
+                newSaleItems = null;
+                _context.ChangeTracker.Clear();
+            }
         }
 
         public async Task SyncProductsAsync(int customerId)
         {
-            _logger.LogInformation("Syncing products for customer {CustomerId}", customerId);
+            // Collection declarations at method scope for guaranteed cleanup in finally block
+            List<SkuVaultProductDto>? apiProducts = null;
+            HashSet<string>? apiSkus = null;
+            List<Product>? localProducts = null;
+            HashSet<string>? localSkuSet = null;
+            List<Product>? toDelete = null;
+            List<SkuVaultProductDto>? batch = null;
 
-            var customer = await _context.Customers
-                .Include(c => c.Tenant)
-                .FirstOrDefaultAsync(c => c.Id == customerId);
-
-            if (customer?.Tenant?.SkuVaultTenantToken == null || string.IsNullOrWhiteSpace(customer.Tenant.SkuVaultUserToken))
+            try
             {
-                _logger.LogWarning("Customer {CustomerId} is missing SkuVault tokens (tenant or user)", customerId);
-                return;
-            }
+                _logger.LogInformation("Syncing products for customer {CustomerId}", customerId);
 
-            _logger.LogInformation("Fetching products from SkuVault API for customer {CustomerId}", customerId);
-            // Decrypt tokens before sending to API
-            var tenantToken = DecryptToken(customer.Tenant.SkuVaultTenantToken)!;
-            var userToken = DecryptToken(customer.Tenant.SkuVaultUserToken)!;
-            
-            var apiProducts = await _apiClient.GetProductsAsync(tenantToken, userToken);
-            _logger.LogInformation("Received {Count} products from SkuVault API for customer {CustomerId}", apiProducts.Count, customerId);
-            
-            if (apiProducts.Count == 0)
-            {
-                _logger.LogWarning("No products returned from SkuVault API for customer {CustomerId}", customerId);
-                return;
-            }
+                var customer = await _context.Customers
+                    .Include(c => c.Tenant)
+                    .FirstOrDefaultAsync(c => c.Id == customerId);
 
-            // Build lookup of SkuVault SKUs
-            var apiSkus = new HashSet<string>(apiProducts.Select(p => p.Sku));
-
-            // Load all local products for this customer
-            var localProducts = await _context.Products.Where(p => p.CustomerId == customerId).ToListAsync();
-            var localSkuSet = new HashSet<string>(localProducts.Select(p => p.Sku));
-
-            // Process products in batches to reduce memory spike
-            const int batchSize = 2000;
-            int totalProcessed = 0;
-            int totalSaved = 0;
-
-            for (int i = 0; i < apiProducts.Count; i += batchSize)
-            {
-                var batch = apiProducts.Skip(i).Take(batchSize).ToList();
-                
-                // Upsert (insert/update) products in this batch
-                foreach (var apiProduct in batch)
+                if (customer?.Tenant?.SkuVaultTenantToken == null || string.IsNullOrWhiteSpace(customer.Tenant.SkuVaultUserToken))
                 {
-                    var local = localProducts.FirstOrDefault(p => p.Sku == apiProduct.Sku);
-                    if (local != null)
-                    {
-                        local.Name = apiProduct.Description;
-                        local.Description = apiProduct.LongDescription;
-                        local.Category = apiProduct.Classification;
-                        local.Cost = apiProduct.Cost;
-                        local.Price = apiProduct.RetailPrice;
-                        local.UpdatedAtUtc = DateTime.UtcNow;
-                    }
-                    else
-                    {
-                        var newProduct = new Product
-                        {
-                            CustomerId = customerId,
-                            Sku = apiProduct.Sku,
-                            Name = apiProduct.Description,
-                            Description = apiProduct.LongDescription,
-                            Category = apiProduct.Classification,
-                            Cost = apiProduct.Cost,
-                            Price = apiProduct.RetailPrice,
-                            CreatedAtUtc = DateTime.UtcNow,
-                            UpdatedAtUtc = DateTime.UtcNow
-                        };
-                        _context.Products.Add(newProduct);
-                    }
+                    _logger.LogWarning("Customer {CustomerId} is missing SkuVault tokens (tenant or user)", customerId);
+                    return;
                 }
 
-                // Save batch
-                var saved = await _context.SaveChangesAsync();
-                totalProcessed += batch.Count;
-                totalSaved += saved;
+                _logger.LogInformation("Fetching products from SkuVault API for customer {CustomerId}", customerId);
+                // Decrypt tokens before sending to API
+                var tenantToken = DecryptToken(customer.Tenant.SkuVaultTenantToken)!;
+                var userToken = DecryptToken(customer.Tenant.SkuVaultUserToken)!;
                 
-                _logger.LogInformation("Saved batch of {BatchSize} products ({Processed}/{Total}). Changes: {Saved}", 
-                    batch.Count, totalProcessed, apiProducts.Count, saved);
+                apiProducts = await _apiClient.GetProductsAsync(tenantToken, userToken);
+                _logger.LogInformation("Received {Count} products from SkuVault API for customer {CustomerId}", apiProducts.Count, customerId);
                 
-                // Clear change tracker to release memory from this batch
-                _context.ChangeTracker.Clear();
-                batch?.Clear();
-                batch = null;
-            }
+                if (apiProducts.Count == 0)
+                {
+                    _logger.LogWarning("No products returned from SkuVault API for customer {CustomerId}", customerId);
+                    return;
+                }
 
-            // After all product batches, handle deletions
-            var toDelete = localProducts.Where(p => !apiSkus.Contains(p.Sku)).ToList();
-            if (toDelete.Count > 0)
+                // Build lookup of SkuVault SKUs
+                apiSkus = new HashSet<string>(apiProducts.Select(p => p.Sku));
+
+                // Load all local products for this customer
+                localProducts = await _context.Products.Where(p => p.CustomerId == customerId).ToListAsync();
+                localSkuSet = new HashSet<string>(localProducts.Select(p => p.Sku));
+
+                // Process products in batches to reduce memory spike
+                const int batchSize = 2000;
+                int totalProcessed = 0;
+                int totalSaved = 0;
+
+                for (int i = 0; i < apiProducts.Count; i += batchSize)
+                {
+                    batch = apiProducts.Skip(i).Take(batchSize).ToList();
+                    
+                    // Upsert (insert/update) products in this batch
+                    foreach (var apiProduct in batch)
+                    {
+                        var local = localProducts.FirstOrDefault(p => p.Sku == apiProduct.Sku);
+                        if (local != null)
+                        {
+                            local.Name = apiProduct.Description;
+                            local.Description = apiProduct.LongDescription;
+                            local.Category = apiProduct.Classification;
+                            local.Cost = apiProduct.Cost;
+                            local.Price = apiProduct.RetailPrice;
+                            local.UpdatedAtUtc = DateTime.UtcNow;
+                        }
+                        else
+                        {
+                            var newProduct = new Product
+                            {
+                                CustomerId = customerId,
+                                Sku = apiProduct.Sku,
+                                Name = apiProduct.Description,
+                                Description = apiProduct.LongDescription,
+                                Category = apiProduct.Classification,
+                                Cost = apiProduct.Cost,
+                                Price = apiProduct.RetailPrice,
+                                CreatedAtUtc = DateTime.UtcNow,
+                                UpdatedAtUtc = DateTime.UtcNow
+                            };
+                            _context.Products.Add(newProduct);
+                        }
+                    }
+
+                    // Save batch
+                    var saved = await _context.SaveChangesAsync();
+                    totalProcessed += batch.Count;
+                    totalSaved += saved;
+                    
+                    _logger.LogInformation("Saved batch of {BatchSize} products ({Processed}/{Total}). Changes: {Saved}", 
+                        batch.Count, totalProcessed, apiProducts.Count, saved);
+                    
+                    // Clear change tracker to release memory from this batch
+                    _context.ChangeTracker.Clear();
+                    batch?.Clear();
+                    batch = null;
+                }
+
+                // After all product batches, handle deletions
+                toDelete = localProducts.Where(p => !apiSkus.Contains(p.Sku)).ToList();
+                if (toDelete.Count > 0)
+                {
+                    _context.Products.RemoveRange(toDelete);
+                    await _context.SaveChangesAsync();
+                    _logger.LogInformation("Deleted {Count} products not present in SkuVault for customer {CustomerId}", toDelete.Count, customerId);
+                    _context.ChangeTracker.Clear();
+                }
+                
+                _logger.LogInformation("Synced {TotalProcessed} products for customer {CustomerId}. Total changes saved: {TotalSaved}", 
+                    totalProcessed, customerId, totalSaved);
+            }
+            catch (Exception ex)
             {
-                _context.Products.RemoveRange(toDelete);
-                await _context.SaveChangesAsync();
-                _logger.LogInformation("Deleted {Count} products not present in SkuVault for customer {CustomerId}", toDelete.Count, customerId);
+                _logger.LogError(ex, "Error during product sync for customer {CustomerId}. Clearing change tracker.", customerId);
+                _context.ChangeTracker.Clear();
+                throw;
+            }
+            finally
+            {
+                // Guaranteed cleanup even on exception
+                apiProducts?.Clear();
+                apiProducts = null;
+                apiSkus?.Clear();
+                apiSkus = null;
+                localProducts?.Clear();
+                localProducts = null;
+                localSkuSet?.Clear();
+                localSkuSet = null;
                 toDelete?.Clear();
                 toDelete = null;
+                batch?.Clear();
+                batch = null;
                 _context.ChangeTracker.Clear();
             }
-            
-            // Clear collections to free memory
-            localProducts?.Clear();
-            localProducts = null;
-            localSkuSet?.Clear();
-            localSkuSet = null;
-            apiProducts?.Clear();
-            apiProducts = null;
-            apiSkus?.Clear();
-            apiSkus = null;
-            
-            _logger.LogInformation("Synced {TotalProcessed} products for customer {CustomerId}. Total changes saved: {TotalSaved}", 
-                totalProcessed, customerId, totalSaved);
         }
 
         public async Task SyncLocationsAsync(int customerId)
@@ -627,124 +667,186 @@ namespace SkuVaultSaaS.Infrastructure.Services
 
         public async Task SyncInventoryLevelsAsync(int customerId)
         {
-            _logger.LogInformation("Syncing inventory levels for customer {CustomerId}", customerId);
+            // Collection declarations at method scope for guaranteed cleanup in finally block
+            Dictionary<string, int>? products = null;
+            List<Location>? locations = null;
+            Dictionary<string, int>? locationDict = null;
+            List<SkuVaultInventoryDto>? apiInventory = null;
+            List<InventoryLevel>? localLevels = null;
+            HashSet<(string Sku, string LocationCode)>? apiKeys = null;
+            HashSet<(int ProductId, int LocationId)>? processedKeys = null;
+            Dictionary<(string Sku, string LocationCode), int>? duplicateCounts = null;
+            List<InventoryLevel>? toDelete = null;
 
-            var customer = await _context.Customers
-                .Include(c => c.Tenant)
-                .FirstOrDefaultAsync(c => c.Id == customerId);
-
-            if (customer?.Tenant?.SkuVaultTenantToken == null || string.IsNullOrWhiteSpace(customer.Tenant.SkuVaultUserToken))
+            try
             {
-                _logger.LogWarning("Customer {CustomerId} is missing SkuVault tokens (tenant or user)", customerId);
-                return;
-            }
+                _logger.LogInformation("Syncing inventory levels for customer {CustomerId}", customerId);
 
-            // Decrypt tokens before sending to API
-            var tenantToken = DecryptToken(customer.Tenant.SkuVaultTenantToken)!;
-            var userToken = DecryptToken(customer.Tenant.SkuVaultUserToken)!;
+                var customer = await _context.Customers
+                    .Include(c => c.Tenant)
+                    .FirstOrDefaultAsync(c => c.Id == customerId);
 
-            var apiInventory = await _apiClient.GetInventoryAsync(tenantToken, userToken);
-
-            // Load all products and locations for this customer to map SKU/LocationCode to IDs
-            var products = await _context.Products
-                .AsNoTracking()
-                .Where(p => p.CustomerId == customerId)
-                .ToDictionaryAsync(p => p.Sku, p => p.Id);
-
-            var locations = await _context.Locations
-                .AsNoTracking()
-                .Where(l => l.CustomerId == customerId)
-                .ToListAsync();
-
-            // Build location dictionary, taking first occurrence of each code (duplicates skipped)
-            var locationDict = new Dictionary<string, int>();
-            foreach (var location in locations)
-            {
-                if (!locationDict.ContainsKey(location.Code))
+                if (customer?.Tenant?.SkuVaultTenantToken == null || string.IsNullOrWhiteSpace(customer.Tenant.SkuVaultUserToken))
                 {
-                    locationDict[location.Code] = location.Id;
+                    _logger.LogWarning("Customer {CustomerId} is missing SkuVault tokens (tenant or user)", customerId);
+                    return;
                 }
-            }
 
-            // Build lookup of SkuVault inventory keys (SKU + LocationCode)
-            var apiKeys = new HashSet<(string Sku, string LocationCode)>(apiInventory.Select(i => (i.Sku, i.LocationCode)));
+                // Decrypt tokens before sending to API
+                var tenantToken = DecryptToken(customer.Tenant.SkuVaultTenantToken)!;
+                var userToken = DecryptToken(customer.Tenant.SkuVaultUserToken)!;
 
-            // Load all local inventory levels for this customer
-            var localLevels = await _context.InventoryLevels
-                .Where(i => i.CustomerId == customerId)
-                .Include(i => i.Product)
-                .Include(i => i.Location)
-                .ToListAsync();
+                apiInventory = await _apiClient.GetInventoryAsync(tenantToken, userToken);
 
-            // Track keys we've processed in this sync to avoid duplicates from API response
-            var processedKeys = new HashSet<(int ProductId, int LocationId)>();
+                // Load all products and locations for this customer to map SKU/LocationCode to IDs
+                products = await _context.Products
+                    .AsNoTracking()
+                    .Where(p => p.CustomerId == customerId)
+                    .ToDictionaryAsync(p => p.Sku, p => p.Id);
 
-            // Upsert (insert/update) inventory levels
-            foreach (var apiItem in apiInventory)
-            {
-                if (!products.TryGetValue(apiItem.Sku, out var productId))
-                    continue;
-                if (!locationDict.TryGetValue(apiItem.LocationCode, out var locationId))
-                    continue;
+                locations = await _context.Locations
+                    .AsNoTracking()
+                    .Where(l => l.CustomerId == customerId)
+                    .ToListAsync();
 
-                var key = (productId, locationId);
-                // Skip if we've already processed this key in this sync (duplicate from API)
-                if (processedKeys.Contains(key))
+                // Build location dictionary, taking first occurrence of each code (duplicates skipped)
+                locationDict = new Dictionary<string, int>();
+                foreach (var location in locations)
                 {
-                    _logger.LogWarning("Duplicate inventory entry from API: SKU={Sku}, LocationCode={LocationCode}, skipping", apiItem.Sku, apiItem.LocationCode);
-                    continue;
-                }
-                processedKeys.Add(key);
-
-                var local = localLevels.FirstOrDefault(i => i.ProductId == productId && i.LocationId == locationId);
-                if (local != null)
-                {
-                    local.QuantityOnHand = apiItem.QuantityOnHand;
-                    local.QuantityAvailable = apiItem.QuantityAvailable;
-                    local.QuantityAllocated = apiItem.QuantityAllocated;
-                    local.UpdatedAtUtc = DateTime.UtcNow;
-                }
-                else
-                {
-                    var newLevel = new InventoryLevel
+                    if (!locationDict.ContainsKey(location.Code))
                     {
-                        CustomerId = customerId,
-                        ProductId = productId,
-                        LocationId = locationId,
-                        QuantityOnHand = apiItem.QuantityOnHand,
-                        QuantityAvailable = apiItem.QuantityAvailable,
-                        QuantityAllocated = apiItem.QuantityAllocated,
-                        UpdatedAtUtc = DateTime.UtcNow
-                    };
-                    _context.InventoryLevels.Add(newLevel);
+                        locationDict[location.Code] = location.Id;
+                    }
                 }
-            }
 
-            // Delete local inventory levels not present in SkuVault
-            var toDelete = localLevels.Where(i => !apiKeys.Contains((i.Product.Sku, i.Location.Code))).ToList();
-            if (toDelete.Count > 0)
+                // Build lookup of SkuVault inventory keys (SKU + LocationCode)
+                apiKeys = new HashSet<(string Sku, string LocationCode)>(apiInventory.Select(i => (i.Sku, i.LocationCode)));
+
+                // Load all local inventory levels for this customer
+                localLevels = await _context.InventoryLevels
+                    .Where(i => i.CustomerId == customerId)
+                    .Include(i => i.Product)
+                    .Include(i => i.Location)
+                    .ToListAsync();
+
+                // Track keys we've processed in this sync to avoid duplicates from API response
+                // Also track duplicate counts for better diagnostics
+                processedKeys = new HashSet<(int ProductId, int LocationId)>();
+                duplicateCounts = new Dictionary<(string Sku, string LocationCode), int>();
+
+                // Upsert (insert/update) inventory levels
+                foreach (var apiItem in apiInventory)
+                {
+                    if (!products.TryGetValue(apiItem.Sku, out var productId))
+                        continue;
+                    if (!locationDict.TryGetValue(apiItem.LocationCode, out var locationId))
+                        continue;
+
+                    var key = (productId, locationId);
+                    // Skip if we've already processed this key in this sync (duplicate from API)
+                    if (processedKeys.Contains(key))
+                    {
+                        var dupKey = (apiItem.Sku, apiItem.LocationCode);
+                        if (duplicateCounts.TryGetValue(dupKey, out var count))
+                        {
+                            duplicateCounts[dupKey] = count + 1;
+                        }
+                        else
+                        {
+                            duplicateCounts[dupKey] = 1;
+                        }
+                        _logger.LogWarning("Duplicate inventory entry from API: SKU={Sku}, LocationCode={LocationCode}, Qty={QtyOnHand}/{QtyAvailable}/{QtyAllocated}, skipping (instance #{Instance})", 
+                            apiItem.Sku, apiItem.LocationCode, apiItem.QuantityOnHand, apiItem.QuantityAvailable, apiItem.QuantityAllocated, duplicateCounts[dupKey] + 1);
+                        continue;
+                    }
+                    processedKeys.Add(key);
+
+                    var local = localLevels.FirstOrDefault(i => i.ProductId == productId && i.LocationId == locationId);
+                    if (local != null)
+                    {
+                        local.QuantityOnHand = apiItem.QuantityOnHand;
+                        local.QuantityAvailable = apiItem.QuantityAvailable;
+                        local.QuantityAllocated = apiItem.QuantityAllocated;
+                        local.UpdatedAtUtc = DateTime.UtcNow;
+                    }
+                    else
+                    {
+                        var newLevel = new InventoryLevel
+                        {
+                            CustomerId = customerId,
+                            ProductId = productId,
+                            LocationId = locationId,
+                            QuantityOnHand = apiItem.QuantityOnHand,
+                            QuantityAvailable = apiItem.QuantityAvailable,
+                            QuantityAllocated = apiItem.QuantityAllocated,
+                            UpdatedAtUtc = DateTime.UtcNow
+                        };
+                        _context.InventoryLevels.Add(newLevel);
+                    }
+                }
+
+                // Delete local inventory levels not present in SkuVault
+                toDelete = localLevels.Where(i => !apiKeys.Contains((i.Product.Sku, i.Location.Code))).ToList();
+                if (toDelete.Count > 0)
+                {
+                    _context.InventoryLevels.RemoveRange(toDelete);
+                    _logger.LogInformation("Deleted {Count} inventory levels not present in SkuVault for customer {CustomerId}", toDelete.Count, customerId);
+                }
+
+                await _context.SaveChangesAsync();
+                
+                // Log detailed summary for debugging inventory value issues
+                var totalInventoryValue = processedKeys.Count > 0 ? localLevels
+                    .Where(il => il.CustomerId == customerId)
+                    .Sum(il => (il.Product?.Cost ?? 0m) * il.QuantityOnHand) : 0m;
+                
+                var itemsWithNullCost = localLevels
+                    .Where(il => il.CustomerId == customerId && il.Product?.Cost == null)
+                    .Count();
+                
+                _logger.LogInformation("Inventory sync complete for customer {CustomerId}: " +
+                    "{ProcessedCount} items synced, {DeletedCount} items deleted. " +
+                    "Inventory value snapshot: {TotalValue:C}, Items with null cost: {NullCostCount}",
+                    customerId, processedKeys.Count, toDelete.Count, totalInventoryValue, itemsWithNullCost);
+                
+                // Log duplicate summary
+                if (duplicateCounts.Count > 0)
+                {
+                    _logger.LogWarning("Inventory sync found {DuplicateItemCount} items with duplicates. Total duplicate instances: {TotalDuplicates}", 
+                        duplicateCounts.Count, duplicateCounts.Values.Sum());
+                }
+
+                _logger.LogInformation("Synced inventory levels for customer {CustomerId}", customerId);
+            }
+            catch (Exception ex)
             {
-                _context.InventoryLevels.RemoveRange(toDelete);
-                _logger.LogInformation("Deleted {Count} inventory levels not present in SkuVault for customer {CustomerId}", toDelete.Count, customerId);
+                _logger.LogError(ex, "Error during inventory sync for customer {CustomerId}. Clearing change tracker.", customerId);
+                _context.ChangeTracker.Clear();
+                throw;
             }
-
-            await _context.SaveChangesAsync();
-            
-            products?.Clear();
-            products = null;
-            locations?.Clear();
-            locations = null;
-            locationDict?.Clear();
-            locationDict = null;
-            apiInventory?.Clear();
-            apiInventory = null;
-            localLevels?.Clear();
-            localLevels = null;
-            processedKeys?.Clear();
-            processedKeys = null;
-            _context.ChangeTracker.Clear();
-            
-            _logger.LogInformation("Synced inventory levels for customer {CustomerId}", customerId);
+            finally
+            {
+                // Guaranteed cleanup even on exception
+                products?.Clear();
+                products = null;
+                locations?.Clear();
+                locations = null;
+                locationDict?.Clear();
+                locationDict = null;
+                apiInventory?.Clear();
+                apiInventory = null;
+                localLevels?.Clear();
+                localLevels = null;
+                apiKeys?.Clear();
+                apiKeys = null;
+                processedKeys?.Clear();
+                processedKeys = null;
+                duplicateCounts?.Clear();
+                duplicateCounts = null;
+                toDelete?.Clear();
+                toDelete = null;
+                _context.ChangeTracker.Clear();
+            }
         }
 
         // DECOMMISSIONED: SyncInventoryMovementsAsync - use SyncTransactionsAsync instead
@@ -776,129 +878,147 @@ namespace SkuVaultSaaS.Infrastructure.Services
 
         public async Task SyncTransactionsAsync(int customerId, DateTime syncStartTime, DateTime syncFromDate)
         {
-            _logger.LogInformation("Syncing transactions for customer {CustomerId}", customerId);
+            // Collection declarations at method scope for guaranteed cleanup in finally block
+            Dictionary<string, int>? products = null;
+            Dictionary<string, int>? locations = null;
+            List<Location>? locationList = null;
+            HashSet<string>? existingSkuVaultIds = null;
+            List<SkuVaultInventoryMovementDto>? chunkTransactions = null;
 
-            var customer = await _context.Customers
-                .Include(c => c.Tenant)
-                .FirstOrDefaultAsync(c => c.Id == customerId);
-
-            if (customer?.Tenant == null)
+            try
             {
-                throw new InvalidOperationException($"Customer {customerId} not found or has no tenant");
-            }
+                _logger.LogInformation("Syncing transactions for customer {CustomerId}", customerId);
 
-            if (string.IsNullOrEmpty(customer.Tenant.SkuVaultTenantToken) || string.IsNullOrEmpty(customer.Tenant.SkuVaultUserToken))
-            {
-                throw new InvalidOperationException($"SkuVault tokens not configured for customer {customerId}");
-            }
+                var customer = await _context.Customers
+                    .Include(c => c.Tenant)
+                    .FirstOrDefaultAsync(c => c.Id == customerId);
 
-            // Determine if this is an initial sync
-            bool isInitialSync = customer.LastSyncedAt == default;
-            
-            // Use the syncFromDate passed from main method (calculated before transactions ran)
-            // This ensures sales sync uses the same historical window
-            var fromDate = syncFromDate;
-            var toDate = DateTime.UtcNow;
-
-            _logger.LogInformation("Sync mode: {Mode}, date range: {From} to {To}", 
-                isInitialSync ? "Initial" : "Incremental", fromDate, toDate);
-
-            // Decrypt tokens before sending to API
-            var tenantToken = DecryptToken(customer.Tenant.SkuVaultTenantToken);
-            var userToken = DecryptToken(customer.Tenant.SkuVaultUserToken);
-
-            // Fetch and process transactions in 6-day chunks (stay under 7-day limit)
-            // Process each chunk immediately during the delay period instead of accumulating all
-            var products = await _context.Products
-                .AsNoTracking()
-                .Where(p => p.CustomerId == customerId)
-                .ToDictionaryAsync(p => p.Sku, p => p.Id);
-
-            var locationList = await _context.Locations
-                .AsNoTracking()
-                .Where(l => l.CustomerId == customerId)
-                .ToListAsync();
-
-            // Build location dictionary, taking first occurrence of each code (duplicates skipped)
-            var locations = new Dictionary<string, int>();
-            foreach (var location in locationList)
-            {
-                if (!locations.ContainsKey(location.Code))
+                if (customer?.Tenant == null)
                 {
-                    locations[location.Code] = location.Id;
+                    throw new InvalidOperationException($"Customer {customerId} not found or has no tenant");
                 }
-            }
 
-            // Load all existing transaction SkuVaultIds for this customer into memory (single query)
-            var existingSkuVaultIds = new HashSet<string>(
-                await _context.Transactions
-                    .Where(t => t.CustomerId == customerId)
-                    .AsNoTracking()
-                    .Select(t => t.SkuVaultId)
-                    .ToListAsync()
-            );
-            _logger.LogInformation("Loaded {Count} existing transaction IDs for customer {CustomerId}", existingSkuVaultIds.Count, customerId);
+                if (string.IsNullOrEmpty(customer.Tenant.SkuVaultTenantToken) || string.IsNullOrEmpty(customer.Tenant.SkuVaultUserToken))
+                {
+                    throw new InvalidOperationException($"SkuVault tokens not configured for customer {customerId}");
+                }
 
-            const int batchSize = 500;
-            int totalSyncedCount = 0;
-            DateTime chunkStart = fromDate;
-            while (chunkStart < toDate)
-            {
-                DateTime chunkEnd = chunkStart.AddDays(6);
-                if (chunkEnd > toDate) chunkEnd = toDate;
-                _logger.LogInformation($"Requesting transactions chunk: {chunkStart:u} to {chunkEnd:u}");
-                try
-                {
-                    var chunkTransactions = await _apiClient.GetInventoryMovementsAsync(
-                        tenantToken!,
-                        userToken!,
-                        chunkStart,
-                        chunkEnd);
-                    
-                    // Process this chunk immediately during the delay
-                    _logger.LogInformation("Processing {Count} transactions from chunk {ChunkStart} to {ChunkEnd} during delay period", 
-                        chunkTransactions.Count, chunkStart, chunkEnd);
-                    
-                    int chunkSyncedCount = await ProcessTransactionChunkAsync(chunkTransactions, customerId, products, locations, 
-                        existingSkuVaultIds, batchSize);
-                    totalSyncedCount += chunkSyncedCount;
-                    
-                    // Explicitly dispose/clear chunk to free memory immediately after processing
-                    chunkTransactions?.Clear();
-                    chunkTransactions = null;
-                }
-                catch (HttpRequestException ex) when (ex.Message.Contains("429"))
-                {
-                    _logger.LogWarning("Rate limited while fetching chunk {ChunkStart} to {ChunkEnd}, skipping this chunk", chunkStart, chunkEnd);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to fetch transactions for chunk {ChunkStart} to {ChunkEnd}", chunkStart, chunkEnd);
-                }
-                chunkStart = chunkEnd;
+                // Determine if this is an initial sync
+                bool isInitialSync = customer.LastSyncedAt == default;
                 
-                if (chunkStart < toDate)
+                // Use the syncFromDate passed from main method (calculated before transactions ran)
+                // This ensures sales sync uses the same historical window
+                var fromDate = syncFromDate;
+                var toDate = DateTime.UtcNow;
+
+                _logger.LogInformation("Sync mode: {Mode}, date range: {From} to {To}", 
+                    isInitialSync ? "Initial" : "Incremental", fromDate, toDate);
+
+                // Decrypt tokens before sending to API
+                var tenantToken = DecryptToken(customer.Tenant.SkuVaultTenantToken);
+                var userToken = DecryptToken(customer.Tenant.SkuVaultUserToken);
+
+                // Fetch and process transactions in 6-day chunks (stay under 7-day limit)
+                // Process each chunk immediately during the delay period instead of accumulating all
+                products = await _context.Products
+                    .AsNoTracking()
+                    .Where(p => p.CustomerId == customerId)
+                    .ToDictionaryAsync(p => p.Sku, p => p.Id);
+
+                locationList = await _context.Locations
+                    .AsNoTracking()
+                    .Where(l => l.CustomerId == customerId)
+                    .ToListAsync();
+
+                // Build location dictionary, taking first occurrence of each code (duplicates skipped)
+                locations = new Dictionary<string, int>();
+                foreach (var location in locationList)
                 {
-                    _logger.LogInformation("Waiting 13 seconds before next chunk...");
-                    await Task.Delay(13000);
+                    if (!locations.ContainsKey(location.Code))
+                    {
+                        locations[location.Code] = location.Id;
+                    }
                 }
+
+                // Load all existing transaction SkuVaultIds for this customer into memory (single query)
+                existingSkuVaultIds = new HashSet<string>(
+                    await _context.Transactions
+                        .Where(t => t.CustomerId == customerId)
+                        .AsNoTracking()
+                        .Select(t => t.SkuVaultId)
+                        .ToListAsync()
+                );
+                _logger.LogInformation("Loaded {Count} existing transaction IDs for customer {CustomerId}", existingSkuVaultIds.Count, customerId);
+
+                const int batchSize = 500;
+                int totalSyncedCount = 0;
+                DateTime chunkStart = fromDate;
+                while (chunkStart < toDate)
+                {
+                    DateTime chunkEnd = chunkStart.AddDays(6);
+                    if (chunkEnd > toDate) chunkEnd = toDate;
+                    _logger.LogInformation($"Requesting transactions chunk: {chunkStart:u} to {chunkEnd:u}");
+                    try
+                    {
+                        chunkTransactions = await _apiClient.GetInventoryMovementsAsync(
+                            tenantToken!,
+                            userToken!,
+                            chunkStart,
+                            chunkEnd);
+                        
+                        // Process this chunk immediately during the delay
+                        _logger.LogInformation("Processing {Count} transactions from chunk {ChunkStart} to {ChunkEnd} during delay period", 
+                            chunkTransactions.Count, chunkStart, chunkEnd);
+                        
+                        int chunkSyncedCount = await ProcessTransactionChunkAsync(chunkTransactions, customerId, products, locations, 
+                            existingSkuVaultIds, batchSize);
+                        totalSyncedCount += chunkSyncedCount;
+                        
+                        // Explicitly dispose/clear chunk to free memory immediately after processing
+                        chunkTransactions?.Clear();
+                        chunkTransactions = null;
+                    }
+                    catch (HttpRequestException ex) when (ex.Message.Contains("429"))
+                    {
+                        _logger.LogWarning("Rate limited while fetching chunk {ChunkStart} to {ChunkEnd}, skipping this chunk", chunkStart, chunkEnd);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to fetch transactions for chunk {ChunkStart} to {ChunkEnd}", chunkStart, chunkEnd);
+                    }
+                    chunkStart = chunkEnd;
+                    
+                    if (chunkStart < toDate)
+                    {
+                        _logger.LogInformation("Waiting 13 seconds before next chunk...");
+                        await Task.Delay(13000);
+                    }
+                }
+
+                _logger.LogInformation("Transaction sync complete for customer {CustomerId}: {SyncedCount} transactions synced", 
+                    customerId, totalSyncedCount);
             }
-
-            _logger.LogInformation("Transaction sync complete for customer {CustomerId}: {SyncedCount} transactions synced", 
-                customerId, totalSyncedCount);
-
-            // Clear large collections to free memory immediately after processing
-            products?.Clear();
-            products = null;
-            locations?.Clear();
-            locations = null;
-            locationList?.Clear();
-            locationList = null;
-            existingSkuVaultIds?.Clear();
-            existingSkuVaultIds = null;
-            
-            // CRITICAL: Clear EF Core change tracker to release all tracked entities from memory
-            _context.ChangeTracker.Clear();
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during transaction sync for customer {CustomerId}. Clearing change tracker.", customerId);
+                _context.ChangeTracker.Clear();
+                throw;
+            }
+            finally
+            {
+                // Guaranteed cleanup even on exception
+                products?.Clear();
+                products = null;
+                locations?.Clear();
+                locations = null;
+                locationList?.Clear();
+                locationList = null;
+                existingSkuVaultIds?.Clear();
+                existingSkuVaultIds = null;
+                chunkTransactions?.Clear();
+                chunkTransactions = null;
+                _context.ChangeTracker.Clear();
+            }
         }
 
         /// <summary>
@@ -1167,6 +1287,8 @@ namespace SkuVaultSaaS.Infrastructure.Services
                 return;
             }
 
+            // Use pre-calculated syncFromDate from SyncCustomerDataAsync for consistent date ranges across all syncs
+            // After initial sync, uses LastSyncedAt to retrieve only new/updated POs since last sync
             var fromDate = syncFromDate ?? (customer.LastSyncedAt == default ? DateTime.UtcNow.AddDays(-30) : customer.LastSyncedAt);
             var toDate = DateTime.UtcNow;
 
@@ -1195,6 +1317,8 @@ namespace SkuVaultSaaS.Infrastructure.Services
                 return;
             }
 
+            // Use pre-calculated syncFromDate from SyncCustomerDataAsync for consistent date ranges across all syncs
+            // After initial sync, uses LastSyncedAt; on initial sync, extends to 90 days for historical lead time analysis
             var fromDate = syncFromDate ?? (customer.LastSyncedAt == default ? DateTime.UtcNow.AddDays(-90) : customer.LastSyncedAt);
             var toDate = DateTime.UtcNow;
 
@@ -1275,7 +1399,9 @@ namespace SkuVaultSaaS.Infrastructure.Services
             
             foreach (var apiPo in apiPos)
             {
+                PurchaseOrder purchaseOrder;
                 var existingPo = existingPos.TryGetValue(apiPo.PoId, out var po) ? po : null;
+                
                 if (existingPo != null)
                 {
                     existingPo.PoNumber = apiPo.PoNumber;
@@ -1300,6 +1426,7 @@ namespace SkuVaultSaaS.Infrastructure.Services
                     existingPo.LineItemCount = apiPo.LineItemCount;
                     existingPo.TotalCost = apiPo.TotalCost;
                     existingPo.UpdatedDateUtc = DateTime.UtcNow;
+                    purchaseOrder = existingPo;
                     updated++;
                 }
                 else
@@ -1333,7 +1460,14 @@ namespace SkuVaultSaaS.Infrastructure.Services
                         UpdatedDateUtc = DateTime.UtcNow
                     };
                     _context.PurchaseOrders.Add(newPo);
+                    purchaseOrder = newPo;
                     added++;
+                }
+                
+                // Sync line items from API response
+                if (apiPo.LineItems?.Count > 0)
+                {
+                    await SyncPurchaseOrderLineItems(customerId, purchaseOrder.Id, apiPo.PoNumber, apiPo.LineItems);
                 }
             }
 
@@ -1351,6 +1485,64 @@ namespace SkuVaultSaaS.Infrastructure.Services
             _logger.LogInformation("Purchase orders sync complete ({SyncType}) for customer {CustomerId}: {Added} added, {Updated} updated", syncType, customerId, added, updated);
             
             return (added, updated);
+        }
+
+        private async Task SyncPurchaseOrderLineItems(int customerId, int purchaseOrderId, string poNumber, List<SkuVaultPurchaseOrderLineItemDto> apiLineItems)
+        {
+            // Load existing line items for this PO
+            var existingLineItems = await _context.PurchaseOrderLineItems
+                .Where(li => li.PurchaseOrderId == purchaseOrderId)
+                .ToDictionaryAsync(li => li.SKU, li => li);
+
+            foreach (var apiLineItem in apiLineItems)
+            {
+                if (existingLineItems.TryGetValue(apiLineItem.SKU, out var existingLineItem))
+                {
+                    // Update existing line item
+                    existingLineItem.ProductId = apiLineItem.ProductId;
+                    existingLineItem.Quantity = apiLineItem.Quantity;
+                    existingLineItem.QuantityTo3PL = apiLineItem.QuantityTo3PL;
+                    existingLineItem.ReceivedQuantity = apiLineItem.ReceivedQuantity;
+                    existingLineItem.ReceivedQuantityTo3PL = apiLineItem.ReceivedQuantityTo3PL;
+                    existingLineItem.ReceivedDate = apiLineItem.ReceivedDate;
+                    existingLineItem.Cost = apiLineItem.Cost;
+                    existingLineItem.RetailCost = apiLineItem.RetailCost;
+                    existingLineItem.PrivateNotes = apiLineItem.PrivateNotes;
+                    existingLineItem.PublicNotes = apiLineItem.PublicNotes;
+                    existingLineItem.Variant = apiLineItem.Variant;
+                    existingLineItem.Identifier = apiLineItem.Identifier;
+                    existingLineItem.UpdatedDateUtc = DateTime.UtcNow;
+                }
+                else
+                {
+                    // Add new line item
+                    var newLineItem = new PurchaseOrderLineItem
+                    {
+                        CustomerId = customerId,
+                        PurchaseOrderId = purchaseOrderId,
+                        PoNumber = poNumber,
+                        ProductId = apiLineItem.ProductId,
+                        SKU = apiLineItem.SKU,
+                        Quantity = apiLineItem.Quantity,
+                        QuantityTo3PL = apiLineItem.QuantityTo3PL,
+                        ReceivedQuantity = apiLineItem.ReceivedQuantity,
+                        ReceivedQuantityTo3PL = apiLineItem.ReceivedQuantityTo3PL,
+                        ReceivedDate = apiLineItem.ReceivedDate,
+                        Cost = apiLineItem.Cost,
+                        RetailCost = apiLineItem.RetailCost,
+                        PrivateNotes = apiLineItem.PrivateNotes,
+                        PublicNotes = apiLineItem.PublicNotes,
+                        Variant = apiLineItem.Variant,
+                        Identifier = apiLineItem.Identifier,
+                        CreatedDateUtc = DateTime.UtcNow,
+                        UpdatedDateUtc = DateTime.UtcNow
+                    };
+                    _context.PurchaseOrderLineItems.Add(newLineItem);
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Synced {Count} line items for PO {PoNumber} (PurchaseOrderId {PurchaseOrderId})", apiLineItems.Count, poNumber, purchaseOrderId);
         }
 
         public async Task SyncIntegrationsAsync(int customerId)
@@ -1451,7 +1643,7 @@ namespace SkuVaultSaaS.Infrastructure.Services
             return result;
         }
 
-        public async Task SyncReceivesHistoryAsync(int customerId, DateTime? syncFromDate = null)
+        public async Task SyncReceivesHistoryAsync(int customerId, DateTime? syncFromDate = null, DateTime? syncToDate = null)
         {
             var customer = await _context.Customers.Include(c => c.Tenant).FirstOrDefaultAsync(c => c.Id == customerId);
             if (customer?.Tenant == null || string.IsNullOrEmpty(customer.Tenant.SkuVaultTenantToken) || string.IsNullOrEmpty(customer.Tenant.SkuVaultUserToken))
@@ -1467,9 +1659,10 @@ namespace SkuVaultSaaS.Infrastructure.Services
                 var userToken = DecryptToken(customer.Tenant.SkuVaultUserToken)!;
 
                 var fromDate = syncFromDate ?? (customer.LastSyncedAt != DateTime.MinValue ? customer.LastSyncedAt : DateTime.UtcNow.AddDays(-90));
-                _logger.LogInformation("Syncing receives history for customer {CustomerId} from {FromDate}", customerId, fromDate);
+                var toDate = syncToDate ?? DateTime.UtcNow;
+                _logger.LogInformation("Syncing receives history for customer {CustomerId} from {FromDate} to {ToDate}", customerId, fromDate, toDate);
 
-                var receives = await _apiClient.GetReceivesHistoryAsync(tenantToken, userToken, fromDate, null, null);
+                var receives = await _apiClient.GetReceivesHistoryAsync(tenantToken, userToken, fromDate, toDate, null);
 
                 // Process receives
                 var (receivesAdded, receivesUpdated) = await UpdateReceivesInDatabase(customerId, receives.Receives);
@@ -1578,14 +1771,26 @@ namespace SkuVaultSaaS.Infrastructure.Services
         {
             int added = 0, updated = 0;
 
-            var existingPoNumbers = apiCorrections.Select(c => c.PONumber).Distinct().ToList();
+            // Deduplicate corrections by (PONumber, SKU, CorrectedDate) - keep the last occurrence
+            var deduplicatedCorrections = apiCorrections
+                .GroupBy(c => new { c.PONumber, c.SKU, c.CorrectedDate })
+                .Select(g => g.Last())
+                .ToList();
+
+            if (deduplicatedCorrections.Count < apiCorrections.Count)
+            {
+                _logger.LogInformation("Skipped {DuplicateCount} duplicate corrections for customer {CustomerId}",
+                    apiCorrections.Count - deduplicatedCorrections.Count, customerId);
+            }
+
+            var existingPoNumbers = deduplicatedCorrections.Select(c => c.PONumber).Distinct().ToList();
             var existingCorrections = await _context.PurchaseOrderReceiveCorrections
                 .Where(c => c.CustomerId == customerId && existingPoNumbers.Contains(c.PONumber))
-                .ToDictionaryAsync(c => new { c.PONumber, c.PartNumber, c.CorrectedDate }, c => c);
+                .ToDictionaryAsync(c => new { c.PONumber, c.SKU, c.CorrectedDate }, c => c);
 
-            foreach (var apiCorrection in apiCorrections)
+            foreach (var apiCorrection in deduplicatedCorrections)
             {
-                var key = new { PONumber = apiCorrection.PONumber, PartNumber = apiCorrection.PartNumber, CorrectedDate = apiCorrection.CorrectedDate };
+                var key = new { PONumber = apiCorrection.PONumber, SKU = apiCorrection.SKU, CorrectedDate = apiCorrection.CorrectedDate };
 
                 if (existingCorrections.TryGetValue(key, out var existing))
                 {

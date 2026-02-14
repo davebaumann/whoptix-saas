@@ -78,11 +78,11 @@ namespace SkuVaultSaaS.Api.Services
                 _logger.LogInformation("Starting demo data refresh for customer 2");
 
                 // Create a separate DbContext for the demo database
-                var demoConnectionString = _demoConnectionService.GetConnectionString(null);
+                var demoConnectionString = _demoConnectionService.GetConnectionString(null) ?? throw new InvalidOperationException("Demo connection string is null");
                 var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
                 optionsBuilder.UseMySql(demoConnectionString, ServerVersion.AutoDetect(demoConnectionString), mySqlOptions =>
                 {
-                    mySqlOptions.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(5), errorNumbersToAdd: null);
+                    mySqlOptions.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(5), errorNumbersToAdd: new List<int>());
                 });
 
                 using var demoContext = new ApplicationDbContext(optionsBuilder.Options);

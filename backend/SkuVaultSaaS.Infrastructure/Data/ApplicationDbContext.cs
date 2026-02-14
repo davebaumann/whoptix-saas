@@ -21,6 +21,7 @@ namespace SkuVaultSaaS.Infrastructure.Data
         public DbSet<SaleItem> SaleItems => Set<SaleItem>();
         public DbSet<Shipment> Shipments => Set<Shipment>();
         public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
+        public DbSet<PurchaseOrderLineItem> PurchaseOrderLineItems => Set<PurchaseOrderLineItem>();
         public DbSet<PurchaseOrderReceive> PurchaseOrderReceives => Set<PurchaseOrderReceive>();
         public DbSet<PurchaseOrderReceiveCorrection> PurchaseOrderReceiveCorrections => Set<PurchaseOrderReceiveCorrection>();
         public DbSet<UserInvitation> UserInvitations => Set<UserInvitation>();

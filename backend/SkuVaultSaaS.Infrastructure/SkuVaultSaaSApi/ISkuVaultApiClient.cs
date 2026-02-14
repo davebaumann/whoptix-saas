@@ -139,10 +139,52 @@ namespace SkuVaultSaaS.Infrastructure.SkuVaultSaaSApi
         public string TermsName { get; set; } = string.Empty;
         public string ShipToWarehouse { get; set; } = string.Empty;
         public string ShipToAddress { get; set; } = string.Empty;
-        public string CarrierName { get; set; } = string.Empty;
-        public string ClassName { get; set; } = string.Empty;
+        
+        // Nested object from API - flattened after deserialization
+        public SkuVaultShippingCarrierClassDto? ShippingCarrierClass { get; set; }
+        
+        // Extracted from ShippingCarrierClass for convenience
+        [System.Text.Json.Serialization.JsonIgnore]
+        public string CarrierName 
+        { 
+            get => ShippingCarrierClass?.CarrierName ?? string.Empty;
+            set { if (ShippingCarrierClass == null) ShippingCarrierClass = new(); ShippingCarrierClass.CarrierName = value; }
+        }
+        
+        [System.Text.Json.Serialization.JsonIgnore]
+        public string ClassName 
+        { 
+            get => ShippingCarrierClass?.ClassName ?? string.Empty;
+            set { if (ShippingCarrierClass == null) ShippingCarrierClass = new(); ShippingCarrierClass.ClassName = value; }
+        }
+        
+        public List<object>? Costs { get; set; } = null;
         public int LineItemCount { get; set; }
         public decimal TotalCost { get; set; }
+        public List<SkuVaultPurchaseOrderLineItemDto>? LineItems { get; set; } = null;
+    }
+
+    public class SkuVaultShippingCarrierClassDto
+    {
+        public string CarrierName { get; set; } = string.Empty;
+        public string ClassName { get; set; } = string.Empty;
+    }
+
+    public class SkuVaultPurchaseOrderLineItemDto
+    {
+        public string ProductId { get; set; } = string.Empty;
+        public string SKU { get; set; } = string.Empty;
+        public int Quantity { get; set; }
+        public int QuantityTo3PL { get; set; }
+        public int ReceivedQuantity { get; set; }
+        public int ReceivedQuantityTo3PL { get; set; }
+        public DateTime ReceivedDate { get; set; }
+        public decimal Cost { get; set; }
+        public decimal RetailCost { get; set; }
+        public string? PrivateNotes { get; set; }
+        public string? PublicNotes { get; set; }
+        public string? Variant { get; set; }
+        public string? Identifier { get; set; }
     }
 
     public class SkuVaultReceiveDto

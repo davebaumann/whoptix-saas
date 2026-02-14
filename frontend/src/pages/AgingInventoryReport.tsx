@@ -80,7 +80,7 @@ export default function AgingInventoryReport() {
     queryKey: ['agingInventoryReport', customerId],
     queryFn: async () => {
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/reports/customer/${customerId}/aging-inventory`, {
-        credentials: 'include', // Use cookies for authentication like other working reports
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         }
@@ -99,13 +99,13 @@ export default function AgingInventoryReport() {
       setSortField(field)
       setSortDirection('desc')
     }
-    setCurrentPage(1)
+    setCurrentPage(1) // Reset to first page when sorting changes
   }
 
   // Group by SKU for main rows, with subrows for each location
   const getGroupedData = () => {
     if (!agingData) return [];
-    // Sort first
+    // Sort first - applies to entire dataset
     const sorted = [...agingData.details].sort((a, b) => {
       const aValue = a[sortField];
       const bValue = b[sortField];
@@ -125,8 +125,9 @@ export default function AgingInventoryReport() {
     return Object.entries(grouped);
   };
 
-  const paginatedGroups = getGroupedData().slice((currentPage - 1) * pageSize, currentPage * pageSize);
-  const totalPages = Math.ceil((agingData?.details.length || 0) / pageSize)
+  const allGroups = getGroupedData();
+  const paginatedGroups = allGroups.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const totalPages = Math.ceil((allGroups.length || 0) / pageSize);
 
   const getAgeColor = (days: number): string => {
     if (days <= 30) return 'text-green-600'
@@ -135,8 +136,14 @@ export default function AgingInventoryReport() {
     return 'text-red-600'
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return 'Unknown'
+    const date = new Date(dateString)
+    // Check if it's the Unix epoch (Jan 1, 1970)
+    if (date.getFullYear() === 1970 && date.getMonth() === 0 && date.getDate() === 1) {
+      return 'Unknown'
+    }
+    return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric'
@@ -373,8 +380,8 @@ export default function AgingInventoryReport() {
                   <div>
                     <p className="text-sm text-gray-700">
                       Showing <span className="font-medium">{(currentPage - 1) * pageSize + 1}</span> to{' '}
-                      <span className="font-medium">{Math.min(currentPage * pageSize, agingData.details.length)}</span> of{' '}
-                      <span className="font-medium">{agingData.details.length}</span> results
+                      <span className="font-medium">{Math.min(currentPage * pageSize, allGroups.length)}</span> of{' '}
+                      <span className="font-medium">{allGroups.length}</span> SKU groups
                     </p>
                   </div>
                   <div>

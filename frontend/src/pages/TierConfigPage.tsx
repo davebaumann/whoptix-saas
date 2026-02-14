@@ -37,7 +37,7 @@ const TierConfigPage: React.FC = () => {
     'locations': { tier: 3, name: 'Locations Report', description: 'Location utilization and optimization insights' },
     'performance': { tier: 4, name: 'Performance Analytics', description: 'Advanced metrics including velocity, turnover, and trends' },
     'picker-analytics': { tier: 3, name: 'Picker Analytics', description: 'Individual picker performance metrics, accuracy tracking, and productivity rankings' },
-    'lead-time': { tier: 5, name: 'Lead Time Report', description: 'Average lead time analysis by vendor and item - Development (Admin Only)' }
+    'lead-time': { tier: 4, name: 'Lead Time Report', description: 'Average lead time analysis by vendor and item' }
   };
 
   // Initialize edited state with current values from backend

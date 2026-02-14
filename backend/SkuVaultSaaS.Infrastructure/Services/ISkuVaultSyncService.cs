@@ -67,7 +67,7 @@ namespace SkuVaultSaaS.Infrastructure.Services
         /// <summary>
         /// Synchronizes purchase order receives history for a specific customer (for item-level lead time analysis)
         /// </summary>
-        Task SyncReceivesHistoryAsync(int customerId, DateTime? syncFromDate = null);
+        Task SyncReceivesHistoryAsync(int customerId, DateTime? syncFromDate = null, DateTime? syncToDate = null);
 
         /// <summary>
         /// Synchronizes integrations for a specific customer

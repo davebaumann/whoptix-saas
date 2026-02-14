@@ -23,6 +23,8 @@ const METRIC_TOOLTIPS: Tooltip = {
 
 const PickerAnalyticsContent: React.FC = () => {
   const [hoveredTooltip, setHoveredTooltip] = useState<string | null>(null)
+  const [sortField, setSortField] = useState<string>('unitsPicked')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const { user } = useAuth()
   // Check if admin is viewing as another customer
   const adminViewingData = sessionStorage.getItem('adminViewingAs');
@@ -45,6 +47,29 @@ const PickerAnalyticsContent: React.FC = () => {
         </div>
       )}
     </div>
+  )
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('desc')
+    }
+  }
+
+  const SortableHeader = ({ field, label }: { field: string; label: string }) => (
+    <th 
+      onClick={() => handleSort(field)}
+      className="px-6 py-3 text-right font-semibold text-gray-700 cursor-pointer hover:bg-gray-100"
+    >
+      <div className="flex items-center justify-end gap-1">
+        <span>{label}</span>
+        {sortField === field && (
+          <span className="text-xs">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+        )}
+      </div>
+    </th>
   )
 
   const { data: pickerData, isLoading, error } = useQuery({
@@ -170,15 +195,32 @@ const PickerAnalyticsContent: React.FC = () => {
             <thead>
               <tr className="border-b-2 border-gray-200">
                 <th className="px-6 py-3 text-left font-semibold text-gray-700">Name</th>
-                <th className="px-6 py-3 text-right font-semibold text-gray-700">Shift {renderTooltip('shift')}</th>
-                <th className="px-6 py-3 text-right font-semibold text-gray-700">Units Picked</th>
-                <th className="px-6 py-3 text-right font-semibold text-gray-700">Accuracy {renderTooltip('accuracy')}</th>
-                <th className="px-6 py-3 text-right font-semibold text-gray-700">Avg Time/Unit {renderTooltip('avgTimePerUnit')}</th>
+                <SortableHeader field="shift" label={`Shift ${renderTooltip('shift')}`} />
+                <SortableHeader field="unitsPicked" label="Units Picked" />
+                <SortableHeader field="accuracy" label={`Accuracy ${renderTooltip('accuracy')}`} />
+                <SortableHeader field="avgTimePerUnit" label={`Avg Time/Unit ${renderTooltip('avgTimePerUnit')}`} />
                 <th className="px-6 py-3 text-right font-semibold text-gray-700">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y">
-              {pickerData.pickerPerformance.map((picker: any) => (
+              {pickerData.pickerPerformance
+                .sort((a: any, b: any) => {
+                  let aVal = a[sortField]
+                  let bVal = b[sortField]
+                  
+                  // Handle numeric fields
+                  if (typeof aVal === 'number' && typeof bVal === 'number') {
+                    return sortDirection === 'asc' ? aVal - bVal : bVal - aVal
+                  }
+                  
+                  // Handle string fields
+                  if (typeof aVal === 'string' && typeof bVal === 'string') {
+                    return sortDirection === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
+                  }
+                  
+                  return 0
+                })
+                .map((picker: any) => (
                 <tr key={picker.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 font-medium text-gray-900">{picker.name}</td>
                   <td className="px-6 py-4 text-right text-gray-600">{picker.shift}</td>

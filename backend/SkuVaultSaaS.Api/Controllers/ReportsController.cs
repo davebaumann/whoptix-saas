@@ -494,10 +494,10 @@ namespace SkuVaultSaaS.Api.Controllers
                 var cutoffDate = DateTime.UtcNow.Date;
                 var transactionHistoryCutoff = cutoffDate.AddYears(-2); // Reduced from 3 to 2 years
                 
-                // Get current inventory with positive quantities
+                // Get all current inventory (including zero quantity items for aging analysis)
                 var currentInventory = await _context.InventoryLevels
                     .AsNoTracking()
-                    .Where(il => il.CustomerId == customerId && il.QuantityAvailable > 0)
+                    .Where(il => il.CustomerId == customerId)
                     .Include(il => il.Product)
                     .Include(il => il.Location)
                     .ToListAsync();
@@ -512,27 +512,34 @@ namespace SkuVaultSaaS.Api.Controllers
                     });
                 }
 
-                // Get SKUs and LocationIds that have current inventory
-                var skusWithInventory = currentInventory.Select(i => i.Product.Sku).Distinct().ToList();
+                // Get SKUs and LocationIds that have inventory
+                var skusWithInventory = currentInventory.Select(i => i.Product?.Sku).Where(s => !string.IsNullOrEmpty(s)).Distinct().ToList();
                 var locationIdsWithInventory = currentInventory.Where(i => i.LocationId > 0).Select(i => i.LocationId).Distinct().ToList();
 
-                // Fetch ALL relevant transactions in ONE query (memory optimized with AsNoTracking)
+                // Get ALL transactions for this customer (not filtered by SKU) to ensure we capture all aging data
                 var transactions = await _context.Transactions
-                    .AsNoTracking()
                     .Where(t => t.CustomerId == customerId && 
                                 t.TransactionDate >= transactionHistoryCutoff &&
-                                skusWithInventory.Contains(t.Sku) &&
-                                (!t.LocationId.HasValue || locationIdsWithInventory.Contains(t.LocationId.Value)))
-                    .OrderBy(t => t.TransactionDate)
+                                (t.TransactionType == "Add" || t.TransactionType == "Return") &&
+                                t.Quantity > 0)
+                    .AsNoTracking()
                     .ToListAsync();
 
                 var agingResults = new List<AgingInventoryItem>();
 
                 // Process each inventory item
+                _logger.LogInformation("Processing {InventoryCount} inventory items for customer {CustomerId}", currentInventory.Count, customerId);
                 foreach (var invLevel in currentInventory)
                 {
                     try
                     {
+                        // Skip if product not loaded
+                        if (invLevel.Product == null)
+                        {
+                            _logger.LogWarning("Inventory level {InventoryLevelId} has no associated product", invLevel.Id);
+                            continue;
+                        }
+
                         var sku = invLevel.Product.Sku;
                         var locationId = invLevel.LocationId;
 
@@ -596,6 +603,14 @@ namespace SkuVaultSaaS.Api.Controllers
                             oldestDate = null;
                         }
 
+                        // Calculate average days old weighted by quantity in each bucket
+                        var averageDaysOld = 0.0;
+                        if (currentQty > 0)
+                        {
+                            var daysSum = (days0_30 * 15) + (days31_60 * 45) + (days61_90 * 75) + (days90Plus * 120);
+                            averageDaysOld = (double)daysSum / currentQty;
+                        }
+
                         agingResults.Add(new AgingInventoryItem
                         {
                             Sku = sku,
@@ -609,7 +624,7 @@ namespace SkuVaultSaaS.Api.Controllers
                             Days61_90 = days61_90,
                             Days90Plus = days90Plus,
                             OldestReceiveDate = oldestDate,
-                            AverageDaysOld = 0
+                            AverageDaysOld = Math.Round(averageDaysOld, 1)
                         });
                     }
                     catch (Exception ex)
@@ -629,6 +644,9 @@ namespace SkuVaultSaaS.Api.Controllers
                     Days90Plus_Total = agingResults.Sum(x => x.Days90Plus)
                 };
 
+                _logger.LogInformation("Aging inventory report for customer {CustomerId}: {TotalSkus} SKUs, {DetailCount} detail items", 
+                    customerId, summary.TotalSkus, agingResults.Count);
+                
                 // Clear collections for GC
                 transactions.Clear();
                 currentInventory.Clear();
@@ -756,9 +774,11 @@ namespace SkuVaultSaaS.Api.Controllers
                         break;
                 }
 
-                // Get current inventory levels from InventoryLevels table (same as other reports)
+                // Get current inventory levels from InventoryLevels table
+                // NOTE: Using QuantityOnHand (includes allocated) not QuantityAvailable (excludes allocated)
+                // This ensures we capture the true inventory cost value
                 var inventoryLevels = await _context.InventoryLevels
-                    .Where(il => il.CustomerId == customerId && il.QuantityAvailable > 0)
+                    .Where(il => il.CustomerId == customerId && il.QuantityOnHand > 0)
                     .Include(il => il.Product)
                     .Include(il => il.Location)
                     .AsNoTracking()
@@ -783,11 +803,11 @@ namespace SkuVaultSaaS.Api.Controllers
                         ProductName = level.Product?.Name ?? "Unknown Product",
                         Warehouse = warehouse,
                         Location = location,
-                        Quantity = level.QuantityAvailable,
+                        Quantity = level.QuantityOnHand,
                         Cost = cost,
                         Price = price,
-                        TotalCostValue = cost * level.QuantityAvailable,
-                        TotalRetailValue = price * level.QuantityAvailable
+                        TotalCostValue = cost * level.QuantityOnHand,
+                        TotalRetailValue = price * level.QuantityOnHand
                     });
                 }
 
@@ -834,6 +854,85 @@ namespace SkuVaultSaaS.Api.Controllers
             {
                 _logger.LogError(ex, "Error generating financial warehouse report for customer {CustomerId}", customerId);
                 return StatusCode(500, "Error generating financial warehouse report");
+            }
+        }
+
+        [HttpGet("customer/{customerId}/inventory-diagnostics")]
+        [Authorize]
+        public async Task<IActionResult> GetInventoryDiagnostics(int customerId)
+        {
+            // Validate customer ID to prevent injection
+            if (!SkuVaultSaaS.Api.Utilities.ValidationHelper.ValidateCustomerId(customerId))
+            {
+                return BadRequest(SkuVaultSaaS.Api.Models.ErrorResponse.BadRequest("Invalid customer ID."));
+            }
+
+            // Check tenant access
+            var accessCheck = await CheckReportAccessAsync(customerId, "diagnostics");
+            if (accessCheck != null) return accessCheck;
+
+            try
+            {
+                // Get all inventory levels for this customer
+                var inventoryLevels = await _context.InventoryLevels
+                    .Where(il => il.CustomerId == customerId)
+                    .Include(il => il.Product)
+                    .Include(il => il.Location)
+                    .AsNoTracking()
+                    .ToListAsync();
+
+                // Calculate statistics
+                var totalOnHand = inventoryLevels.Sum(il => il.QuantityOnHand);
+                var totalAvailable = inventoryLevels.Sum(il => il.QuantityAvailable);
+                var totalAllocated = inventoryLevels.Sum(il => il.QuantityAllocated);
+                
+                var itemsWithCost = inventoryLevels.Where(il => il.Product?.Cost.HasValue == true).ToList();
+                var itemsWithoutCost = inventoryLevels.Where(il => !il.Product?.Cost.HasValue == true).ToList();
+                
+                var totalCostValueOnHand = itemsWithCost.Sum(il => (il.Product?.Cost ?? 0m) * il.QuantityOnHand);
+                var totalCostValueAvailable = itemsWithCost.Sum(il => (il.Product?.Cost ?? 0m) * il.QuantityAvailable);
+                
+                var warehouseBreakdown = inventoryLevels
+                    .GroupBy(il => il.Location?.Warehouse ?? "Unknown")
+                    .Select(g => new
+                    {
+                        Warehouse = g.Key,
+                        Items = g.Count(),
+                        TotalQuantityOnHand = g.Sum(il => il.QuantityOnHand),
+                        TotalQuantityAvailable = g.Sum(il => il.QuantityAvailable),
+                        CostValue = g.Where(il => il.Product?.Cost.HasValue == true)
+                            .Sum(il => (il.Product?.Cost ?? 0m) * il.QuantityOnHand)
+                    })
+                    .OrderByDescending(w => w.CostValue)
+                    .ToList();
+
+                return Ok(new
+                {
+                    summary = new
+                    {
+                        TotalInventoryItems = inventoryLevels.Count,
+                        TotalQuantityOnHand = totalOnHand,
+                        TotalQuantityAvailable = totalAvailable,
+                        TotalQuantityAllocated = totalAllocated,
+                        ItemsWithCost = itemsWithCost.Count,
+                        ItemsWithoutCost = itemsWithoutCost.Count,
+                        TotalCostValueOnHand = $"{totalCostValueOnHand:C}",
+                        TotalCostValueAvailable = $"{totalCostValueAvailable:C}",
+                        AverageCostPerItemOnHand = totalOnHand > 0 ? totalCostValueOnHand / totalOnHand : 0m,
+                        AverageCostPerItemAvailable = totalAvailable > 0 ? totalCostValueAvailable / totalAvailable : 0m
+                    },
+                    warehouseBreakdown = warehouseBreakdown,
+                    itemsWithoutCost = itemsWithoutCost
+                        .Select(il => new { SKU = il.Product?.Sku ?? "Unknown", LocationCode = il.Location?.Code ?? "Unknown" })
+                        .Distinct()
+                        .Take(20)
+                        .ToList()
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating inventory diagnostics for customer {CustomerId}", customerId);
+                return StatusCode(500, "Error generating inventory diagnostics");
             }
         }
 
@@ -1168,25 +1267,8 @@ namespace SkuVaultSaaS.Api.Controllers
                     query = query.Where(s => s.SaleDate <= toDateUtc);
                 }
 
-                // Get all sales for this customer
-                var sales = await query.ToListAsync();
-
-                // Get all products with their costs
-                var products = await _context.Products
-                    .Where(p => p.CustomerId == customerId)
-                    .ToListAsync();
-
-                // Get current inventory levels
-                var inventoryLevels = await _context.InventoryLevels
-                    .Where(il => il.CustomerId == customerId)
-                    .Include(il => il.Product)
-                    .ToListAsync();
-
-                // Build SKU → Product map
-                var productMap = products.ToDictionary(p => p.Sku, p => p);
-
-                // Group sales by SKU
-                var salesBySku = sales
+                // Aggregate at database level - NO ToListAsync for large sales table!
+                var salesBySku = await query
                     .GroupBy(s => s.Sku)
                     .Select(g => new
                     {
@@ -1195,7 +1277,24 @@ namespace SkuVaultSaaS.Api.Controllers
                         TotalRevenue = g.Sum(s => s.Quantity * s.Price),
                         AvgPrice = g.Average(s => s.Price)
                     })
-                    .ToList();
+                    .ToListAsync();
+
+                // Get only products referenced in sales
+                var skusInSales = salesBySku.Select(s => s.Sku).ToList();
+                var products = await _context.Products
+                    .Where(p => p.CustomerId == customerId && skusInSales.Contains(p.Sku))
+                    .AsNoTracking()
+                    .ToListAsync();
+
+                // Get inventory only for SKUs in sales
+                var inventoryLevels = await _context.InventoryLevels
+                    .Where(il => il.CustomerId == customerId && skusInSales.Contains(il.Product.Sku))
+                    .Include(il => il.Product)
+                    .AsNoTracking()
+                    .ToListAsync();
+
+                // Build SKU → Product map
+                var productMap = products.ToDictionary(p => p.Sku, p => p);
 
                 // Build profitability items
                 var items = new List<ProfitabilityItem>();
@@ -1276,27 +1375,10 @@ namespace SkuVaultSaaS.Api.Controllers
 
             try
             {
-                // Get sales data for the last 90 days
+                // Get sales data for the last 90 days - aggregate at database level
                 var cutoffDate = DateTime.UtcNow.AddDays(-90);
-                var sales = await _context.Sales
+                var salesBySkuAndDate = await _context.Sales
                     .Where(s => s.CustomerId == customerId && s.SaleDate >= cutoffDate)
-                    .ToListAsync();
-
-                // Get all products
-                var products = await _context.Products
-                    .Where(p => p.CustomerId == customerId)
-                    .ToListAsync();
-
-                // Get current inventory levels
-                var inventoryLevels = await _context.InventoryLevels
-                    .Where(il => il.CustomerId == customerId)
-                    .Include(il => il.Product)
-                    .ToListAsync();
-
-                var productMap = products.ToDictionary(p => p.Sku, p => p);
-
-                // Group sales by SKU and date
-                var salesBySkuAndDate = sales
                     .GroupBy(s => new { s.Sku, Date = s.SaleDate.Date })
                     .Select(g => new
                     {
@@ -1306,7 +1388,25 @@ namespace SkuVaultSaaS.Api.Controllers
                     })
                     .OrderBy(x => x.Sku)
                     .ThenBy(x => x.Date)
-                    .ToList();
+                    .ToListAsync();
+
+                // Get only SKUs that have sales data
+                var skusWithSales = salesBySkuAndDate.Select(s => s.Sku).Distinct().ToList();
+
+                // Get only products referenced in sales
+                var products = await _context.Products
+                    .Where(p => p.CustomerId == customerId && skusWithSales.Contains(p.Sku))
+                    .AsNoTracking()
+                    .ToListAsync();
+
+                // Get inventory only for SKUs with sales
+                var inventoryLevels = await _context.InventoryLevels
+                    .Where(il => il.CustomerId == customerId && skusWithSales.Contains(il.Product.Sku))
+                    .Include(il => il.Product)
+                    .AsNoTracking()
+                    .ToListAsync();
+
+                var productMap = products.ToDictionary(p => p.Sku, p => p);
 
                 var forecasts = new List<DemandForecastItem>();
 
@@ -1561,15 +1661,25 @@ namespace SkuVaultSaaS.Api.Controllers
                     var unitsSold = g.Sum(m => Math.Abs(m.Quantity));
                     var days = 30; // Assuming 30-day period
                     var velocity = days > 0 ? (decimal)unitsSold / days : 0;
+                    
+                    // Get product cost from inventory levels
+                    var productCost = inventory
+                        .Where(il => il.ProductId == g.Key.ProductId)
+                        .Select(il => il.Product?.Cost ?? 0)
+                        .FirstOrDefault();
+                    
+                    var revenue = unitsSold * productCost;
+                    var currentStock = inventory.Where(il => il.ProductId == g.Key.ProductId).Sum(il => il.QuantityOnHand);
+                    
                     return new TopPerformer
                     {
                         ProductSku = g.Key.Sku,
-                        ProductName = g.FirstOrDefault()?.Title ?? g.Key.Sku, // Use Title from Transactions
+                        ProductName = g.FirstOrDefault()?.Title ?? g.Key.Sku,
                         Sku = g.Key.Sku,
-                        Revenue = 0, // Transactions table has no cost data
+                        Revenue = revenue,
                         UnitsSold = unitsSold,
                         Transactions = g.Count(),
-                        CurrentStock = inventory.Where(il => il.ProductId == g.Key.ProductId).Sum(il => il.QuantityOnHand),
+                        CurrentStock = currentStock,
                         Velocity = velocity
                     };
                 })
@@ -1790,106 +1900,131 @@ namespace SkuVaultSaaS.Api.Controllers
         }
 
         [HttpGet("customer/{customerId}/lead-time")]
-        public async Task<IActionResult> GetLeadTimeReport(int customerId)
+        public async Task<IActionResult> GetLeadTimeReport(int customerId, [FromQuery] DateTime? fromDate = null, [FromQuery] DateTime? toDate = null)
         {
             var accessCheck = await CheckReportAccessAsync(customerId, "lead-time");
             if (accessCheck != null) return accessCheck;
 
             try
             {
-                // Get all purchase orders with their receives
-                var purchaseOrders = await _context.PurchaseOrders
-                    .Where(po => po.CustomerId == customerId)
+                var today = DateTime.UtcNow.Date;
+
+                // Get all POs and receives with efficient filtering
+                var pos = await _context.PurchaseOrders
+                    .Where(po => po.CustomerId == customerId &&
+                                (!fromDate.HasValue || po.OrderDate >= fromDate.Value) &&
+                                (!toDate.HasValue || po.OrderDate <= toDate.Value))
                     .AsNoTracking()
                     .ToListAsync();
 
                 var receives = await _context.PurchaseOrderReceives
-                    .Where(r => r.CustomerId == customerId)
+                    .Where(r => r.CustomerId == customerId &&
+                               (!toDate.HasValue || r.ReceiptDate <= toDate.Value))
                     .AsNoTracking()
                     .ToListAsync();
 
-                // Calculate Lead Time by Vendor
-                var leadTimeByVendor = purchaseOrders
-                    .GroupBy(po => po.SupplierName)
-                    .Select(g => {
-                        var orders = g.ToList();
-                        var completedOrders = orders.Where(po => po.Status == "Received" || po.Status == "Closed").ToList();
-                        
-                        var leadTimes = completedOrders
-                            .Where(po => po.ArrivalDueDate > DateTime.MinValue && po.ActualShippedDate > DateTime.MinValue)
-                            .Select(po => (po.ActualShippedDate - po.OrderDate).TotalDays)
-                            .ToList();
+                // Build set of PO numbers that have receipts
+                var posWithReceipts = new HashSet<string>(receives.Select(r => r.PONumber));
 
-                        var lateOrders = completedOrders.Count(po => po.ActualShippedDate > po.ArrivalDueDate);
-
-                        return new LeadTimeByVendor
-                        {
-                            Vendor = g.Key,
-                            TotalOrders = orders.Count,
-                            CompletedOrders = completedOrders.Count,
-                            AverageLeadTimeDays = leadTimes.Any() ? Math.Round(leadTimes.Average(), 2) : 0,
-                            MinLeadTimeDays = leadTimes.Any() ? Math.Round(leadTimes.Min(), 2) : 0,
-                            MaxLeadTimeDays = leadTimes.Any() ? Math.Round(leadTimes.Max(), 2) : 0,
-                            LatePurchaseOrders = lateOrders,
-                            LatePercentage = completedOrders.Any() ? Math.Round((lateOrders / (double)completedOrders.Count) * 100, 2) : 0
-                        };
-                    })
-                    .OrderByDescending(v => v.AverageLeadTimeDays)
+                // Filter out completed POs with no receipts (drop-ship orders that bypass warehouse)
+                var filteredPos = pos
+                    .Where(po => po.Status != "Completed" || posWithReceipts.Contains(po.PoNumber))
                     .ToList();
 
-                // Calculate Lead Time by Item
+                _logger.LogInformation("Lead time report: {TotalPOs} total POs, filtered to {FilteredPOs} (excluded {ExcludedCount} completed drop-ship POs with no receipts) for customer {CustomerId}",
+                    pos.Count, filteredPos.Count, pos.Count - filteredPos.Count, customerId);
+
+                // Calculate lead times in memory using filtered POs
+                var leadTimes = filteredPos
+                    .Where(po => !string.IsNullOrEmpty(po.SupplierName) && po.SupplierName != "Unknown")
+                    .GroupBy(po => po.SupplierName)
+                    .Select(g => new
+                    {
+                        Vendor = g.Key,
+                        Orders = g.ToList(),
+                        LeadTimes = g.SelectMany(po =>
+                            receives.Where(r => r.PONumber == po.PoNumber)
+                                   .Select(r => (int)(r.ReceiptDate.Date - po.OrderDate.Date).TotalDays)
+                        ).ToList()
+                    })
+                    .ToList();
+
+                // Build vendor summary
+                var leadTimeByVendor = leadTimes
+                    .Select(lt => new LeadTimeByVendor
+                    {
+                        Vendor = lt.Vendor,
+                        TotalOrders = lt.Orders.Count,
+                        CompletedOrders = lt.Orders.Count(o => receives.Any(r => r.PONumber == o.PoNumber)),
+                        AverageLeadTimeDays = lt.LeadTimes.Any() ? Math.Round(lt.LeadTimes.Average(), 1) : 0,
+                        MinLeadTimeDays = lt.LeadTimes.Any() ? lt.LeadTimes.Min() : 0,
+                        MaxLeadTimeDays = lt.LeadTimes.Any() ? lt.LeadTimes.Max() : 0,
+                        LatePurchaseOrders = lt.Orders.Count(o => 
+                            o.ArrivalDueDate != DateTime.MinValue && 
+                            (receives.Any(r => r.PONumber == o.PoNumber && r.ReceiptDate.Date > o.ArrivalDueDate.Date) || 
+                             (!receives.Any(r => r.PONumber == o.PoNumber) && o.ArrivalDueDate < today))
+                        ),
+                        LatePercentage = lt.Orders.Count > 0 ? 
+                            Math.Round((double)lt.Orders.Count(o => 
+                                o.ArrivalDueDate != DateTime.MinValue && 
+                                (receives.Any(r => r.PONumber == o.PoNumber && r.ReceiptDate.Date > o.ArrivalDueDate.Date) || 
+                                 (!receives.Any(r => r.PONumber == o.PoNumber) && o.ArrivalDueDate < today))
+                            ) / lt.Orders.Count * 100, 2) : 0
+                    })
+                    .OrderByDescending(v => v.TotalOrders)
+                    .ToList();
+
+                // Build item summary
                 var leadTimeByItem = receives
                     .GroupBy(r => new { r.SKU, r.PartNumber })
                     .Select(g => {
-                        var poNumbers = g.Select(r => r.PONumber).Distinct().ToList();
-                        var relatedPos = purchaseOrders.Where(po => poNumbers.Contains(po.PoNumber)).ToList();
-                        var vendor = relatedPos.FirstOrDefault()?.SupplierName ?? "Unknown";
-
-                        var leadTimes = g
-                            .Select(r => {
-                                var po = relatedPos.FirstOrDefault(po => po.PoNumber == r.PONumber);
-                                if (po != null && po.OrderDate > DateTime.MinValue && r.ReceiptDate > DateTime.MinValue)
-                                {
-                                    return (r.ReceiptDate - po.OrderDate).TotalDays;
-                                }
-                                return 0;
-                            })
-                            .Where(lt => lt > 0)
-                            .ToList();
-
+                        var firstPO = pos.FirstOrDefault(po => po.PoNumber == g.First().PONumber);
                         return new LeadTimeByItem
                         {
                             SKU = g.Key.SKU,
                             PartNumber = g.Key.PartNumber ?? string.Empty,
-                            Vendor = vendor,
-                            TotalReceipts = g.Count(),
-                            AverageLeadTimeDays = leadTimes.Any() ? Math.Round(leadTimes.Average(), 2) : 0,
-                            MinLeadTimeDays = leadTimes.Any() ? Math.Round(leadTimes.Min(), 2) : 0,
-                            MaxLeadTimeDays = leadTimes.Any() ? Math.Round(leadTimes.Max(), 2) : 0,
-                            TotalQuantityReceived = g.Sum(r => r.Quantity),
+                            Vendor = firstPO?.SupplierName ?? "Unknown",
+                        TotalReceipts = g.Count(),
+                        AverageLeadTimeDays = g.SelectMany(r => 
+                            pos.Where(po => po.PoNumber == r.PONumber)
+                               .Select(po => (int)(r.ReceiptDate.Date - po.OrderDate.Date).TotalDays)
+                        ).DefaultIfEmpty(0).Average(),
+                        MinLeadTimeDays = g.SelectMany(r => 
+                            pos.Where(po => po.PoNumber == r.PONumber)
+                               .Select(po => (int)(r.ReceiptDate.Date - po.OrderDate.Date).TotalDays)
+                        ).DefaultIfEmpty(0).Min(),
+                        MaxLeadTimeDays = g.SelectMany(r => 
+                            pos.Where(po => po.PoNumber == r.PONumber)
+                               .Select(po => (int)(r.ReceiptDate.Date - po.OrderDate.Date).TotalDays)
+                        ).DefaultIfEmpty(0).Max(),
+                        TotalQuantityReceived = g.Sum(r => r.Quantity),
                             AvgQtyPerReceipt = g.Count() > 0 ? Math.Round(g.Sum(r => r.Quantity) / (double)g.Count(), 2) : 0
                         };
                     })
-                    .OrderByDescending(i => i.AverageLeadTimeDays)
+                    .OrderByDescending(i => i.TotalReceipts)
                     .ToList();
 
-                // Calculate Summary
-                var allLeadTimes = purchaseOrders
-                    .Where(po => po.ArrivalDueDate > DateTime.MinValue && po.ActualShippedDate > DateTime.MinValue)
-                    .Select(po => (po.ActualShippedDate - po.OrderDate).TotalDays)
+                // Calculate summary stats
+                var allLeadTimes = pos
+                    .SelectMany(po => receives.Where(r => r.PONumber == po.PoNumber)
+                                             .Select(r => (int)(r.ReceiptDate.Date - po.OrderDate.Date).TotalDays))
                     .ToList();
 
-                var totalLatePos = purchaseOrders.Count(po => po.ActualShippedDate > po.ArrivalDueDate);
+                var overallLatePOs = filteredPos.Count(o =>
+                    o.ArrivalDueDate != DateTime.MinValue &&
+                    (receives.Any(r => r.PONumber == o.PoNumber && r.ReceiptDate.Date > o.ArrivalDueDate.Date) ||
+                     (!receives.Any(r => r.PONumber == o.PoNumber) && o.ArrivalDueDate < today))
+                );
 
                 var summary = new LeadTimeReportSummary
                 {
-                    TotalVendors = leadTimeByVendor.Count,
-                    TotalSkus = leadTimeByItem.Count,
-                    TotalPurchaseOrders = purchaseOrders.Count,
+                    TotalVendors = leadTimes.Count,
+                    TotalSkus = receives.GroupBy(r => r.SKU).Count(),
+                    TotalPurchaseOrders = filteredPos.Count,
                     TotalReceipts = receives.Count,
-                    OverallAverageLeadTimeDays = allLeadTimes.Any() ? Math.Round(allLeadTimes.Average(), 2) : 0,
-                    LatePoCount = totalLatePos,
-                    LatePoPercentage = purchaseOrders.Any() ? Math.Round((totalLatePos / (double)purchaseOrders.Count) * 100, 2) : 0
+                    OverallAverageLeadTimeDays = allLeadTimes.Any() ? Math.Round(allLeadTimes.Average(), 1) : 0,
+                    LatePoCount = overallLatePOs,
+                    LatePoPercentage = filteredPos.Count > 0 ? Math.Round((double)overallLatePOs / filteredPos.Count * 100, 2) : 0
                 };
 
                 return Ok(new

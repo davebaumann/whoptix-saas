@@ -15,12 +15,55 @@ const METRIC_TOOLTIPS: Tooltip = {
   totalMovements: 'Total count of all transaction entries (picks, adds, removes, adjustments) by all users during the selected period',
   totalQuantity: 'Sum of all item quantities affected by transactions during the selected period',
   picksPerHour: 'Total picks divided by hours in the selected period. Measures average picking productivity/efficiency',
-  usersActive: 'Number of unique users/pickers who performed transactions during the selected period'
+  usersActive: 'Number of unique users/pickers who performed transactions during the selected period',
+  activityCount: 'Number of transactions (picks, adds, removes, adjustments) performed by this user',
+  activityTotalQuantity: 'Total number of units/items affected by all transactions performed by this user'
 }
 
 export default function Dashboard() {
   const { user } = useAuth()
   const [hoveredTooltip, setHoveredTooltip] = useState<string | null>(null)
+  const [sortField, setSortField] = useState<string>('user')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('desc')
+    }
+  }
+
+  const SortableHeader = ({ field, label, tooltip }: { field: string; label: string; tooltip?: string }) => (
+    <th 
+      onClick={() => handleSort(field)}
+      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+    >
+      <div className="flex items-center gap-1">
+        <span>{label}</span>
+        {sortField === field && (
+          <span className="text-xs">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+        )}
+        {tooltip && (
+          <div 
+            className="relative inline-block"
+            onMouseEnter={() => setHoveredTooltip(field)}
+            onMouseLeave={() => setHoveredTooltip(null)}
+          >
+            <Info 
+              className="w-3 h-3 text-gray-400 hover:text-gray-600 cursor-help flex-shrink-0"
+            />
+            {hoveredTooltip === field && (
+              <div className="absolute right-0 top-6 w-48 bg-gray-900 text-white text-xs rounded p-2 z-40 pointer-events-none whitespace-normal shadow-lg">
+                {tooltip}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </th>
+  )
   
   const renderTooltip = (key: string) => (
     <div className="relative group inline-block">
@@ -356,22 +399,14 @@ export default function Dashboard() {
         <div className="px-6 py-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">Activity Summary</h2>
         </div>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-visible">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+            <thead className="bg-gray-50 relative z-10">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  User
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Transaction Type
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Count
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Total Quantity
-                </th>
+                <SortableHeader field="user" label="User" />
+                <SortableHeader field="typeCount" label="Transaction Type" />
+                <SortableHeader field="totalCount" label="Count" tooltip={METRIC_TOOLTIPS.activityCount} />
+                <SortableHeader field="totalQty" label="Total Quantity" tooltip={METRIC_TOOLTIPS.activityTotalQuantity} />
               </tr>
             </thead>
             <tbody className="bg-white">
@@ -395,50 +430,63 @@ export default function Dashboard() {
                     acc[user].push(item)
                     return acc
                   }, {} as Record<string, Array<{ user: string | null; transactionType: string | null; count: number; totalQuantity: number }>>)
-                ).map(([user, items], userIdx) => {
+                ).map(([user, items]) => {
                   const totalCount = items.reduce((sum, item) => sum + item.count, 0)
                   const totalQty = items.reduce((sum, item) => sum + Math.abs(item.totalQuantity), 0)
-                  return (
-                    <React.Fragment key={userIdx}>
-                      <tr className="border-t-2 border-gray-300 bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                          <button
-                            onClick={() => setSelectedPicker(user)}
-                            className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
-                          >
-                            {user}
-                          </button>
+                  return { user, items, totalCount, totalQty, typeCount: items.length }
+                })
+                .sort((a, b) => {
+                  let aVal = a[sortField as keyof typeof a]
+                  let bVal = b[sortField as keyof typeof b]
+                  
+                  if (typeof aVal === 'number' && typeof bVal === 'number') {
+                    return sortDirection === 'asc' ? aVal - bVal : bVal - aVal
+                  }
+                  
+                  const aStr = String(aVal || '')
+                  const bStr = String(bVal || '')
+                  return sortDirection === 'asc' ? aStr.localeCompare(bStr) : bStr.localeCompare(aStr)
+                })
+                .map(({ user, items, totalCount, totalQty }, userIdx) => (
+                  <React.Fragment key={userIdx}>
+                    <tr className="border-t-2 border-gray-300 bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                        <button
+                          onClick={() => setSelectedPicker(user)}
+                          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                        >
+                          {user}
+                        </button>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-semibold">
+                        {items.length} type{items.length > 1 ? 's' : ''}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                        {totalCount.toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                        {totalQty.toLocaleString()}
+                      </td>
+                    </tr>
+                    {items.map((item, itemIdx) => (
+                      <tr key={`${userIdx}-${itemIdx}`} className="bg-white">
+                        <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-400 pl-12">
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-semibold">
-                          {items.length} type{items.length > 1 ? 's' : ''}
+                        <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
+                          <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded">
+                            {item.transactionType || 'N/A'}
+                          </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                          {totalCount.toLocaleString()}
+                        <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-700">
+                          {item.count.toLocaleString()}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                          {totalQty.toLocaleString()}
+                        <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-700">
+                          {Math.abs(item.totalQuantity).toLocaleString()}
                         </td>
                       </tr>
-                      {items.map((item, itemIdx) => (
-                        <tr key={`${userIdx}-${itemIdx}`} className="bg-white">
-                          <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-400 pl-12">
-                          </td>
-                          <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
-                            <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded">
-                              {item.transactionType || 'N/A'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-700">
-                            {item.count.toLocaleString()}
-                          </td>
-                          <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-700">
-                            {Math.abs(item.totalQuantity).toLocaleString()}
-                          </td>
-                        </tr>
-                      ))}
-                    </React.Fragment>
-                  )
-                })
+                    ))}
+                  </React.Fragment>
+                ))
               )}
             </tbody>
           </table>

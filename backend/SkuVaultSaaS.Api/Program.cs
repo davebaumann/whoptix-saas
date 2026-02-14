@@ -87,7 +87,8 @@ builder.Services.AddScoped<SkuVaultSaaS.Api.Services.ICachingService, SkuVaultSa
 // builder.Services.AddScoped<SkuVaultSaaS.Infrastructure.Services.IDemoConnectionService, SkuVaultSaaS.Infrastructure.Services.DemoConnectionService>();
 
 // Report Access Service for membership-based report authorization
-builder.Services.AddScoped<SkuVaultSaaS.Core.Services.IReportAccessService, SkuVaultSaaS.Core.Services.ReportAccessService>();
+// Use Singleton to ensure configuration persists for the lifetime of the application
+builder.Services.AddSingleton<SkuVaultSaaS.Core.Services.IReportAccessService, SkuVaultSaaS.Core.Services.ReportAccessService>();
 
 // Configure sync settings from appsettings
 builder.Services.Configure<SkuVaultSaaS.Infrastructure.Configuration.SyncSettings>(
